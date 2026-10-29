@@ -24,7 +24,10 @@ import LoginTabs from './component/LoginTab';
 const LogoSection = memo(() => {
   const insets = useSafeAreaInsets();
   return (
-    <View
+    <LinearGradient
+      colors={['#145D3E', '#0B3F2B']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
       style={[
         styles.logoContainer,
         {
@@ -38,7 +41,7 @@ const LogoSection = memo(() => {
         </View>
         <View>
           <Text style={styles.logoText}>
-            Meal<Text style={styles.logoTextGreen}>Craft</Text>
+            COOKING<Text style={styles.logoTextand}>&</Text><Text style={styles.logoTextGreen}>HEALTH</Text>
           </Text>
           <Text style={styles.logoCaption}>Ăn ngon, sống khỏe mỗi ngày</Text>
         </View>
@@ -49,7 +52,7 @@ const LogoSection = memo(() => {
           Lên thực đơn dễ dàng, chăm sóc sức khỏe cho cả gia đình.
         </Text>
       </View>
-    </View>
+    </LinearGradient>
   );
 });
 
@@ -311,15 +314,15 @@ const Login = () => {
           }
           showsVerticalScrollIndicator={false}
         >
+          <LogoSection/>
           <View style={styles.content}>
-            <LogoSection />
             <LinearGradient
               colors={['#FFFFFF', '#F0F8F2']}
               style={styles.authPanel}
             >
               <Text style={styles.formEyebrow}>
                 {state.isLogin
-                  ? 'CHÀO MỪNG BẠN TỚI MEALCRAFT'
+                  ? 'CHÀO MỪNG BẠN TỚI COOKING AND HEALTH'
                   : 'BẮT ĐẦU HÀNH TRÌNH'}
               </Text>
               <Text style={styles.formTitle}>
@@ -455,7 +458,6 @@ const styles = StyleSheet.create({
     paddingBottom: 52,
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
-    backgroundColor: '#145D3E',
   },
   brandRow: {
     flexDirection: 'row',
@@ -489,6 +491,9 @@ const styles = StyleSheet.create({
   logoTextGreen: {
     color: '#C8E7A5',
   },
+  logoTextand:{
+   color: '#ffc400',
+  },
   logoCaption: {
     marginTop: 2,
     color: 'rgba(255,255,255,0.72)',
@@ -517,9 +522,7 @@ const styles = StyleSheet.create({
   authPanel: {
     zIndex: 1,
     padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E8EEE9',
+    borderRadius: 10,
     shadowColor: '#183B29',
     shadowOpacity: 0.08,
     shadowRadius: 18,
@@ -552,7 +555,7 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     minHeight: 52,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#168653',
     flexDirection: 'row',
     alignItems: 'center',

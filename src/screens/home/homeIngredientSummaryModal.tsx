@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#E7F4EC',
   },
   closeText: {
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 8,
     paddingHorizontal: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#E7F4EC',
   },
   retryText: {

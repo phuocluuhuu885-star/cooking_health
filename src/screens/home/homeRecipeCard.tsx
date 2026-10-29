@@ -3,22 +3,23 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { AppImage } from '../../abase/component';
 import type { HomeRecipeCardProps } from '../../utils/types';
+import { formatEstimatedPrice } from '../../utils/priceUtils';
 
 const HomeRecipeCard = memo(
   ({
     meal,
     onPress,
     reviewSummary,
+    recommendationReason,
+    recommendedServings,
+    estimatedPrice,
   }: HomeRecipeCardProps) => {
     const handlePress = useCallback(() => {
       onPress(meal.id);
     }, [meal.id, onPress]);
 
     return (
-      <LinearGradient
-        colors={['#FFFFFF', '#F2F8F4']}
-        style={styles.card}
-      >
+      <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.card}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Xem công thức ${meal.name}`}
@@ -43,12 +44,25 @@ const HomeRecipeCard = memo(
             <Text numberOfLines={1} style={styles.meta}>
               {meal.nutritionSummary
                 ? `${Math.round(
-                    meal.nutritionSummary.perServing.calories,
+                    recommendedServings
+                      ? meal.nutritionSummary.total.calories
+                      : meal.nutritionSummary.perServing.calories,
                   )} kcal`
                 : 'Chưa có dữ liệu calo'}
+              {recommendedServings ? ` · ${recommendedServings} khẩu phần` : ''}
               {' · '}
               {meal.prepTimeMinutes + meal.cookTimeMinutes} phút
             </Text>
+            {estimatedPrice ? (
+              <Text style={styles.estimatedPrice}>
+                {formatEstimatedPrice(estimatedPrice)}
+              </Text>
+            ) : null}
+            {recommendationReason ? (
+              <Text numberOfLines={2} style={styles.recommendationReason}>
+                {recommendationReason}
+              </Text>
+            ) : null}
             <Text style={styles.detailLink}>Xem chi tiết công thức</Text>
           </View>
           <Text style={styles.chevron}>›</Text>
@@ -85,7 +99,6 @@ const styles = StyleSheet.create({
     borderColor: '#E5EBE7',
   },
   recipeButton: {
-    minHeight: 88,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -131,11 +144,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  recommendationReason: {
+    marginTop: 4,
+    color: '#66756D',
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  estimatedPrice: {
+    marginTop: 4,
+    color: '#168653',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   reviewRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 7,
+    paddingLeft: 10,
   },
   ratingSummary: {
     flexDirection: 'row',

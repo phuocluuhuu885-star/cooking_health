@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 10,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.muted,
   },
   closeText: {
@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   submitText: {

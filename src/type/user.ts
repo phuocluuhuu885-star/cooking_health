@@ -9,9 +9,7 @@ export type UserCategory = {
   categoryType: number;
   categoryTypeName: string;
 };
-export type Gender =
-  | 'MALE'
-  | 'FEMALE';
+export type Gender = 'MALE' | 'FEMALE';
 
 export type ActivityLevel =
   | 'SEDENTARY'
@@ -20,10 +18,7 @@ export type ActivityLevel =
   | 'ACTIVE'
   | 'VERY_ACTIVE';
 
-export type Goal =
-  | 'LOSE_WEIGHT'
-  | 'MAINTAIN'
-  | 'GAIN_MUSCLE';
+export type Goal = 'LOSE_WEIGHT' | 'MAINTAIN' | 'GAIN_MUSCLE';
 
 export type BmiCategory =
   | 'UNDERWEIGHT'

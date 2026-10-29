@@ -69,6 +69,29 @@ export type NutritionItemProps = {
 
 export type MealPeriod = 'LUNCH' | 'DINNER';
 
+export type EstimatedPriceRange = {
+  minVnd: number;
+  maxVnd: number;
+};
+
+export type SkippedMealPeriod = {
+  date: string;
+  mealPeriod: MealPeriod;
+  reason: 'ALREADY_PLANNED' | 'COMPLETED';
+};
+
+export type WeeklyMealPlanSaveResponse = {
+  success?: boolean;
+  message?: string;
+  ErrorMessage?: string;
+  data?: {
+    savedCount?: number;
+    proposedCount?: number;
+    plannedCount?: number;
+    skippedPeriods?: SkippedMealPeriod[];
+  };
+};
+
 export type MealPlanDestination = 'PERSONAL' | 'HOUSEHOLD';
 
 export type ConsumptionReportPeriod = 'WEEK' | 'MONTH';
@@ -94,6 +117,7 @@ export type Nutrition = NutritionValues;
 export type PlannedMeal = {
   id: string;
   servings: number;
+  estimatedPrice?: EstimatedPriceRange;
   addedAt?: string;
   meal: {
     id: string;
@@ -177,6 +201,44 @@ export type DailyConsumedMealsResponse = {
   };
 };
 
+export type AiMealRecommendation = {
+  meal: Pick<
+    RecipeDetailMeal,
+    | 'id'
+    | 'name'
+    | 'description'
+    | 'imageUrl'
+    | 'category'
+    | 'prepTimeMinutes'
+    | 'cookTimeMinutes'
+    | 'nutritionSummary'
+  >;
+  recommendedServings: number;
+  recommendationReason: string;
+  estimatedPricePerServing?: EstimatedPriceRange;
+  estimatedPrice?: EstimatedPriceRange;
+};
+
+export type AiMealRecommendationsData = {
+  date: string;
+  targets: Nutrition;
+  consumed: Nutrition;
+  remaining: Nutrition;
+  consumedPeriods: MealPeriod[];
+  unavailableNutritionItems: number;
+  source: 'GEMINI' | 'LOCAL';
+  message: string;
+  budget?: EstimatedPriceRange;
+  recommendations: Record<MealPeriod, AiMealRecommendation[]>;
+};
+
+export type AiMealRecommendationsResponse = {
+  success: boolean;
+  message?: string;
+  ErrorMessage?: string;
+  data?: AiMealRecommendationsData;
+};
+
 export type ConsumptionUpdateResponse = {
   success: boolean;
   message?: string;
@@ -190,6 +252,7 @@ export type ConsumptionUpdateResponse = {
 export type MealPeriodPlan = {
   items: PlannedMeal[];
   nutritionSummary: Nutrition;
+  estimatedPrice?: EstimatedPriceRange;
   unavailableNutritionItems: number;
   isCompleted?: boolean;
   completedAt?: string | null;
@@ -242,13 +305,37 @@ export type MealPlanScreenState = {
 
 export type ProfileScreenState = {
   isHealthProfileVisible: boolean;
-  isAddConsumedMealVisible: boolean;
   consumptionPeriod: ConsumptionReportPeriod;
   reportLoading: boolean;
   reportError: string;
   dailyMeals: DailyConsumedMeal[];
   dailyMealsLoading: boolean;
   dailyMealsError: string;
+  healthHistory: HealthProfileHistoryPoint[];
+  healthHistoryLoading: boolean;
+  healthHistoryError: string;
+};
+
+export type HealthProfileHistoryPoint = {
+  id: string;
+  weightKg: number;
+  bmi: number;
+  measuredAt: string;
+};
+
+export type HealthProfileHistoryResponse = {
+  success: boolean;
+  message?: string;
+  data?: {
+    history: HealthProfileHistoryPoint[];
+  };
+};
+
+export type HealthProfileHistoryCardProps = {
+  history: HealthProfileHistoryPoint[];
+  loading: boolean;
+  error: string;
+  onRetry: () => void;
 };
 
 export type DailyConsumedMealsCardProps = {

@@ -8,7 +8,13 @@ export type RootStackParamList = {
   [ScreenKeys.RECIPE_DETAIL]: { mealId: string };
   [ScreenKeys.MEAL_REVIEWS]: { mealId: string; mealName: string };
   [ScreenKeys.WALKING]: undefined;
-  [ScreenKeys.PERSONAL_INFO]: undefined;
+  [ScreenKeys.PERSONAL_INFO]: { section?: 'BASIC' | 'PASSWORD' } | undefined;
+  [ScreenKeys.DAILY_CONSUMED_MEALS]: undefined;
+  [ScreenKeys.AI_MEAL_RECOMMENDATIONS]: undefined;
+  [ScreenKeys.WEEKLY_MEAL_PLAN]: undefined;
+  [ScreenKeys.EATING_PROGRESS]: undefined;
+  [ScreenKeys.SMART_SHOPPING]: undefined;
+  [ScreenKeys.DAILY_PLANNED_MEALS]: { date: string };
   [ScreenKeys.FAMILY]:
     | { date?: string; mealPeriod?: 'LUNCH' | 'DINNER' }
     | undefined;

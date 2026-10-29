@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
   closeButton: {
     paddingHorizontal: 12,
     paddingVertical: 9,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.lightGreen,
   },
   closeText: {
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 13,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.white,

@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
   familyCard: {
     marginTop: 18,
     minHeight: 68,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.Gray.g300,
     flexDirection: 'row',

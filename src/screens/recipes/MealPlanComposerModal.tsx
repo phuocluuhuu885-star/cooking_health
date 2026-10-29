@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
   removeButton: {
     paddingHorizontal: 10,
     paddingVertical: 7,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#FEF3F2',
   },
   removeText: { color: '#B42318', fontSize: 11, fontWeight: '700' },
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     borderWidth: 1,
     borderColor: '#E5EBE7',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#FFFFFF',
   },
   dateButtonText: {
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
   calendarCloseButton: {
     paddingHorizontal: 10,
     paddingVertical: 7,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#E7F4EC',
   },
   calendarCloseText: { color: '#168653', fontSize: 11, fontWeight: '700' },
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E5EBE7',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#FFFFFF',
   },
   optionSelected: {
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 20,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#168653',
   },
   saveText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },

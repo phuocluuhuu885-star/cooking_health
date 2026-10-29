@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { goBack } from '../../utils/navigation';
+import ScreenHeader from '../component/ScreenHeader';
 import { useSelector } from 'react-redux';
 import { selectUserInfo } from '../../reduxs/reduces/user';
 import { getDailyConsumedMeals } from '../../utils/mealPlanApi';
@@ -321,7 +321,7 @@ const WalkingScreen = () => {
       : null;
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <View style={styles.screen}>
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -329,20 +329,11 @@ const WalkingScreen = () => {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Quay lại hồ sơ"
-            onPress={goBack}
-            style={styles.backButton}
-          >
-            <Text style={styles.backText}>‹</Text>
-          </Pressable>
-          <View style={styles.headerCopy}>
-            <Text style={styles.eyebrow}>HOẠT ĐỘNG THỂ CHẤT</Text>
-            <Text style={styles.title}>Theo dõi đi bộ</Text>
-          </View>
-        </View>
+        <ScreenHeader
+          eyebrow="HOẠT ĐỘNG THỂ CHẤT"
+          title="Theo dõi đi bộ"
+          backAccessibilityLabel="Quay lại hồ sơ"
+        />
 
         <View style={styles.foregroundNotice}>
           <Text style={styles.noticeText}>
@@ -888,7 +879,7 @@ const styles = StyleSheet.create({
     minHeight: 46,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   secondaryAction: {
@@ -957,7 +948,7 @@ const styles = StyleSheet.create({
     minHeight: 35,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   periodButtonGradient: {

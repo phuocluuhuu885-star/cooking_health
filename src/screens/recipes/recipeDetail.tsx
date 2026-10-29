@@ -11,6 +11,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppImage } from '../../abase/component';
+import LoginRequiredModal from '../component/LoginRequiredModal';
 import apiConst from '../../abase/constant/apiConst';
 import { selectUserInfo } from '../../reduxs/reduces/user';
 import { useSelector } from 'react-redux';
@@ -59,6 +60,7 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
   const household = useSelector(selectCurrentHousehold);
   const householdLoaded = useSelector(selectHouseholdLoaded);
   const mealPlanDestination = useSelector(selectMealPlanDestination);
+  const [loginPromptVisible, setLoginPromptVisible] = useState(false);
   const [state, setState] = useState<RecipeDetailState>({
     servings: 1,
     reloadIndex: 0,
@@ -240,12 +242,16 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
   const handleRemoveComposerRecipe = useCallback(() => {
     setComposerVisible(false);
   }, [setComposerVisible]);
+  const closeLoginPrompt = useCallback(() => {
+    setLoginPromptVisible(false);
+  }, []);
+  const confirmLogin = useCallback(() => {
+    setLoginPromptVisible(false);
+    navigate(ScreenKeys.LOGIN);
+  }, []);
   const handleOpenComposer = useCallback(async () => {
     if (!user?.accessToken) {
-      Alert.alert(
-        'Cần đăng nhập',
-        'Vui lòng đăng nhập để thêm món vào thực đơn.',
-      );
+      setLoginPromptVisible(true);
       return;
     }
 
@@ -330,11 +336,12 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
       mealPeriod: MealPeriod,
       destination: MealPlanDestination,
     ) => {
-      if (!user?.accessToken || !meal) {
-        Alert.alert(
-          'Cần đăng nhập',
-          'Vui lòng đăng nhập để thêm món vào thực đơn.',
-        );
+      if (!user?.accessToken) {
+        setComposerVisible(false);
+        setLoginPromptVisible(true);
+        return;
+      }
+      if (!meal) {
         return;
       }
       setComposerSaving(true);
@@ -765,6 +772,11 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
         onRemoveSelection={handleRemoveComposerRecipe}
         onSubmit={handleSubmitMealPlan}
       />
+      <LoginRequiredModal
+        visible={loginPromptVisible}
+        onClose={closeLoginPrompt}
+        onConfirm={confirmLogin}
+      />
       <MealReviewModal
         mealId={meal?.id ?? null}
         mealName={meal?.name ?? ''}
@@ -840,7 +852,7 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.94)',
   },
   backButtonText: {
@@ -912,7 +924,7 @@ const styles = StyleSheet.create({
   addToPlanButton: {
     alignItems: 'flex-end',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
     paddingHorizontal: 12,
   },
@@ -951,7 +963,7 @@ const styles = StyleSheet.create({
     minHeight: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.lightGreen,
   },
   viewReviewsText: {
@@ -964,7 +976,7 @@ const styles = StyleSheet.create({
     minHeight: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   rateButtonText: {
@@ -1016,7 +1028,7 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.lightGreen,
   },
   servingButtonText: {
@@ -1235,7 +1247,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     paddingHorizontal: 22,
     paddingVertical: 11,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   retryButtonText: {

@@ -21,9 +21,9 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ScreenHeader from '../component/ScreenHeader';
 import { useSelector } from 'react-redux';
 import type { StackScreenProps } from '@react-navigation/stack';
-import { goBack } from '../../utils/navigation';
 import ScreenKeys from '../../utils/screenKey';
 import type { RootStackParamList } from '../../utils/types/navigation';
 import type { HouseholdChatMessage } from '../../utils/types';
@@ -456,24 +456,11 @@ const HouseholdChatScreen = ({ route }: Props) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.screen}
     >
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Quay lại"
-          onPress={goBack}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <View style={styles.headerCopy}>
-          <Text numberOfLines={1} style={styles.headerTitle}>
-            {householdName}
-          </Text>
-          <Text style={styles.connectionStatus}>
-            {connected ? 'Đang kết nối' : 'Đang kết nối lại…'}
-          </Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title={householdName}
+        subtitle={connected ? 'Đang kết nối' : 'Đang kết nối lại…'}
+        style={styles.sharedHeader}
+      />
 
       {error ? (
         <View style={styles.errorBanner}>
@@ -563,6 +550,12 @@ export default HouseholdChatScreen;
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
+  sharedHeader: {
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
   header: {
     minHeight: 76,
     flexDirection: 'row',
@@ -702,7 +695,7 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   sendDisabled: { opacity: 0.5 },

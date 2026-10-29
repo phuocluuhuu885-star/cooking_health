@@ -1,4 +1,9 @@
-import type { MealPeriod, MealPeriodPlan, PlannedMeal } from './meal';
+import type {
+  EstimatedPriceRange,
+  MealPeriod,
+  MealPeriodPlan,
+  PlannedMeal,
+} from './meal';
 
 export type HouseholdRole = 'ADMIN' | 'MEMBER';
 
@@ -69,6 +74,7 @@ export type HouseholdMealPollOption = {
     imageUrl: string | null;
     category: string;
   };
+  estimatedPrice?: EstimatedPriceRange;
   agrees: number;
   disagrees: number;
   unvoted: number;
@@ -189,7 +195,6 @@ export type HouseholdScreenState = {
   selectedMealPeriod: MealPeriod;
   votingOptionKey: string;
   chatUnreadCount: number;
-  notificationUnreadCount: number;
   pollDeadlineVisible: boolean;
   pollDeadlineSaving: boolean;
   shoppingListVisible: boolean;

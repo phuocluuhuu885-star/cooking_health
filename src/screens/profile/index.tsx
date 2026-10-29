@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Pressable,
@@ -17,32 +18,27 @@ import { logOutUser, selectUserInfo } from '../../reduxs/reduces/user';
 import {
   cacheConsumptionReport,
   getConsumptionReportCacheKey,
-  invalidateCachedConsumptionReports,
-  selectMealPlanDestination,
+  selectCurrentHousehold,
   selectConsumptionReport,
-  setMealPlanDestination,
 } from '../../reduxs/reduces/appData';
 import { useAppDispatch } from '../../reduxs/store';
 import { setSyncUser, syncApi } from '../../utils/syncUtils';
 import ScreenKeys from '../../utils/screenKey';
 import { navigate, resetTo } from '../../utils/navigation';
-import { createStateSetter } from '../../utils/stateUtils';
 import { formatNumberWithOptionalDecimal } from '../../utils/numberUtils';
 import { getInitials } from '../../utils/stringUtils';
 import { getAvatarUri } from '../../utils/avatarImageUtils';
 import type { GlobalState } from '../../type/global';
 import type { ActivityLevel, BmiCategory, Goal } from '../../type/user';
-import type { MealPlanDestination } from '../../utils/types';
 import type {
   ConsumptionReportResponse,
   DailyConsumedMealsResponse,
+  HealthProfileHistoryResponse,
   ProfileScreenState,
 } from '../../utils/types';
 import HealthProfile from './healthProfile';
 import ConsumptionReport from './consumptionReport';
-import DailyConsumedMeals from './dailyConsumedMeals';
-import AddConsumedMealModal from './addConsumedMealModal';
-import FamilyCodeCard from '../component/FamilyCodeCard';
+import HealthMetricHistory from './HealthMetricHistory';
 
 const COLORS = {
   background: '#F5F7F5',
@@ -125,24 +121,21 @@ const Profile = () => {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
-  const mealPlanDestination = useSelector(selectMealPlanDestination);
+  const household = useSelector(selectCurrentHousehold);
   const healthProfile = user?.healthProfile ?? null;
   const reportDate = new Date().toISOString().slice(0, 10);
   const [state, setState] = useState<ProfileScreenState>({
     isHealthProfileVisible: false,
-    isAddConsumedMealVisible: false,
     consumptionPeriod: 'WEEK',
     reportLoading: true,
     reportError: '',
     dailyMeals: [],
     dailyMealsLoading: true,
     dailyMealsError: '',
+    healthHistory: [],
+    healthHistoryLoading: true,
+    healthHistoryError: '',
   });
-  const { isAddConsumedMealVisible } = state;
-  const setAddConsumedMealVisible = useMemo(
-    () => createStateSetter(setState, 'isAddConsumedMealVisible'),
-    [setState],
-  );
   const reportCacheKey = getConsumptionReportCacheKey(
     state.consumptionPeriod,
     reportDate,
@@ -154,21 +147,16 @@ const Profile = () => {
     reportCache: cachedConsumptionReport,
     reportRequestId: 0,
     dailyMealsRequestId: 0,
+    healthHistoryRequestId: 0,
   });
   refs.current.reportCache = cachedConsumptionReport;
   const fullName = user?.fullName?.trim() || 'Thành viên MealCraft';
-
-  const changeMealPlanDestination = useCallback(
-    (destination: MealPlanDestination) => {
-      dispatch(
-        setMealPlanDestination({
-          userId: user?.id ?? 'guest',
-          destination,
-        }),
-      );
-    },
-    [dispatch, user?.id],
-  );
+  const openFamily = useCallback(() => {
+    navigate(ScreenKeys.FAMILY);
+  }, []);
+  const openDailyConsumedMeals = useCallback(() => {
+    navigate(ScreenKeys.DAILY_CONSUMED_MEALS);
+  }, []);
 
   const changeConsumptionPeriod = useCallback(
     (consumptionPeriod: ProfileScreenState['consumptionPeriod']) => {
@@ -193,7 +181,7 @@ const Profile = () => {
           onPress: () => {
             setSyncUser(null);
             dispatch(logOutUser());
-            resetTo(ScreenKeys.LOGIN);
+            resetTo(ScreenKeys.HOMESCREEN);
           },
         },
       ],
@@ -326,31 +314,66 @@ const Profile = () => {
     }
   }, [reportDate, user]);
 
-  const retryDailyConsumedMeals = useCallback(() => {
-    loadDailyConsumedMeals();
-  }, [loadDailyConsumedMeals]);
-
-  const handleConsumedMealSaved = useCallback(async () => {
-    if (user?.id) {
-      dispatch(invalidateCachedConsumptionReports({ userId: user.id }));
+  const loadHealthHistory = useCallback(async () => {
+    const requestId = ++refs.current.healthHistoryRequestId;
+    setSyncUser(user ?? null);
+    if (!user?.accessToken) {
+      setState(previous => ({
+        ...previous,
+        healthHistory: [],
+        healthHistoryLoading: false,
+        healthHistoryError: '',
+      }));
+      return;
     }
-    refs.current.reportCache = null;
-    await Promise.all([loadDailyConsumedMeals(), loadConsumptionReport()]);
-  }, [dispatch, loadConsumptionReport, loadDailyConsumedMeals, user?.id]);
 
-  const handleOpenConsumedMeal = useCallback((mealId: string) => {
-    navigate(ScreenKeys.RECIPE_DETAIL, { mealId });
-  }, []);
+    setState(previous => ({
+      ...previous,
+      healthHistoryLoading: true,
+      healthHistoryError: '',
+    }));
+    try {
+      const response = (await syncApi(
+        apiConst.getHealthProfileHistory,
+      )) as HealthProfileHistoryResponse;
+      if (requestId !== refs.current.healthHistoryRequestId) return;
+      if (!response?.success || !response.data?.history) {
+        setState(previous => ({
+          ...previous,
+          healthHistoryLoading: false,
+          healthHistoryError:
+            response?.message || 'Không thể tải lịch sử cân nặng và BMI.',
+        }));
+        return;
+      }
+      setState(previous => ({
+        ...previous,
+        healthHistory: response.data?.history ?? [],
+        healthHistoryLoading: false,
+        healthHistoryError: '',
+      }));
+    } catch {
+      if (requestId === refs.current.healthHistoryRequestId) {
+        setState(previous => ({
+          ...previous,
+          healthHistoryLoading: false,
+          healthHistoryError: 'Không thể kết nối để tải lịch sử sức khỏe.',
+        }));
+      }
+    }
+  }, [user]);
 
   useFocusEffect(
     useCallback(() => {
       loadConsumptionReport();
       loadDailyConsumedMeals();
+      loadHealthHistory();
       return () => {
         refs.current.reportRequestId += 1;
         refs.current.dailyMealsRequestId += 1;
+        refs.current.healthHistoryRequestId += 1;
       };
-    }, [loadConsumptionReport, loadDailyConsumedMeals]),
+    }, [loadConsumptionReport, loadDailyConsumedMeals, loadHealthHistory]),
   );
 
   const bmiLabel = useMemo(() => {
@@ -393,9 +416,6 @@ const Profile = () => {
               Thông tin và mục tiêu sức khỏe
             </Text>
           </View>
-          <View style={styles.headerMark}>
-            <Text style={styles.headerMarkText}>MC</Text>
-          </View>
         </View>
 
         <Pressable
@@ -435,55 +455,33 @@ const Profile = () => {
             <Text style={styles.identityChevron}>›</Text>
           </LinearGradient>
         </Pressable>
-        <FamilyCodeCard />
-
-        <LinearGradient
-          colors={['#FFFFFF', '#F3FAF5']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.planDestinationCard}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            household ? 'Mở màn hình gia đình' : 'Tạo hoặc tham gia gia đình'
+          }
+          onPress={openFamily}
+          style={({ pressed }) => pressed && styles.consumedDestinationPressed}
         >
-          <Text style={styles.sectionTitle}>Chế độ thực đơn</Text>
-          <Text style={styles.planDestinationDescription}>
-            Chọn nơi xem thực đơn và nơi lưu món khi bạn thêm món ăn.
-          </Text>
-          <View style={styles.planDestinationOptions}>
-            {(
-              [
-                ['PERSONAL', 'Cá nhân'],
-                ['HOUSEHOLD', 'Gia đình'],
-              ] as const
-            ).map(([destination, label]) => {
-              const selected = mealPlanDestination === destination;
-              return (
-                <Pressable
-                  key={destination}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => changeMealPlanDestination(destination)}
-                  style={[
-                    styles.planDestinationOption,
-                    selected && styles.planDestinationOptionSelected,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.planDestinationOptionText,
-                      selected && styles.planDestinationOptionTextSelected,
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Text style={styles.planDestinationHint}>
-            {mealPlanDestination === 'HOUSEHOLD'
-              ? 'Món mới sẽ được gửi vào thực đơn gia đình để các thành viên bình chọn.'
-              : 'Món mới sẽ được lưu vào thực đơn cá nhân của bạn.'}
-          </Text>
-        </LinearGradient>
+          <LinearGradient
+            colors={['#FFFFFF', '#F3FAF5']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.consumedDestinationCard}
+          >
+            <View style={styles.consumedDestinationTop}>
+              <View style={styles.consumedDestinationCopy}>
+                <Text style={styles.sectionTitle}>Gia đình</Text>
+                <Text style={styles.consumedDestinationDescription}>
+                  {household
+                    ? `Tạo món ăn cho gia đình ${household.name}`
+                    : 'Tạo hoặc tham gia gia đình để cùng lập thực đơn'}
+                </Text>
+              </View>
+              <Text style={styles.consumedDestinationChevron}>›</Text>
+            </View>
+          </LinearGradient>
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"
@@ -494,12 +492,50 @@ const Profile = () => {
           ]}
         >
           <View style={styles.walkingButtonCopy}>
-            <Text style={styles.walkingButtonTitle}>Theo dõi đi bộ</Text>
+            <Text style={styles.walkingButtonTitle}>Bắt đầu đi bộ</Text>
             <Text style={styles.walkingButtonSubtitle}>
-              Ghi nhận bước chân, quãng đường và calo ước tính
+              Cải thiện sức khỏe, tính toán quãng đường và calo tiêu hao
             </Text>
           </View>
           <Text style={styles.editButtonArrow}>›</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Xem thực phẩm đã tiêu thụ hôm nay"
+          onPress={openDailyConsumedMeals}
+          style={({ pressed }) => pressed && styles.consumedDestinationPressed}
+        >
+          <LinearGradient
+            colors={['#FFFFFF', '#F3FAF5']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.consumedDestinationCard}
+          >
+            <View style={styles.consumedDestinationTop}>
+              <View style={styles.consumedDestinationIcon}>
+                <Text style={styles.consumedDestinationIconText}>✓</Text>
+              </View>
+              <View style={styles.consumedDestinationCopy}>
+                <Text style={styles.sectionTitle}>
+                  Thực phẩm đã tiêu thụ hôm nay
+                </Text>
+                <Text style={styles.consumedDestinationDescription}>
+                  {state.dailyMealsLoading
+                    ? 'Đang cập nhật danh sách món ăn'
+                    : state.dailyMealsError
+                    ? state.dailyMealsError
+                    : state.dailyMeals.length > 0
+                    ? `${state.dailyMeals.length} món đã được ghi nhận`
+                    : 'Xem danh sách những món bạn đã ăn'}
+                </Text>
+              </View>
+              {state.dailyMealsLoading ? (
+                <ActivityIndicator color={COLORS.green} size="small" />
+              ) : (
+                <Text style={styles.consumedDestinationChevron}>›</Text>
+              )}
+            </View>
+          </LinearGradient>
         </Pressable>
 
         <ConsumptionReport
@@ -512,18 +548,14 @@ const Profile = () => {
           onChangePeriod={changeConsumptionPeriod}
           onRetry={retryConsumptionReport}
         />
-        <DailyConsumedMeals
-          items={state.dailyMeals}
-          loading={state.dailyMealsLoading}
-          error={state.dailyMealsError}
-          onRetry={retryDailyConsumedMeals}
-          onAddMeal={
-            user?.accessToken
-              ? () => setAddConsumedMealVisible(true)
-              : undefined
-          }
-          onPressMeal={handleOpenConsumedMeal}
-        />
+        {user?.accessToken ? (
+          <HealthMetricHistory
+            history={state.healthHistory}
+            loading={state.healthHistoryLoading}
+            error={state.healthHistoryError}
+            onRetry={loadHealthHistory}
+          />
+        ) : null}
 
         {healthProfile ? (
           <>
@@ -712,18 +744,13 @@ const Profile = () => {
 
       <HealthProfile
         visible={state.isHealthProfileVisible}
+        onUpdated={loadHealthHistory}
         onClose={() =>
           setState(previous => ({
             ...previous,
             isHealthProfileVisible: false,
           }))
         }
-      />
-      <AddConsumedMealModal
-        visible={isAddConsumedMealVisible}
-        user={user}
-        onClose={() => setAddConsumedMealVisible(false)}
-        onSaved={handleConsumedMealSaved}
       />
     </View>
   );
@@ -777,49 +804,44 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  planDestinationCard: {
+  consumedDestinationCard: {
     padding: 15,
     marginTop: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  planDestinationDescription: {
-    marginTop: 5,
-    color: COLORS.secondary,
-    fontSize: 14,
-    lineHeight: 18,
-  },
-  planDestinationOptions: {
+  consumedDestinationPressed: { opacity: 0.84 },
+  consumedDestinationTop: {
     flexDirection: 'row',
-    gap: 9,
-    marginTop: 12,
+    alignItems: 'center',
+    gap: 12,
   },
-  planDestinationOption: {
-    flex: 1,
-    minHeight: 42,
+  consumedDestinationIcon: {
+    width: 42,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.background,
-  },
-  planDestinationOptionSelected: {
-    borderColor: COLORS.green,
     backgroundColor: COLORS.lightGreen,
   },
-  planDestinationOptionText: {
-    color: COLORS.secondary,
-    fontSize: 14,
-    fontWeight: '700',
+  consumedDestinationIconText: {
+    color: COLORS.green,
+    fontSize: 20,
+    fontWeight: '800',
   },
-  planDestinationOptionTextSelected: { color: COLORS.green },
-  planDestinationHint: {
-    marginTop: 8,
+  consumedDestinationCopy: { flex: 1 },
+  consumedDestinationDescription: {
+    marginTop: 4,
     color: COLORS.secondary,
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  consumedDestinationChevron: {
+    color: COLORS.green,
+    fontSize: 28,
+    lineHeight: 30,
+    fontWeight: '400',
   },
   avatar: {
     width: 58,
@@ -1110,7 +1132,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 18,
     paddingHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   walkingButton: {
@@ -1120,7 +1142,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 11,
     marginTop: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   walkingButtonCopy: {
@@ -1163,7 +1185,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 24,
     marginBottom: 20,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#F1C9C6',
     backgroundColor: COLORS.white,

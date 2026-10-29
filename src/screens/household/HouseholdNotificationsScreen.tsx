@@ -10,9 +10,11 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ScreenHeader from '../component/ScreenHeader';
 import { useSelector } from 'react-redux';
 import { selectUserInfo } from '../../reduxs/reduces/user';
-import { goBack, navigate } from '../../utils/navigation';
+import { selectCurrentHousehold } from '../../reduxs/reduces/appData';
+import { navigate } from '../../utils/navigation';
 import ScreenKeys from '../../utils/screenKey';
 import {
   fetchHouseholdNotifications,
@@ -37,6 +39,7 @@ const COLORS = {
 const HouseholdNotificationsScreen = () => {
   const insets = useSafeAreaInsets();
   const user = useSelector(selectUserInfo);
+  const household = useSelector(selectCurrentHousehold);
   const [state, setState] = useState<{
     notifications: HouseholdNotification[];
     unreadCount: number;
@@ -80,6 +83,13 @@ const HouseholdNotificationsScreen = () => {
       setError('Vui lòng đăng nhập để xem thông báo.');
       return;
     }
+    if (!household) {
+      setLoading(false);
+      setNotifications([]);
+      setUnreadCount(0);
+      setError('');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -101,6 +111,7 @@ const HouseholdNotificationsScreen = () => {
     setLoading,
     setNotifications,
     setUnreadCount,
+    household,
     user?.accessToken,
   ]);
 
@@ -149,13 +160,7 @@ const HouseholdNotificationsScreen = () => {
         setSaving(false);
       }
     },
-    [
-      setError,
-      setNotifications,
-      setSaving,
-      setUnreadCount,
-      user?.accessToken,
-    ],
+    [setError, setNotifications, setSaving, setUnreadCount, user?.accessToken],
   );
 
   const markAllRead = useCallback(async () => {
@@ -194,35 +199,28 @@ const HouseholdNotificationsScreen = () => {
   ]);
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Quay lại"
-          onPress={goBack}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>Thông báo</Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          disabled={saving || unreadCount === 0}
-          onPress={markAllRead}
-          style={styles.readAllButton}
-        >
-          <Text
-            style={[
-              styles.readAllText,
-              (saving || unreadCount === 0) && styles.disabledText,
-            ]}
+    <View style={styles.screen}>
+      <ScreenHeader
+        title="Thông báo"
+        style={styles.sharedHeader}
+        rightAction={
+          <Pressable
+            accessibilityRole="button"
+            disabled={saving || unreadCount === 0}
+            onPress={markAllRead}
+            style={styles.readAllButton}
           >
-            Đọc tất cả
-          </Text>
-        </Pressable>
-      </View>
+            <Text
+              style={[
+                styles.readAllText,
+                (saving || unreadCount === 0) && styles.disabledText,
+              ]}
+            >
+              Đọc tất cả
+            </Text>
+          </Pressable>
+        }
+      />
 
       {error ? (
         <View style={styles.errorBox}>
@@ -259,8 +257,9 @@ const HouseholdNotificationsScreen = () => {
               />
               <Text style={styles.emptyTitle}>Chưa có thông báo</Text>
               <Text style={styles.emptyDescription}>
-                Khi có món mới, kết quả bình chọn hoặc cập nhật thực đơn gia
-                đình, thông báo sẽ xuất hiện tại đây.
+                {household
+                  ? 'Khi có món mới, kết quả bình chọn hoặc cập nhật thực đơn gia đình, thông báo sẽ xuất hiện tại đây.'
+                  : 'Thông báo gia đình sẽ xuất hiện tại đây khi bạn tạo hoặc tham gia một gia đình.'}
               </Text>
             </View>
           ) : (
@@ -330,6 +329,11 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  sharedHeader: {
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
   },
   header: {
     minHeight: 72,
@@ -409,7 +413,7 @@ const styles = StyleSheet.create({
   },
   notificationCard: {
     padding: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: COLORS.border,
     overflow: 'hidden',

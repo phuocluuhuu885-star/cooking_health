@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LoginRequiredModal from '../component/LoginRequiredModal';
 import ItemProduct from './itemProduct';
 import CategoryItem from './categoryItem';
 import { syncApi, setSyncUser } from '../../utils/syncUtils';
@@ -91,6 +92,7 @@ const RecipeLibrary = () => {
     composerVisible: false,
     composerSaving: false,
   });
+  const [loginPromptVisible, setLoginPromptVisible] = useState(false);
   const { selectedRecipe, reviewSummaries, composerVisible, composerSaving } =
     state;
   const setSelectedRecipe = useMemo(
@@ -290,6 +292,13 @@ const RecipeLibrary = () => {
         : [...prev.favorites, recipeId],
     }));
   }, []);
+  const closeLoginPrompt = useCallback(() => {
+    setLoginPromptVisible(false);
+  }, []);
+  const confirmLogin = useCallback(() => {
+    setLoginPromptVisible(false);
+    navigate(ScreenKeys.LOGIN);
+  }, []);
 
   const toggleFavoritesOnly = useCallback(() => {
     setState(previous => ({
@@ -301,7 +310,7 @@ const RecipeLibrary = () => {
   const handleAddRecipe = useCallback(
     async (recipeId: string) => {
       if (!user?.accessToken) {
-        Alert.alert('Cần đăng nhập', 'Vui lòng đăng nhập để lên thực đơn.');
+        setLoginPromptVisible(true);
         return;
       }
 
@@ -416,7 +425,12 @@ const RecipeLibrary = () => {
       mealPeriod: MealPeriod,
       destination: MealPlanDestination,
     ) => {
-      if (!user?.accessToken || !selectedRecipe) {
+      if (!user?.accessToken) {
+        setComposerVisible(false);
+        setLoginPromptVisible(true);
+        return;
+      }
+      if (!selectedRecipe) {
         return;
       }
       setComposerSaving(true);
@@ -791,6 +805,11 @@ const RecipeLibrary = () => {
         onRemoveSelection={handleRemoveSelectedRecipe}
         onSubmit={handleSubmitMealPlan}
       />
+      <LoginRequiredModal
+        visible={loginPromptVisible}
+        onClose={closeLoginPrompt}
+        onConfirm={confirmLogin}
+      />
     </View>
   );
 };
@@ -869,7 +888,7 @@ const styles = StyleSheet.create({
     height: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#EEF3EF',
   },
   clearSearchText: {
@@ -909,7 +928,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: '#E3EAE4',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#FFFFFF',
   },
   favoritesFilterSelected: {

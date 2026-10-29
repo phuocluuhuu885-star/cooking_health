@@ -11,6 +11,12 @@ import HouseholdChatScreen from '../screens/household/HouseholdChatScreen';
 import HouseholdNotificationsScreen from '../screens/household/HouseholdNotificationsScreen';
 import WalkingScreen from '../screens/walking/WalkingScreen';
 import PersonalInfoScreen from '../screens/profile/PersonalInfoScreen';
+import DailyConsumedMealsScreen from '../screens/profile/DailyConsumedMealsScreen';
+import AiMealRecommendationsScreen from '../screens/home/AiMealRecommendationsScreen';
+import WeeklyMealPlanScreen from '../screens/home/WeeklyMealPlanScreen';
+import EatingProgressScreen from '../screens/home/EatingProgressScreen';
+import SmartShoppingScreen from '../screens/home/SmartShoppingScreen';
+import DailyPlannedMealsScreen from '../screens/home/DailyPlannedMealsScreen';
 
 const HomeStack = createStackNavigator<RootStackParamList>({
   initialRouteName: ScreenKeys.PRIVACY_POLICY,
@@ -22,6 +28,12 @@ const HomeStack = createStackNavigator<RootStackParamList>({
     [ScreenKeys.MEAL_REVIEWS]: MealReviewsScreen,
     [ScreenKeys.WALKING]: WalkingScreen,
     [ScreenKeys.PERSONAL_INFO]: PersonalInfoScreen,
+    [ScreenKeys.DAILY_CONSUMED_MEALS]: DailyConsumedMealsScreen,
+    [ScreenKeys.AI_MEAL_RECOMMENDATIONS]: AiMealRecommendationsScreen,
+    [ScreenKeys.WEEKLY_MEAL_PLAN]: WeeklyMealPlanScreen,
+    [ScreenKeys.EATING_PROGRESS]: EatingProgressScreen,
+    [ScreenKeys.SMART_SHOPPING]: SmartShoppingScreen,
+    [ScreenKeys.DAILY_PLANNED_MEALS]: DailyPlannedMealsScreen,
     [ScreenKeys.FAMILY]: HouseholdScreen,
     [ScreenKeys.HOUSEHOLD_CHAT]: HouseholdChatScreen,
     [ScreenKeys.NOTIFICATIONS]: HouseholdNotificationsScreen,

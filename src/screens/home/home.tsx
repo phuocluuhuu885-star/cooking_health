@@ -63,6 +63,7 @@ import type {
 import HomeMealPeriod from './homeMealPeriod';
 import HomeNutritionCard from './homeNutritionCard';
 import HomeRecipeCard from './homeRecipeCard';
+import AICoachBox from './AICoachBox';
 import HouseholdChatButton from '../household/HouseholdChatButton';
 import HouseholdNotificationButton from '../household/HouseholdNotificationButton';
 import { createStateSetter } from '../../utils/stateUtils';
@@ -120,6 +121,7 @@ const HomeScreen = () => {
       householdMealPlan: cachedHouseholdMealPlan,
     },
   });
+  const homeScrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   refs.current.selectedDestination = selectedDestination;
   refs.current.cache = {
     mealCatalog,
@@ -187,7 +189,6 @@ const HomeScreen = () => {
     useCallback(() => {
       if (!user?.accessToken || !household?.id) {
         setChatUnreadCount(0);
-        setNotificationUnreadCount(0);
         return undefined;
       }
       let active = true;
@@ -209,12 +210,7 @@ const HomeScreen = () => {
         active = false;
         clearInterval(interval);
       };
-    }, [
-      household?.id,
-      setChatUnreadCount,
-      setNotificationUnreadCount,
-      user?.accessToken,
-    ]),
+    }, [household?.id, setChatUnreadCount, user?.accessToken]),
   );
 
   useFocusEffect(
@@ -542,9 +538,25 @@ const HomeScreen = () => {
   const openRecipe = useCallback((mealId: string) => {
     navigate(ScreenKeys.RECIPE_DETAIL, { mealId });
   }, []);
+  const openAiMealRecommendations = useCallback(() => {
+    navigate(ScreenKeys.AI_MEAL_RECOMMENDATIONS);
+  }, []);
+
+  const onHouseholdChat = useCallback(() => {
+    if (!household) return;
+    navigate(ScreenKeys.HOUSEHOLD_CHAT, {
+      householdId: household.id,
+      householdName: household.name,
+    });
+  }, [household]);
+  const openNotifications = useCallback(() => {
+    navigate(ScreenKeys.NOTIFICATIONS);
+  }, []);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
+        ref={homeScrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -561,20 +573,17 @@ const HomeScreen = () => {
             </Text>
             <Text style={styles.date}>{todayLabel}</Text>
           </View>
-          {household && user?.accessToken ? (
+          {user?.accessToken ? (
             <View style={styles.headerActions}>
-              <HouseholdChatButton
-                unreadCount={chatUnreadCount}
-                onPress={() =>
-                  navigate(ScreenKeys.HOUSEHOLD_CHAT, {
-                    householdId: household.id,
-                    householdName: household.name,
-                  })
-                }
-              />
+              {household ? (
+                <HouseholdChatButton
+                  unreadCount={chatUnreadCount}
+                  onPress={onHouseholdChat}
+                />
+              ) : null}
               <HouseholdNotificationButton
                 unreadCount={notificationUnreadCount}
-                onPress={() => navigate(ScreenKeys.NOTIFICATIONS)}
+                onPress={openNotifications}
               />
             </View>
           ) : null}
@@ -590,25 +599,27 @@ const HomeScreen = () => {
           unavailableNutritionItems={
             consumedDay?.unavailableNutritionItems ?? 0
           }
-          onRetry={() => loadDashboard()}
+          onRetry={loadDashboard}
+        />
+
+        <AICoachBox
+          onMealSuggestions={openAiMealRecommendations}
+          onWeeklyPlan={() => navigate(ScreenKeys.WEEKLY_MEAL_PLAN)}
+          onProgressAnalysis={() => navigate(ScreenKeys.EATING_PROGRESS)}
+          onSmartShopping={() => navigate(ScreenKeys.SMART_SHOPPING)}
         />
 
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionTitle}>Thực đơn hôm nay</Text>
-            <Text style={styles.sectionSubtitle}>
-              {selectedMealLabel} · tự động cập nhật theo giờ
-            </Text>
+            <Text style={styles.sectionSubtitle}>{selectedMealLabel}</Text>
           </View>
           {state.loading ? (
             <ActivityIndicator color={COLORS.green} size="small" />
           ) : null}
         </View>
         {state.mealPlanError ? (
-          <LinearGradient
-            colors={['#FFFFFF', '#F2F8F4']}
-            style={styles.card}
-          >
+          <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.card}>
             <Text style={styles.messageText}>{state.mealPlanError}</Text>
             {user?.accessToken ? (
               <Pressable
@@ -621,10 +632,7 @@ const HomeScreen = () => {
             ) : null}
           </LinearGradient>
         ) : (
-          <LinearGradient
-            colors={['#FFFFFF', '#F2F8F4']}
-            style={styles.card}
-          >
+          <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.card}>
             {selectedMealItems.length > 0 ? (
               <HomeMealPeriod
                 title={selectedMealLabel}
@@ -654,10 +662,7 @@ const HomeScreen = () => {
           ) : null}
         </View>
         {state.recommendationsError ? (
-          <LinearGradient
-            colors={['#FFFFFF', '#F2F8F4']}
-            style={styles.card}
-          >
+          <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.card}>
             <Text style={styles.messageText}>{state.recommendationsError}</Text>
             <Pressable
               accessibilityRole="button"
@@ -668,10 +673,7 @@ const HomeScreen = () => {
             </Pressable>
           </LinearGradient>
         ) : (
-          <LinearGradient
-            colors={['#FFFFFF', '#F2F8F4']}
-            style={styles.card}
-          >
+          <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.card}>
             {suggestedMeals.length > 0 ? (
               suggestedMeals.map(meal => (
                 <HomeRecipeCard
@@ -770,7 +772,9 @@ const styles = StyleSheet.create({
   sectionSubtitle: {
     marginTop: 3,
     color: COLORS.secondary,
-    fontSize: 10,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
   },
   messageText: {
     color: '#A43C36',

@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   recipeCard: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E8EEE9',
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     right: 6,
     width: 30,
     height: 30,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.94)',
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   addButton: {
     width: 32,
     height: 32,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#168653',
     alignItems: 'center',
     justifyContent: 'center',

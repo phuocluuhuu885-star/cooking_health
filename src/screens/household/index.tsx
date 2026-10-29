@@ -21,7 +21,8 @@ import type { RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { AppImage } from '../../abase/component';
-import { goBack, navigate } from '../../utils/navigation';
+import ScreenHeader from '../component/ScreenHeader';
+import { navigate } from '../../utils/navigation';
 import ScreenKeys from '../../utils/screenKey';
 import apiConst from '../../abase/constant/apiConst';
 import {
@@ -41,7 +42,6 @@ import {
   voteForHouseholdMeal,
 } from '../../utils/householdApi';
 import { fetchHouseholdChatUnreadCount } from '../../utils/householdChatApi';
-import { fetchHouseholdNotificationUnreadCount } from '../../utils/householdNotificationApi';
 import type {
   MealPeriod,
   HouseholdMealPoll,
@@ -60,7 +60,6 @@ import { completeMealPeriod } from '../../utils/mealPlanApi';
 import { aggregateMealIngredients } from '../../utils/homeUtils';
 import HomeIngredientSummaryModal from '../home/homeIngredientSummaryModal';
 import HouseholdChatButton from './HouseholdChatButton';
-import HouseholdNotificationButton from './HouseholdNotificationButton';
 import HouseholdPollScheduleModal from './HouseholdPollScheduleModal';
 import HouseholdShoppingListModal from './HouseholdShoppingListModal';
 import { useSendHouseholdMealReminder } from './HouseholdMealReminderProvider';
@@ -69,6 +68,7 @@ import {
   isMealReminderAllowed,
 } from '../../utils/mealReminderUtils';
 import { createStateSetter } from '../../utils/stateUtils';
+import { formatEstimatedPrice } from '../../utils/priceUtils';
 import {
   formatPollDeadline,
   getCurrentMealPeriod,
@@ -97,10 +97,10 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
   const insets = useSafeAreaInsets();
   const scrollContentInsets = useMemo(
     () => ({
-      paddingTop: embedded ? 0 : insets.top + 14,
+      paddingTop: 0,
       paddingBottom: embedded ? 16 : insets.bottom + 40,
     }),
-    [embedded, insets.bottom, insets.top],
+    [embedded, insets.bottom],
   );
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
@@ -123,7 +123,6 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
     selectedMealPeriod: getCurrentMealPeriod(),
     votingOptionKey: '',
     chatUnreadCount: 0,
-    notificationUnreadCount: 0,
     pollDeadlineVisible: false,
     pollDeadlineSaving: false,
     shoppingListVisible: false,
@@ -142,7 +141,6 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
     selectedMealPeriod,
     votingOptionKey,
     chatUnreadCount,
-    notificationUnreadCount,
     pollDeadlineVisible,
     pollDeadlineSaving,
     shoppingListVisible,
@@ -166,10 +164,6 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
     () => createStateSetter(setState, 'chatUnreadCount'),
     [setState],
   );
-  const setNotificationUnreadCount = useMemo(
-    () => createStateSetter(setState, 'notificationUnreadCount'),
-    [setState],
-  );
   const setPollDeadlineVisible = useMemo(
     () => createStateSetter(setState, 'pollDeadlineVisible'),
     [setState],
@@ -190,8 +184,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
     () => createStateSetter(setState, 'sendingMealReminder'),
     [setState],
   );
-  const { sendMealReminder, isReminderActive } =
-    useSendHouseholdMealReminder();
+  const { sendMealReminder, isReminderActive } = useSendHouseholdMealReminder();
   const setIngredientSummary = useMemo(
     () => createStateSetter(setState, 'ingredientSummary'),
     [setState],
@@ -343,37 +336,6 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
     }, [household?.id, setChatUnreadCount, user?.accessToken]),
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!user?.accessToken || !household?.id) {
-        setNotificationUnreadCount(0);
-        return undefined;
-      }
-      let active = true;
-      const refreshUnreadCount = async () => {
-        try {
-          const count = await fetchHouseholdNotificationUnreadCount(
-            user.accessToken,
-          );
-          if (active) {
-            setNotificationUnreadCount(count);
-          }
-        } catch (error) {
-          console.error(
-            'Failed to refresh household notification unread count',
-            error,
-          );
-        }
-      };
-      refreshUnreadCount();
-      const interval = setInterval(refreshUnreadCount, 30_000);
-      return () => {
-        active = false;
-        clearInterval(interval);
-      };
-    }, [household?.id, setNotificationUnreadCount, user?.accessToken]),
-  );
-
   const handleRetryHousehold = useCallback(() => {
     loadHousehold();
   }, [loadHousehold]);
@@ -416,14 +378,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
         setVotingOptionKey('');
       }
     },
-    [
-      dispatch,
-      household,
-      loadHousehold,
-      setVotingOptionKey,
-      state.date,
-      user,
-    ],
+    [dispatch, household, loadHousehold, setVotingOptionKey, state.date, user],
   );
 
   const selectedPoll = state.mealPlan?.meals[selectedMealPeriod].poll ?? null;
@@ -432,9 +387,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
     selectedMealPeriod,
     currentTime,
   );
-  const reminderIsActive = household
-    ? isReminderActive(household.id)
-    : false;
+  const reminderIsActive = household ? isReminderActive(household.id) : false;
   const handleSendMealReminder = useCallback(async () => {
     if (
       !household ||
@@ -447,10 +400,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
     }
     setSendingMealReminder(true);
     try {
-      const response = await sendMealReminder(
-        household.id,
-        selectedMealPeriod,
-      );
+      const response = await sendMealReminder(household.id, selectedMealPeriod);
       if (!response.success) {
         Alert.alert(
           'Không thể gửi lời nhắc',
@@ -551,9 +501,24 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
             carbsG: total.carbsG + plan.nutritionSummary.carbsG,
             fatG: total.fatG + plan.nutritionSummary.fatG,
             unavailable: total.unavailable + plan.unavailableNutritionItems,
+            estimatedPrice: {
+              minVnd:
+                total.estimatedPrice.minVnd +
+                (plan.estimatedPrice?.minVnd ?? 0),
+              maxVnd:
+                total.estimatedPrice.maxVnd +
+                (plan.estimatedPrice?.maxVnd ?? 0),
+            },
           };
         },
-        { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, unavailable: 0 },
+        {
+          calories: 0,
+          proteinG: 0,
+          carbsG: 0,
+          fatG: 0,
+          unavailable: 0,
+          estimatedPrice: { minVnd: 0, maxVnd: 0 },
+        },
       ),
     [state.mealPlan],
   );
@@ -985,16 +950,12 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
         showsVerticalScrollIndicator={false}
       >
         {!embedded ? (
-          <>
-            <View style={styles.topBar}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={goBack}
-                style={styles.back}
-              >
-                <Text style={styles.backText}>‹ Quay lại</Text>
-              </Pressable>
-              {household ? (
+          <ScreenHeader
+            title="Gia đình"
+            subtitle="Cùng xem và quản lý thực đơn chung với những người thân."
+            style={styles.sharedHeader}
+            rightAction={
+              household ? (
                 <View style={styles.headerActions}>
                   <HouseholdChatButton
                     unreadCount={chatUnreadCount}
@@ -1005,18 +966,10 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                       })
                     }
                   />
-                  <HouseholdNotificationButton
-                    unreadCount={notificationUnreadCount}
-                    onPress={() => navigate(ScreenKeys.NOTIFICATIONS)}
-                  />
                 </View>
-              ) : null}
-            </View>
-            <Text style={styles.title}>Gia đình</Text>
-            <Text style={styles.subtitle}>
-              Cùng xem và quản lý thực đơn chung với những người thân.
-            </Text>
-          </>
+              ) : null
+            }
+          />
         ) : null}
 
         {state.loading ? (
@@ -1032,7 +985,6 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
               />
-              <Text style={styles.eyebrow}>THỰC ĐƠN CHUNG</Text>
               <Text style={styles.householdName}>{household.name}</Text>
               <Text style={styles.memberCount}>
                 {household.members.length} thành viên ·{' '}
@@ -1084,12 +1036,12 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                 />
                 {state.invitationCode ? (
                   <View style={styles.codeBox}>
-                   <LinearGradient
-                     colors={['#FFFFFF', '#EAF6EE']}
-                     start={{ x: 0, y: 0 }}
-                     end={{ x: 1, y: 1 }}
-                     style={StyleSheet.absoluteFill}
-                   />
+                    <LinearGradient
+                      colors={['#FFFFFF', '#EAF6EE']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
                     <Text style={styles.codeLabel}>MÃ MỜI</Text>
                     <Text selectable style={styles.code}>
                       {state.invitationCode}
@@ -1143,6 +1095,10 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                   Đạm {householdNutrition.proteinG.toFixed(1)} g · Carb{' '}
                   {householdNutrition.carbsG.toFixed(1)} g · Béo{' '}
                   {householdNutrition.fatG.toFixed(1)} g
+                </Text>
+                <Text style={styles.nutritionPrice}>
+                  Chi phí ước tính:{' '}
+                  {formatEstimatedPrice(householdNutrition.estimatedPrice)}
                 </Text>
                 <Text style={styles.nutritionNote}>
                   Tổng dinh dưỡng của các món đã lên thực đơn cho bữa trưa và
@@ -1242,6 +1198,9 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                       state.mealPlan?.meals[selectedMealPeriod]
                         .nutritionSummary ?? null
                     }
+                    estimatedPrice={
+                      state.mealPlan?.meals[selectedMealPeriod].estimatedPrice
+                    }
                     unavailableNutritionItems={
                       state.mealPlan?.meals[selectedMealPeriod]
                         .unavailableNutritionItems ?? 0
@@ -1299,7 +1258,11 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                         <Text style={styles.mealReminderButtonText}>
                           {reminderIsActive
                             ? 'Đang chờ xác nhận'
-                            : `Nhắc ăn ày ${selectedMealPeriod === 'LUNCH' ? 'bữa trưa' : 'bữa tối'}`}
+                            : `Nhắc ăn ${
+                                selectedMealPeriod === 'LUNCH'
+                                  ? 'bữa trưa'
+                                  : 'bữa tối'
+                              }`}
                         </Text>
                       )}
                     </Pressable>
@@ -1307,14 +1270,14 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                       {selectedMealPlan?.isCompleted
                         ? 'Bữa ăn đã hoàn thành.'
                         : reminderIsActive
-                          ? 'Lời nhắc sẽ dừng khi có thành viên nhấn Đồng ý.'
-                          : reminderAllowed
-                            ? `Có thể nhắc trong khung giờ ${getMealReminderWindowLabel(
-                                selectedMealPeriod,
-                              )} (giờ Việt Nam).`
-                            : `Chỉ khả dụng trong khung giờ ${getMealReminderWindowLabel(
-                                selectedMealPeriod,
-                              )} (giờ Việt Nam).`}
+                        ? 'Lời nhắc sẽ dừng khi có thành viên nhấn Đồng ý.'
+                        : reminderAllowed
+                        ? `Có thể nhắc trong khung giờ ${getMealReminderWindowLabel(
+                            selectedMealPeriod,
+                          )} (giờ Việt Nam).`
+                        : `Chỉ khả dụng trong khung giờ ${getMealReminderWindowLabel(
+                            selectedMealPeriod,
+                          )} (giờ Việt Nam).`}
                     </Text>
                   </View>
                 </>
@@ -1543,6 +1506,9 @@ const HouseholdPlannedMealRow = ({ meal }: { meal: HouseholdPlannedMeal }) => {
           {meal.servings} khẩu phần · Thêm bởi{' '}
           {meal.addedBy.fullName?.trim() || 'thành viên'}
         </Text>
+        <Text style={styles.mealPrice}>
+          {formatEstimatedPrice(meal.estimatedPrice)}
+        </Text>
       </View>
       <Text style={[styles.mealStatus, meal.isConsumed && styles.mealConsumed]}>
         {meal.isConsumed ? 'Đã ăn' : 'Chưa ăn'}
@@ -1555,6 +1521,7 @@ const HouseholdMealPeriodCard = ({
   label,
   items,
   nutrition,
+  estimatedPrice,
   unavailableNutritionItems,
   renderMeal,
   completed,
@@ -1566,6 +1533,7 @@ const HouseholdMealPeriodCard = ({
   label: string;
   items: HouseholdMealPeriodPlan['items'];
   nutrition: HouseholdMealPeriodPlan['nutritionSummary'] | null;
+  estimatedPrice?: HouseholdMealPeriodPlan['estimatedPrice'];
   unavailableNutritionItems: number;
   renderMeal: (meal: HouseholdPlannedMeal) => React.ReactNode;
   completed: boolean;
@@ -1603,6 +1571,9 @@ const HouseholdMealPeriodCard = ({
               g
             </Text>
           ) : null}
+          <Text style={styles.periodNutritionMacros}>
+            Chi phí ước tính: {formatEstimatedPrice(estimatedPrice)}
+          </Text>
           {unavailableNutritionItems > 0 ? (
             <Text style={styles.periodNutritionNote}>
               {unavailableNutritionItems} món thiếu dữ liệu dinh dưỡng.
@@ -1830,6 +1801,9 @@ const HouseholdMealPollOptionRow = ({
             {mealDescription || 'Chưa có mô tả cho món ăn này.'}
           </Text>
           <Text style={styles.recipeLink}>Chạm để xem cách nấu</Text>
+          <Text style={styles.mealPrice}>
+            {formatEstimatedPrice(option.estimatedPrice)}
+          </Text>
         </View>
       </Pressable>
       <Text style={styles.pollCounts}>
@@ -1952,6 +1926,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   embeddedScreen: { marginBottom: 0 },
   content: { paddingHorizontal: 18 },
+  sharedHeader: { paddingHorizontal: 0 },
   topBar: {
     minHeight: 48,
     flexDirection: 'row',
@@ -2001,7 +1976,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 14,
     paddingHorizontal: 13,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#FFFFFF',
   },
   shoppingListButtonText: {
@@ -2048,6 +2023,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 10,
   },
+  nutritionPrice: {
+    color: COLORS.green,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 7,
+  },
   nutritionNote: {
     color: COLORS.secondary,
     fontSize: 11,
@@ -2078,7 +2059,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 62,
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: COLORS.border,
     paddingHorizontal: 10,
@@ -2113,7 +2094,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   mealReminderButtonDisabled: {
@@ -2169,7 +2150,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 11,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.lightGreen,
   },
   pollDeadlineButtonDisabled: {
@@ -2277,7 +2258,7 @@ const styles = StyleSheet.create({
     minHeight: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.border,
     paddingHorizontal: 10,
   },
@@ -2290,7 +2271,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 10,
     paddingHorizontal: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.lightGreen,
   },
   ingredientSummaryButtonText: {
@@ -2356,6 +2337,12 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   mealMeta: { color: COLORS.secondary, fontSize: 10, marginTop: 4 },
+  mealPrice: {
+    color: COLORS.green,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 4,
+  },
   mealStatus: { color: COLORS.secondary, fontSize: 10, fontWeight: '600' },
   mealConsumed: { color: COLORS.green },
   emptyMeals: { color: COLORS.secondary, fontSize: 12, paddingVertical: 10 },
@@ -2372,7 +2359,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   completeButtonText: { color: COLORS.white, fontSize: 11, fontWeight: '800' },
@@ -2403,7 +2390,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     minHeight: 46,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2452,7 +2439,7 @@ const styles = StyleSheet.create({
   removeText: { color: COLORS.danger, fontSize: 12, fontWeight: '700' },
   leaveButton: {
     minHeight: 46,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.lightDanger,

@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 22,
     paddingHorizontal: 24,
-    borderRadius: 14,
+    borderRadius: 8,
     backgroundColor: '#168653',
   },
   confirmButtonDisabled: {

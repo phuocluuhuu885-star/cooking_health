@@ -20,10 +20,7 @@ import apiConst from '../../abase/constant/apiConst';
 import InputComponent from '../../abase/component/InputBox';
 import { colors } from '../../abase/constant';
 import { useAppDispatch } from '../../reduxs/store';
-import {
-  selectUserInfo,
-  updateHealthProfile,
-} from '../../reduxs/reduces/user';
+import { selectUserInfo, updateHealthProfile } from '../../reduxs/reduces/user';
 import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createStateSetter } from '../../utils/stateUtils';
@@ -59,6 +56,7 @@ type FormState = {
 type HealthProfileProps = {
   visible: boolean;
   onClose: () => void;
+  onUpdated?: () => void;
 };
 
 const GENDER_OPTIONS: Option<Gender>[] = [
@@ -118,7 +116,7 @@ const GOAL_OPTIONS: Option<Goal>[] = [
   },
 ];
 
-const HealthProfile = ({ visible, onClose }: HealthProfileProps) => {
+const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
   const { height } = useWindowDimensions();
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
@@ -292,6 +290,7 @@ const HealthProfile = ({ visible, onClose }: HealthProfileProps) => {
       }
 
       dispatch(updateHealthProfile(res.data?.healthProfile ?? res.data));
+      onUpdated?.();
 
       Alert.alert(
         'Thông báo',
@@ -317,7 +316,7 @@ const HealthProfile = ({ visible, onClose }: HealthProfileProps) => {
       setIsLoading(false);
       onHideLoading();
     }
-  }, [dispatch, onClose, setIsLoading, state, validate]);
+  }, [dispatch, onClose, onUpdated, setIsLoading, state, validate]);
 
   const renderOption = useCallback(
     <T extends string>(
@@ -363,7 +362,7 @@ const HealthProfile = ({ visible, onClose }: HealthProfileProps) => {
               styles.modal,
               {
                 maxHeight: modalMaxHeight,
-                paddingBottom: insets.bottom
+                paddingBottom: insets.bottom,
               },
             ]}
           >
@@ -618,7 +617,7 @@ const styles = StyleSheet.create({
   closeButton: {
     width: 34,
     height: 34,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: colors.Gray.g100,
     alignItems: 'center',
     justifyContent: 'center',
@@ -677,7 +676,6 @@ const styles = StyleSheet.create({
   optionContainer: {
     gap: 9,
   },
-
   option: {
     minHeight: 56,
     flexDirection: 'row',
@@ -687,7 +685,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderWidth: 1,
     borderColor: colors.Gray.g300,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: 'white',
   },
 
@@ -751,7 +749,7 @@ const styles = StyleSheet.create({
 
   submitButton: {
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: colors.Green.g400,
     alignItems: 'center',
     justifyContent: 'center',

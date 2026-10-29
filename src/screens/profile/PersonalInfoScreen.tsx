@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,8 +14,11 @@ import {
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
+import ScreenHeader from '../component/ScreenHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
+import type { StackScreenProps } from '@react-navigation/stack';
 import { useAppDispatch } from '../../reduxs/store';
 import {
   selectUserInfo,
@@ -28,9 +31,13 @@ import {
   getAvatarUri,
   pickCompressedAvatar,
 } from '../../utils/avatarImageUtils';
-import { goBack, navigate, resetTo } from '../../utils/navigation';
+import { navigate, resetTo } from '../../utils/navigation';
 import ScreenKeys from '../../utils/screenKey';
 import { setSyncUser } from '../../utils/syncUtils';
+import {
+  hasAiRecommendationConsent,
+  saveAiRecommendationConsent,
+} from '../../utils/aiRecommendationConsent';
 import {
   changePassword,
   deleteUserAccount,
@@ -38,6 +45,7 @@ import {
   updateUserAvatar,
 } from '../../utils/userApi';
 import { createStateSetter } from '../../utils/stateUtils';
+import type { RootStackParamList } from '../../utils/types/navigation';
 
 type PersonalInfoFormState = {
   fullName: string;
@@ -52,10 +60,52 @@ type PersonalInfoFormState = {
   deleteAccountPassword: string;
 };
 
-const PersonalInfoScreen = () => {
+type AccountOption = 'BASIC' | 'PASSWORD' | 'DELETE' | 'PRIVACY' | 'GEMINI';
+type PersonalInfoScreenProps = StackScreenProps<
+  RootStackParamList,
+  typeof ScreenKeys.PERSONAL_INFO
+>;
+
+const ACCOUNT_OPTIONS: Array<{
+  id: AccountOption;
+  title: string;
+  description: string;
+}> = [
+  {
+    id: 'BASIC',
+    title: 'Cập nhật thông tin cơ bản',
+    description: 'Ảnh đại diện và tên hiển thị',
+  },
+  {
+    id: 'PASSWORD',
+    title: 'Đổi mật khẩu',
+    description: 'Cập nhật mật khẩu đăng nhập',
+  },
+  {
+    id: 'DELETE',
+    title: 'Xóa tài khoản',
+    description: 'Xóa vĩnh viễn tài khoản và dữ liệu liên quan',
+  },
+  {
+    id: 'PRIVACY',
+    title: 'Chính sách và quyền riêng tư',
+    description: 'Xem chính sách quyền riêng tư và điều khoản',
+  },
+  {
+    id: 'GEMINI',
+    title: 'Thu hồi đồng ý chia sẻ với Gemini',
+    description: 'Quản lý sự đồng ý dùng dữ liệu dinh dưỡng cho gợi ý AI',
+  },
+];
+
+const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
+  const section = route.params?.section;
+  const [geminiConsentGranted, setGeminiConsentGranted] = useState(() =>
+    Boolean(user?.id && hasAiRecommendationConsent(user.id)),
+  );
   const [state, setState] = useState<PersonalInfoFormState>({
     fullName: user?.fullName ?? '',
     currentPassword: '',
@@ -68,6 +118,13 @@ const PersonalInfoScreen = () => {
     deleteAccountVisible: false,
     deleteAccountPassword: '',
   });
+  useFocusEffect(
+    useCallback(() => {
+      setGeminiConsentGranted(
+        Boolean(user?.id && hasAiRecommendationConsent(user.id)),
+      );
+    }, [user?.id]),
+  );
   const setFullName = useMemo(
     () => createStateSetter(setState, 'fullName'),
     [setState],
@@ -288,23 +345,46 @@ const PersonalInfoScreen = () => {
     );
   };
 
-  return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Quay lại hồ sơ cá nhân"
-          onPress={goBack}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <View>
-          <Text style={styles.eyebrow}>TÀI KHOẢN</Text>
-          <Text style={styles.title}>Thông tin cá nhân</Text>
-        </View>
-      </View>
+  const revokeGeminiConsent = () => {
+    if (!user?.id) return;
+    if (!geminiConsentGranted) {
+      Alert.alert(
+        'Chưa bật đồng ý chia sẻ',
+        'Hiện không có đồng ý chia sẻ với Gemini đang bật trên thiết bị này.',
+      );
+      return;
+    }
+    Alert.alert(
+      'Thu hồi đồng ý dùng gợi ý AI?',
+      'MealCraft sẽ ngừng gửi dữ liệu dinh dưỡng cho Gemini trên thiết bị này. Gợi ý AI đã tải sẽ bị xóa khỏi màn hình.',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Thu hồi',
+          style: 'destructive',
+          onPress: () => {
+            saveAiRecommendationConsent(user.id, false);
+            setGeminiConsentGranted(false);
+          },
+        },
+      ],
+    );
+  };
 
+  return (
+    <View style={styles.screen}>
+      <ScreenHeader
+        eyebrow="TÀI KHOẢN"
+        title={
+          section === 'BASIC'
+            ? 'Thông tin cơ bản'
+            : section === 'PASSWORD'
+            ? 'Đổi mật khẩu'
+            : 'Thông tin cá nhân'
+        }
+        backAccessibilityLabel="Quay lại hồ sơ cá nhân"
+        style={styles.sharedHeader}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardArea}
@@ -317,171 +397,207 @@ const PersonalInfoScreen = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
-            <Text style={styles.sectionTitle}>Thông tin cơ bản</Text>
-            <Text style={styles.description}>
-              Cập nhật ảnh đại diện và tên hiển thị trong tài khoản MealCraft.
-            </Text>
+          {!section ? (
+            <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
+              <Text style={styles.sectionTitle}>Tùy chọn tài khoản</Text>
+              <Text style={styles.description}>
+                Chọn nội dung bạn muốn quản lý.
+              </Text>
+              <View style={styles.optionsList}>
+                {ACCOUNT_OPTIONS.map(option => {
+                  const description =
+                    option.id === 'GEMINI'
+                      ? geminiConsentGranted
+                        ? 'Đang bật — chạm để thu hồi'
+                        : 'Chưa bật — chạm để xem trạng thái'
+                      : option.description;
+                  return (
+                    <Pressable
+                      key={option.id}
+                      accessibilityRole="button"
+                      onPress={() => {
+                        if (option.id === 'BASIC' || option.id === 'PASSWORD') {
+                          navigate(
+                            ScreenKeys.PERSONAL_INFO,
+                            { section: option.id },
+                            true,
+                          );
+                          return;
+                        }
+                        if (option.id === 'DELETE') {
+                          confirmAccountDeletion();
+                          return;
+                        }
+                        if (option.id === 'GEMINI') {
+                          revokeGeminiConsent();
+                          return;
+                        }
+                        if (option.id === 'PRIVACY') {
+                          navigate(
+                            ScreenKeys.PRIVACY_POLICY,
+                            { mode: 'view' },
+                            true,
+                          );
+                        }
+                      }}
+                      style={styles.optionRow}
+                    >
+                      <View style={styles.optionCopy}>
+                        <Text
+                          style={[
+                            styles.optionTitle,
+                            option.id === 'DELETE' && styles.optionDanger,
+                          ]}
+                        >
+                          {option.title}
+                        </Text>
+                        <Text style={styles.optionDescription}>
+                          {description}
+                        </Text>
+                      </View>
+                      <Text style={styles.optionChevron}>›</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </LinearGradient>
+          ) : null}
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Chọn ảnh đại diện"
-              disabled={state.savingAvatar}
-              onPress={selectAvatar}
-              style={styles.avatarPicker}
-            >
-              <View style={styles.avatarPreview}>
-                {user?.avatar ? (
-                  <Image
-                    source={{ uri: getAvatarUri(user.avatar) }}
-                    style={styles.avatarImage}
-                  />
+          {section === 'BASIC' ? (
+            <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
+              <Text style={styles.sectionTitle}>Thông tin cơ bản</Text>
+              <Text style={styles.description}>
+                Cập nhật ảnh đại diện và tên hiển thị trong tài khoản MealCraft.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Chọn ảnh đại diện"
+                disabled={state.savingAvatar}
+                onPress={selectAvatar}
+                style={styles.avatarPicker}
+              >
+                <View style={styles.avatarPreview}>
+                  {user?.avatar ? (
+                    <Image
+                      source={{ uri: getAvatarUri(user.avatar) }}
+                      style={styles.avatarImage}
+                    />
+                  ) : (
+                    <Text style={styles.avatarInitials}>
+                      {getInitials(user?.fullName ?? '') || 'M'}
+                    </Text>
+                  )}
+                  <View style={styles.cameraBadge}>
+                    <Text style={styles.cameraBadgeText}>✎</Text>
+                  </View>
+                </View>
+                <View style={styles.avatarPickerCopy}>
+                  <Text style={styles.avatarPickerTitle}>
+                    {state.savingAvatar ? 'Đang tải ảnh…' : 'Đổi ảnh đại diện'}
+                  </Text>
+                  <Text style={styles.hint}>Ảnh được nén, tối đa 512 KB.</Text>
+                </View>
+                {state.savingAvatar ? (
+                  <ActivityIndicator color={COLORS.green} />
+                ) : null}
+              </Pressable>
+
+              <Text style={styles.label}>Họ và tên</Text>
+              <TextInput
+                accessibilityLabel="Họ và tên"
+                autoCapitalize="words"
+                maxLength={80}
+                onChangeText={setFullName}
+                placeholder="Nhập họ và tên"
+                placeholderTextColor={COLORS.muted}
+                value={state.fullName}
+                style={styles.input}
+              />
+
+              <Text style={[styles.label, styles.emailLabel]}>Email</Text>
+              <TextInput
+                accessibilityLabel="Email, không thể chỉnh sửa"
+                editable={false}
+                value={user?.email ?? ''}
+                style={[styles.input, styles.disabledInput]}
+              />
+              <Text style={styles.hint}>Email không thể thay đổi.</Text>
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={
+                  state.savingProfile ||
+                  state.savingAvatar ||
+                  state.changingPassword
+                }
+                onPress={savePersonalInfo}
+                style={[
+                  styles.primaryButton,
+                  (state.savingProfile ||
+                    state.savingAvatar ||
+                    state.changingPassword) &&
+                    styles.disabledButton,
+                ]}
+              >
+                {state.savingProfile ? (
+                  <ActivityIndicator color={COLORS.white} />
                 ) : (
-                  <Text style={styles.avatarInitials}>
-                    {getInitials(user?.fullName ?? '') || 'M'}
+                  <Text style={styles.primaryButtonText}>Lưu thông tin</Text>
+                )}
+              </Pressable>
+            </LinearGradient>
+          ) : null}
+
+          {section === 'PASSWORD' ? (
+            <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
+              <Text style={styles.sectionTitle}>Đổi mật khẩu</Text>
+              <Text style={styles.description}>
+                Nhập mật khẩu hiện tại để xác nhận thay đổi.
+              </Text>
+
+              <PasswordField
+                label="Mật khẩu hiện tại"
+                value={state.currentPassword}
+                onChangeText={setCurrentPassword}
+              />
+              <PasswordField
+                label="Mật khẩu mới"
+                value={state.newPassword}
+                onChangeText={setNewPassword}
+              />
+              <PasswordField
+                label="Xác nhận mật khẩu mới"
+                value={state.confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+              <Text style={styles.hint}>Mật khẩu mới cần ít nhất 6 ký tự.</Text>
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={
+                  state.changingPassword ||
+                  state.savingProfile ||
+                  state.savingAvatar
+                }
+                onPress={submitPasswordChange}
+                style={[
+                  styles.primaryButton,
+                  (state.changingPassword ||
+                    state.savingProfile ||
+                    state.savingAvatar) &&
+                    styles.disabledButton,
+                ]}
+              >
+                {state.changingPassword ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    Cập nhật mật khẩu
                   </Text>
                 )}
-                <View style={styles.cameraBadge}>
-                  <Text style={styles.cameraBadgeText}>✎</Text>
-                </View>
-              </View>
-              <View style={styles.avatarPickerCopy}>
-                <Text style={styles.avatarPickerTitle}>
-                  {state.savingAvatar ? 'Đang tải ảnh…' : 'Đổi ảnh đại diện'}
-                </Text>
-                <Text style={styles.hint}>Ảnh được nén, tối đa 512 KB.</Text>
-              </View>
-              {state.savingAvatar ? (
-                <ActivityIndicator color={COLORS.green} />
-              ) : null}
-            </Pressable>
-
-            <Text style={styles.label}>Họ và tên</Text>
-            <TextInput
-              accessibilityLabel="Họ và tên"
-              autoCapitalize="words"
-              maxLength={80}
-              onChangeText={setFullName}
-              placeholder="Nhập họ và tên"
-              placeholderTextColor={COLORS.muted}
-              value={state.fullName}
-              style={styles.input}
-            />
-
-            <Text style={[styles.label, styles.emailLabel]}>Email</Text>
-            <TextInput
-              accessibilityLabel="Email, không thể chỉnh sửa"
-              editable={false}
-              value={user?.email ?? ''}
-              style={[styles.input, styles.disabledInput]}
-            />
-            <Text style={styles.hint}>Email không thể thay đổi.</Text>
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={
-                state.savingProfile ||
-                state.savingAvatar ||
-                state.changingPassword
-              }
-              onPress={savePersonalInfo}
-              style={[
-                styles.primaryButton,
-                (state.savingProfile ||
-                  state.savingAvatar ||
-                  state.changingPassword) &&
-                  styles.disabledButton,
-              ]}
-            >
-              {state.savingProfile ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text style={styles.primaryButtonText}>Lưu thông tin</Text>
-              )}
-            </Pressable>
-          </LinearGradient>
-
-          <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
-            <Text style={styles.sectionTitle}>Đổi mật khẩu</Text>
-            <Text style={styles.description}>
-              Nhập mật khẩu hiện tại để xác nhận thay đổi.
-            </Text>
-
-            <PasswordField
-              label="Mật khẩu hiện tại"
-              value={state.currentPassword}
-              onChangeText={setCurrentPassword}
-            />
-            <PasswordField
-              label="Mật khẩu mới"
-              value={state.newPassword}
-              onChangeText={setNewPassword}
-            />
-            <PasswordField
-              label="Xác nhận mật khẩu mới"
-              value={state.confirmPassword}
-              onChangeText={setConfirmPassword}
-            />
-            <Text style={styles.hint}>Mật khẩu mới cần ít nhất 6 ký tự.</Text>
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={
-                state.changingPassword ||
-                state.savingProfile ||
-                state.savingAvatar
-              }
-              onPress={submitPasswordChange}
-              style={[
-                styles.primaryButton,
-                (state.changingPassword ||
-                  state.savingProfile ||
-                  state.savingAvatar) &&
-                  styles.disabledButton,
-              ]}
-            >
-              {state.changingPassword ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text style={styles.primaryButtonText}>Cập nhật mật khẩu</Text>
-              )}
-            </Pressable>
-          </LinearGradient>
-
-          <View style={styles.deleteAccountCard}>
-            <Text style={styles.deleteAccountTitle}>Xóa tài khoản</Text>
-            <Text style={styles.description}>
-              Xóa vĩnh viễn tài khoản và dữ liệu sức khỏe, hồ sơ, lịch sử đi bộ
-              liên quan. Tin nhắn gia đình đã gửi có thể được giữ lại ở dạng ẩn
-              danh.
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              disabled={
-                state.deletingAccount ||
-                state.changingPassword ||
-                state.savingProfile ||
-                state.savingAvatar
-              }
-              onPress={confirmAccountDeletion}
-              style={styles.deleteAccountButton}
-            >
-              <Text style={styles.deleteAccountButtonText}>
-                Xóa tài khoản vĩnh viễn
-              </Text>
-            </Pressable>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() =>
-              navigate(ScreenKeys.PRIVACY_POLICY, { mode: 'view' }, true)
-            }
-            style={styles.privacyLink}
-          >
-            <Text style={styles.privacyLinkText}>
-              Xem Chính sách quyền riêng tư và Điều khoản
-            </Text>
-          </Pressable>
+              </Pressable>
+            </LinearGradient>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -570,6 +686,7 @@ const COLORS = {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
+  sharedHeader: { paddingHorizontal: 16 },
   keyboardArea: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -600,6 +717,43 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+  optionsList: {
+    gap: 8,
+  },
+  optionRow: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  optionCopy: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  optionTitle: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  optionDanger: {
+    color: COLORS.danger,
+  },
+  optionDescription: {
+    marginTop: 3,
+    color: COLORS.secondary,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  optionChevron: {
+    color: COLORS.green,
+    fontSize: 22,
+    fontWeight: '700',
   },
   sectionTitle: { color: COLORS.text, fontSize: 17, fontWeight: '800' },
   description: {
@@ -677,35 +831,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   disabledButton: { opacity: 0.6 },
-  deleteAccountCard: {
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F1C7C4',
-    borderRadius: 16,
-    backgroundColor: '#FFF8F7',
-  },
-  deleteAccountTitle: {
-    color: COLORS.danger,
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  deleteAccountButton: {
-    minHeight: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.danger,
-    borderRadius: 12,
-  },
-  deleteAccountButtonText: {
-    color: COLORS.danger,
-    fontSize: 13,
-    fontWeight: '800',
-  },
   modalBackdrop: {
     flex: 1,
     justifyContent: 'center',
@@ -739,17 +868,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 14,
-    borderRadius: 11,
+    borderRadius: 8,
     backgroundColor: COLORS.danger,
   },
   confirmDeleteText: { color: COLORS.white, fontSize: 13, fontWeight: '800' },
-  privacyLink: { alignItems: 'center', paddingVertical: 8 },
-  privacyLinkText: {
-    color: COLORS.green,
-    fontSize: 12,
-    fontWeight: '700',
-    textDecorationLine: 'underline',
-  },
   primaryButtonText: { color: COLORS.white, fontSize: 14, fontWeight: '800' },
 });
 

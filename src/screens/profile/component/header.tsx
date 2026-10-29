@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
 
     width: 24,
     height: 24,
-    borderRadius: 12,
+    borderRadius: 8,
 
     backgroundColor: colors.Green.g300,
 

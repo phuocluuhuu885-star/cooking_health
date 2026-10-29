@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   tab: {
     position: 'relative',
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

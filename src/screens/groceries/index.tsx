@@ -47,6 +47,12 @@ import { aggregateMealIngredients } from '../../utils/homeUtils';
 import { isHouseholdPlan } from '../../utils/mealPlanScreenUtils';
 import { getVietnamDateKey } from '../../utils/dateUtils';
 import { formatNumberWithOptionalDecimal } from '../../utils/numberUtils';
+import {
+  formatEstimatedPrice,
+  sumEstimatedPrices,
+} from '../../utils/priceUtils';
+import { navigate } from '../../utils/navigation';
+import ScreenKeys from '../../utils/screenKey';
 import { completeMealPeriod } from '../../utils/mealPlanApi';
 import HomeIngredientSummaryModal from '../home/homeIngredientSummaryModal';
 import PlannedMealItem from './plannedMealItem';
@@ -162,9 +168,7 @@ const MealPlanScreen = () => {
         }
       }
 
-      const date = activeHousehold
-        ? getVietnamDateKey()
-        : personalDate;
+      const date = activeHousehold ? getVietnamDateKey() : personalDate;
       if (
         !forceReload &&
         householdLoaded &&
@@ -449,11 +453,7 @@ const MealPlanScreen = () => {
           style={styles.periodTab}
         >
           <LinearGradient
-            colors={
-              selected
-                ? ['#2FA878', '#168653']
-                : ['#FFFFFF', '#EAF6EE']
-            }
+            colors={selected ? ['#2FA878', '#168653'] : ['#FFFFFF', '#EAF6EE']}
             pointerEvents="none"
             style={styles.periodTabGradient}
           />
@@ -574,6 +574,10 @@ const MealPlanScreen = () => {
     },
     { ...EMPTY_NUTRITION },
   );
+  const totalEstimatedPrice = sumEstimatedPrices(
+    PERIODS.map(period => meals[period.id].estimatedPrice),
+  );
+  const activeEstimatedPrice = activePlan.estimatedPrice;
   const dailyCaloriesTarget = user?.healthProfile?.dailyCaloriesTarget;
   const toggleViewMode = useCallback(() => {
     refs.current.ingredientRequestId += 1;
@@ -592,15 +596,20 @@ const MealPlanScreen = () => {
       }),
     );
   }, [dispatch, user?.id, viewMode]);
+  const handleFamilyButtonPress = useCallback(() => {
+    if (!household) {
+      navigate(ScreenKeys.FAMILY);
+      return;
+    }
+    toggleViewMode();
+  }, [household, toggleViewMode]);
 
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top + 12 }]}>
       <View style={styles.screenHeader}>
         <View style={styles.screenHeaderText}>
           <Text style={styles.title}>
-            {viewMode === 'HOUSEHOLD'
-              ? 'Gia đình của bạn'
-              : 'Thực đơn hôm nay'}
+            {viewMode === 'HOUSEHOLD' ? 'Gia đình của bạn' : 'Thực đơn hôm nay'}
           </Text>
           <Text style={styles.subtitle}>
             {viewMode === 'HOUSEHOLD'
@@ -611,16 +620,24 @@ const MealPlanScreen = () => {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            viewMode === 'PERSONAL'
-              ? 'Chuyển sang thực phẩm gia đình'
-              : 'Chuyển sang thực phẩm cá nhân'
+            !household
+              ? 'Tạo hoặc tham gia gia đình'
+              : viewMode === 'PERSONAL'
+              ? 'Chuyển sang thực đơn gia đình'
+              : 'Chuyển sang thực đơn cá nhân'
           }
-          onPress={toggleViewMode}
-          style={styles.scopeSwitch}
+          accessibilityHint={
+            household
+              ? 'Chuyển đổi giữa thực đơn cá nhân và gia đình'
+              : 'Mở màn hình gia đình'
+          }
+          onPress={handleFamilyButtonPress}
+          style={[styles.scopeSwitch, !household && styles.scopeSwitchAdd]}
         >
-          <Text style={styles.scopeSwitchText}>
-            {viewMode === 'PERSONAL' ? 'Gia đình' : 'Cá nhân'}
-          </Text>
+          <Text style={styles.scopeSwitchIcon}>{household ? '⇄' : '+'}</Text>
+          {!household ? (
+            <Text style={styles.scopeSwitchText}>Gia đình</Text>
+          ) : null}
         </Pressable>
       </View>
 
@@ -658,12 +675,14 @@ const MealPlanScreen = () => {
                   {dailyCaloriesTarget ? ` / ${dailyCaloriesTarget} kcal` : ''}
                 </Text>
                 <Text style={styles.macros}>
-                  Đạm {formatNumberWithOptionalDecimal(
-                    totalNutrition.proteinG,
-                  )} g · Carb{' '}
+                  Đạm {formatNumberWithOptionalDecimal(totalNutrition.proteinG)}{' '}
+                  g · Carb{' '}
                   {formatNumberWithOptionalDecimal(totalNutrition.carbsG)} g ·
-                  Béo{' '}
-                  {formatNumberWithOptionalDecimal(totalNutrition.fatG)} g
+                  Béo {formatNumberWithOptionalDecimal(totalNutrition.fatG)} g
+                </Text>
+                <Text style={styles.estimatedPrice}>
+                  Chi phí ước tính hôm nay:{' '}
+                  {formatEstimatedPrice(totalEstimatedPrice)}
                 </Text>
               </LinearGradient>
               <View style={styles.periodTabs}>
@@ -695,11 +714,12 @@ const MealPlanScreen = () => {
                     </Pressable>
                   ) : null}
                 </View>
+                <Text style={styles.periodEstimatedPrice}>
+                  Chi phí bữa này: {formatEstimatedPrice(activeEstimatedPrice)}
+                </Text>
 
                 {activePlan.items.length === 0 ? (
-                  <Text style={styles.emptyText}>
-                    Chưa có món nào. Thêm món từ tab Công thức.
-                  </Text>
+                  <Text style={styles.emptyText}>Bạn chưa thêm món</Text>
                 ) : (
                   <>
                     {activePlan.items.map(item => (
@@ -714,7 +734,7 @@ const MealPlanScreen = () => {
                     ))}
                     {activePlan.isCompleted ? (
                       <Text style={styles.completedMessage}>
-                        Bữa ăn đã được ghi nhận. Món mới sẽ được cộng thêm khi
+                        Bữa ăn đã được ghi nhận. Món mới sẽ được ghi thêm khi
                         xác nhận.
                       </Text>
                     ) : activePlan.isLocked ? (
@@ -816,12 +836,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   scopeSwitch: {
+    minWidth: 42,
     minHeight: 38,
+    flexDirection: 'row',
+    gap: 5,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
+  },
+  scopeSwitchAdd: {
+    paddingHorizontal: 10,
+  },
+  scopeSwitchIcon: {
+    color: COLORS.white,
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: '800',
   },
   scopeSwitchText: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
   card: {
@@ -847,6 +879,18 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
     fontSize: 12,
   },
+  estimatedPrice: {
+    marginTop: 9,
+    color: COLORS.green,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  periodEstimatedPrice: {
+    marginBottom: 8,
+    color: COLORS.green,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   helperText: {
     marginTop: 10,
     color: COLORS.secondary,
@@ -869,7 +913,7 @@ const styles = StyleSheet.create({
     minHeight: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   periodTabGradient: {
@@ -888,7 +932,7 @@ const styles = StyleSheet.create({
     minHeight: 36,
     justifyContent: 'center',
     paddingHorizontal: 11,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#E7F4EC',
   },
   periodIngredientButtonText: {
@@ -928,7 +972,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   completeMealButtonText: {

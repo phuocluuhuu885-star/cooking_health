@@ -3,6 +3,7 @@ import type { MealReviewSummary } from './review';
 import type {
   MealPeriod,
   MealPeriodOption,
+  EstimatedPriceRange,
   PlannedMeal,
   RecipeDetailMeal,
 } from './meal';
@@ -50,6 +51,9 @@ export type HomeRecipeCardProps = {
   meal: BackendMeal;
   onPress: (mealId: string) => void;
   reviewSummary?: MealReviewSummary;
+  recommendationReason?: string;
+  recommendedServings?: number;
+  estimatedPrice?: EstimatedPriceRange;
 };
 
 export type HomeAggregatedIngredient = {

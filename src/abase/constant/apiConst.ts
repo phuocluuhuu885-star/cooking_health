@@ -18,7 +18,12 @@ type API = {
   getDailyConsumedMeals: ApiType;
   addConsumedMeal: ApiType;
   getConsumptionReport: ApiType;
+  getAiMealRecommendations: ApiType;
+  saveWeeklyMealPlan: ApiType;
+  getFamilyMealRecommendations: ApiType;
+  saveFamilyWeeklyMealPlan: ApiType;
   updateHealthProfile: ApiType;
+  getHealthProfileHistory: ApiType;
   getCurrentHousehold: ApiType;
   createHousehold: ApiType;
   joinHousehold: ApiType;
@@ -111,9 +116,31 @@ const apiConst: API = {
     method: 'get',
     url: 'api/meal-plan/report',
   },
+  getAiMealRecommendations: {
+    method: 'post',
+    url: 'api/ai/meal-recommendations',
+    timeout: 60000,
+  },
+  saveWeeklyMealPlan: {
+    method: 'post',
+    url: 'api/ai/weekly-plan',
+  },
+  getFamilyMealRecommendations: {
+    method: 'post',
+    url: 'api/household/ai/meal-recommendations',
+    timeout: 60000,
+  },
+  saveFamilyWeeklyMealPlan: {
+    method: 'post',
+    url: 'api/household/meal-plan/weekly',
+  },
   updateHealthProfile: {
     method: 'post',
     url: 'api/auth/updateHealth',
+  },
+  getHealthProfileHistory: {
+    method: 'get',
+    url: 'api/auth/health-history',
   },
   getCurrentHousehold: {
     method: 'get',

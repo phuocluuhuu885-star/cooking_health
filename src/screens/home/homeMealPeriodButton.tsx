@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     minHeight: 58,
     justifyContent: 'center',
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E5EBE7',

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ScreenHeader from '../component/ScreenHeader';
 import { useSelector } from 'react-redux';
 import { selectUserInfo } from '../../reduxs/reduces/user';
 import type {
@@ -17,7 +18,6 @@ import type {
   MealReviewScreenProps,
 } from '../../utils/types';
 import { fetchMealReviews } from '../../utils/mealReviewApi';
-import { goBack } from '../../utils/navigation';
 import MealReviewModal from './MealReviewModal';
 import { createStateSetter } from '../../utils/stateUtils';
 
@@ -54,9 +54,18 @@ const MealReviewsScreen = ({ route }: MealReviewScreenProps) => {
     ratingModalVisible: false,
     refreshIndex: 0,
   });
-  const { data, loading, loadingMore, error, ratingModalVisible, refreshIndex } =
-    state;
-  const setData = useMemo(() => createStateSetter(setState, 'data'), [setState]);
+  const {
+    data,
+    loading,
+    loadingMore,
+    error,
+    ratingModalVisible,
+    refreshIndex,
+  } = state;
+  const setData = useMemo(
+    () => createStateSetter(setState, 'data'),
+    [setState],
+  );
   const setLoading = useMemo(
     () => createStateSetter(setState, 'loading'),
     [setState],
@@ -108,14 +117,7 @@ const MealReviewsScreen = ({ route }: MealReviewScreenProps) => {
         setLoadingMore(false);
       }
     },
-    [
-      mealId,
-      setData,
-      setError,
-      setLoading,
-      setLoadingMore,
-      user?.accessToken,
-    ],
+    [mealId, setData, setError, setLoading, setLoadingMore, user?.accessToken],
   );
 
   useEffect(() => {
@@ -161,23 +163,12 @@ const MealReviewsScreen = ({ route }: MealReviewScreenProps) => {
   );
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Quay lại công thức"
-          onPress={goBack}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>CÔNG THỨC</Text>
-          <Text numberOfLines={1} style={styles.headerTitle}>
-            Đánh giá
-          </Text>
-        </View>
-      </View>
+    <View style={styles.screen}>
+      <ScreenHeader
+        eyebrow="CÔNG THỨC"
+        title="Đánh giá"
+        backAccessibilityLabel="Quay lại công thức"
+      />
 
       <ScrollView
         contentContainerStyle={[
@@ -186,10 +177,7 @@ const MealReviewsScreen = ({ route }: MealReviewScreenProps) => {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <LinearGradient
-          colors={['#FFFFFF', '#F2F8F4']}
-          style={styles.mealCard}
-        >
+        <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.mealCard}>
           <Text style={styles.mealEyebrow}>ĐÁNH GIÁ CÔNG THỨC</Text>
           <Text style={styles.mealName}>{mealName}</Text>
           {!loading && data ? (
@@ -381,7 +369,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 13,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   rateButtonText: {

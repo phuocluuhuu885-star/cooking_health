@@ -19,7 +19,7 @@ const styles = StyleSheet.create({
   socialButton: {
     width: 48,
     height: 48,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: 'white',
     borderWidth: 1,
     borderColor: '#E1E7EB',

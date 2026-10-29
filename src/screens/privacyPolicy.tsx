@@ -11,8 +11,6 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import { useSelector } from 'react-redux';
-import { selectUserInfo } from '../reduxs/reduces/user';
 import {
   hasAcceptedPrivacyPolicy,
   savePrivacyPolicyConsent,
@@ -43,7 +41,6 @@ const PolicySection = ({
 const PrivacyPolicyScreen = ({ route }: Props) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-  const user = useSelector(selectUserInfo);
   const viewOnly = route.params?.mode === 'view';
   const [accepted, setAccepted] = useState(false);
   const [alreadyAccepted] = useState(hasAcceptedPrivacyPolicy() && !viewOnly);
@@ -51,9 +48,9 @@ const PrivacyPolicyScreen = ({ route }: Props) => {
   useEffect(() => {
     onSetNavigation(navigation);
     if (!viewOnly && hasAcceptedPrivacyPolicy()) {
-      resetTo(user?.accessToken ? ScreenKeys.HOMESCREEN : ScreenKeys.LOGIN);
+      resetTo(ScreenKeys.HOMESCREEN);
     }
-  }, [navigation, user?.accessToken, viewOnly]);
+  }, [navigation, viewOnly]);
 
   useEffect(() => {
     if (viewOnly) return undefined;
@@ -72,7 +69,7 @@ const PrivacyPolicyScreen = ({ route }: Props) => {
   const continueToApp = () => {
     if (!accepted) return;
     savePrivacyPolicyConsent();
-    resetTo(user?.accessToken ? ScreenKeys.HOMESCREEN : ScreenKeys.LOGIN);
+    resetTo(ScreenKeys.HOMESCREEN);
   };
 
   if (alreadyAccepted) {
@@ -122,7 +119,7 @@ const PrivacyPolicyScreen = ({ route }: Props) => {
         <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
           <PolicySection
             title="1. Dữ liệu chúng tôi xử lý"
-            children="Thông tin tài khoản gồm email, tên, mật khẩu đã mã hóa và ảnh đại diện nếu bạn chọn tải lên. Dữ liệu sức khỏe gồm tuổi, giới tính, chiều cao, cân nặng, mức độ vận động, mục tiêu và các chỉ số dinh dưỡng được tính từ thông tin đó. Dữ liệu sử dụng gồm thực đơn, món đã ăn, đánh giá, lịch sử đi bộ (bước, thời lượng, quãng đường và calo ước tính), nội dung chat và hoạt động gia đình bạn tham gia. Ứng dụng cũng gửi mã thiết bị cài đặt cùng hệ điều hành/phiên bản ứng dụng để vận hành và hỗ trợ xử lý lỗi."
+            children="Thông tin tài khoản gồm email, tên, mật khẩu đã mã hóa và ảnh đại diện nếu bạn chọn tải lên. Dữ liệu sức khỏe gồm tuổi, giới tính, chiều cao, cân nặng, BMI, mức độ vận động, mục tiêu và các chỉ số dinh dưỡng được tính từ thông tin đó. Mỗi lần bạn lưu hồ sơ sức khỏe, cân nặng và BMI cùng thời điểm cập nhật được lưu để tạo lịch sử biểu đồ. Dữ liệu sử dụng gồm thực đơn, món đã ăn, đánh giá, lịch sử đi bộ (bước, thời lượng, quãng đường và calo ước tính), nội dung chat và hoạt động gia đình bạn tham gia. Ứng dụng cũng gửi mã thiết bị cài đặt cùng hệ điều hành/phiên bản ứng dụng để vận hành và hỗ trợ xử lý lỗi."
           />
           <PolicySection
             title="2. Mục đích sử dụng"
@@ -134,23 +131,27 @@ const PrivacyPolicyScreen = ({ route }: Props) => {
           />
           <PolicySection
             title="4. Chia sẻ và lưu trữ"
-            children="Dữ liệu tài khoản và sức khỏe được lưu trên máy chủ MealCraft để cung cấp dịch vụ. Thông tin, thực đơn, nội dung chat hoặc hoạt động bạn gửi trong không gian gia đình có thể được thành viên của gia đình đó nhìn thấy. Không nhập thông tin sức khỏe nhạy cảm vào nội dung chat nếu bạn không muốn chia sẻ với các thành viên. Ảnh đại diện được lưu trên máy chủ ứng dụng. Không bán dữ liệu sức khỏe cá nhân."
+            children="Dữ liệu tài khoản, hồ sơ sức khỏe và lịch sử cân nặng/BMI được lưu trên máy chủ MealCraft để cung cấp dịch vụ và được xóa cùng tài khoản theo quy trình xóa. Thông tin, thực đơn, nội dung chat hoặc hoạt động bạn gửi trong không gian gia đình có thể được thành viên của gia đình đó nhìn thấy. Gợi ý thực đơn gia đình sử dụng mục tiêu và dinh dưỡng đã ghi nhận của thành viên có hồ sơ sức khỏe để tính nội bộ trên máy chủ MealCraft; dữ liệu gia đình không được gửi sang Gemini. Không nhập thông tin sức khỏe nhạy cảm vào nội dung chat nếu bạn không muốn chia sẻ với các thành viên. Ảnh đại diện được lưu trên máy chủ ứng dụng. Không bán dữ liệu sức khỏe cá nhân."
           />
           <PolicySection
-            title="5. Lưu giữ, truy cập và chỉnh sửa dữ liệu"
+            title="5. Gợi ý món ăn bằng AI (tùy chọn)"
+            children="Chỉ khi bạn chủ động yêu cầu gợi ý AI và đồng ý tại thời điểm sử dụng, MealCraft gửi Google Gemini các mục tiêu năng lượng/dinh dưỡng trong ngày, tổng dinh dưỡng đã ghi nhận hôm đó và thông tin các món phù hợp trong thư viện để xếp hạng, giải thích gợi ý. MealCraft không gửi tên, email, mã tài khoản, tuổi, giới tính, chiều cao, cân nặng hoặc BMI cho Gemini. Với hồ sơ dưới 18 tuổi, gợi ý được xử lý nội bộ và không gửi dữ liệu đến Gemini. Dữ liệu dinh dưỡng người trưởng thành gửi đi đã được giảm thiểu thông tin định danh trực tiếp nhưng vẫn có thể được xem là dữ liệu sức khỏe; Google xử lý dữ liệu theo điều khoản và chính sách hiện hành của họ. MealCraft không lưu nội dung yêu cầu AI. Bạn có thể từ chối hoặc thu hồi đồng ý ngay tại mục gợi ý AI; khi đó vẫn có thể xem các món gợi ý thông thường không cá nhân hóa bằng AI. Gợi ý chỉ mang tính tham khảo, không phải tư vấn y tế."
+          />
+          <PolicySection
+            title="6. Lưu giữ, truy cập và chỉnh sửa dữ liệu"
             children="Bạn có thể xem và cập nhật tên, ảnh đại diện trong mục Thông tin cá nhân; xem và cập nhật dữ liệu sức khỏe trong Hồ sơ sức khỏe. Bạn có thể xóa tài khoản ngay trong ứng dụng. Với yêu cầu truy cập bản sao dữ liệu hoặc yêu cầu khác, hãy liên hệ đơn vị vận hành qua thông tin hỗ trợ chính thức của MealCraft. Việc lưu giữ dữ liệu tuân theo pháp luật áp dụng."
           />
           <PolicySection
-            title="6. Xóa tài khoản và dữ liệu"
+            title="7. Xóa tài khoản và dữ liệu"
             children="Bạn có thể xóa vĩnh viễn tài khoản trong mục Thông tin cá nhân sau khi xác nhận bằng mật khẩu. Hồ sơ, dữ liệu sức khỏe, lịch sử đi bộ, thực đơn cá nhân, đánh giá và ảnh đại diện gắn với tài khoản sẽ bị xóa. Món/đề xuất do bạn tạo và bình chọn gắn với tài khoản trong không gian gia đình cũng có thể bị xóa. Tin nhắn chat đã gửi có thể được giữ lại nhưng gỡ liên kết với tài khoản của bạn. Việc xóa tài khoản không thể hoàn tác."
           />
           <PolicySection
-            title="7. Điều khoản sử dụng"
+            title="8. Điều khoản sử dụng"
             children="Bạn đồng ý cung cấp thông tin chính xác, tự bảo vệ thông tin đăng nhập và chỉ sử dụng ứng dụng hợp pháp. Bạn có thể ngừng sử dụng hoặc xóa tài khoản bất cứ lúc nào. Việc tiếp tục sử dụng tính năng cần quyền thiết bị phụ thuộc vào quyền bạn cấp trong cài đặt hệ điều hành."
           />
         </LinearGradient>
 
-        <Text style={styles.version}>Cập nhật: 28/10/2026</Text>
+        <Text style={styles.version}>Cập nhật: 29/10/2026</Text>
       </ScrollView>
 
       {viewOnly ? (
@@ -303,7 +304,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 12,
-    borderRadius: 13,
+    borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   disabledButton: { opacity: 0.45 },

@@ -12,6 +12,7 @@ import { navigate } from '../../utils/navigation';
 import ScreenKeys from '../../utils/screenKey';
 import type { PlannedMealItemProps } from '../../utils/types';
 import { formatNumberWithOptionalDecimal } from '../../utils/numberUtils';
+import { formatEstimatedPrice } from '../../utils/priceUtils';
 
 const PlannedMealItem = ({
   item,
@@ -48,6 +49,9 @@ const PlannedMealItem = ({
             </Text>
             <Text style={styles.servings}>
               {formatNumberWithOptionalDecimal(item.servings)} khẩu phần
+            </Text>
+            <Text style={styles.price}>
+              {formatEstimatedPrice(item.estimatedPrice)}
             </Text>
             {item.addedBy ? (
               <Text numberOfLines={1} style={styles.servings}>
@@ -121,6 +125,12 @@ const styles = StyleSheet.create({
     color: '#7A858E',
     fontSize: 12,
   },
+  price: {
+    marginTop: 4,
+    color: '#168653',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   deleteButton: {
     minWidth: 40,
     height: 32,
@@ -128,7 +138,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: 8,
     paddingHorizontal: 7,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#FEF3F2',
   },
   deleteButtonText: {
