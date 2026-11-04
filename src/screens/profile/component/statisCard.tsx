@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { StyleSheet, View } from "react-native";
-import LinearGradient from "react-native-linear-gradient";
+import LinearGradient from '../../../components/LinearGradient';
 import Text from "../../../abase/component/text";
 import { colors } from "../../../abase/constant";
 

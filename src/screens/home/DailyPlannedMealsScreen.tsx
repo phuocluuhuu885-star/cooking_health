@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { StackScreenProps } from '@react-navigation/stack';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { AppImage } from '../../abase/component';
@@ -165,7 +165,7 @@ const DailyPlannedMealsScreen = ({ route }: Props) => {
                         />
                       ) : (
                         <View style={[styles.mealImage, styles.imageFallback]}>
-                          <Text style={styles.fallbackText}>MealCraft</Text>
+                          <Text style={styles.fallbackText}>HealthAndCook</Text>
                         </View>
                       )}
                       <View style={styles.mealCopy}>

@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import apiConst from '../../abase/constant/apiConst';
 import type { UserInfo } from '../../type/user';
 import type { MealPeriod } from '../../utils/types';

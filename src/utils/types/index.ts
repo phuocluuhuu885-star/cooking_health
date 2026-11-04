@@ -10,6 +10,11 @@ export type {
   DailyConsumedMealsCardProps,
   AddConsumedMealResponse,
   AiMealRecommendation,
+  AiMealChatResponse,
+  AiMealChatSuggestion,
+  AiMealScanNutrition,
+  AiMealScanResponse,
+  AiMealScanResult,
   AiMealRecommendationsData,
   AiMealRecommendationsResponse,
   ConsumptionReportCardProps,
@@ -31,7 +36,6 @@ export type {
   NutritionValues,
   PlannedMeal,
   PlannedMealItemProps,
-  ProfileScreenState,
   HealthProfileHistoryPoint,
   HealthProfileHistoryResponse,
   HealthProfileHistoryCardProps,
@@ -100,6 +104,18 @@ export type {
 } from './home';
 export * from './review';
 export type {
+  Expense,
+  ExpenseCategory,
+  ExpenseMonthData,
+  ExpenseResponse,
+  ExpenseScope,
+  ExpenseSource,
+  Income,
+  IncomeCategory,
+  IncomeMonthData,
+  MealBudget,
+} from './expense';
+export type {
   WalkingLocationPoint,
   WalkingStepUpdate,
   WalkingSummary,
@@ -110,3 +126,8 @@ export type {
   WalkingWorkoutResponse,
   WalkingWorkoutStatus,
 } from './walking';
+export type {
+  AddWaterIntakeResponse,
+  WaterIntakeEntry,
+  WaterIntakeResponse,
+} from './water';

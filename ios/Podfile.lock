@@ -13,6 +13,9 @@ PODS:
     - ReactNativeDependencies
   - glog (0.3.5):
     - ReactNativeDependencies
+  - Google-Mobile-Ads-SDK (13.10.0):
+    - GoogleUserMessagingPlatform (>= 1.1)
+  - GoogleUserMessagingPlatform (3.1.0)
   - hermes-engine (250829098.0.16):
     - hermes-engine/Pre-built (= 250829098.0.16)
   - hermes-engine/Pre-built (250829098.0.16)
@@ -1815,6 +1818,30 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - RNGoogleMobileAds (17.4.0):
+    - Google-Mobile-Ads-SDK (= 13.10.0)
+    - GoogleUserMessagingPlatform (= 3.1.0)
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-bridging
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - RNScreens (4.30.0):
     - hermes-engine
     - RCTRequired
@@ -2016,6 +2043,7 @@ DEPENDENCIES:
   - RNDeviceInfo (from `../node_modules/react-native-device-info`)
   - "RNFastImage (from `../node_modules/@d11/react-native-fast-image`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
+  - RNGoogleMobileAds (from `../node_modules/react-native-google-mobile-ads`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSVG (from `../node_modules/react-native-svg`)
   - SocketRocket (from `build/rndeps-facades/SocketRocket`)
@@ -2023,6 +2051,8 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - Google-Mobile-Ads-SDK
+    - GoogleUserMessagingPlatform
     - libavif
     - libdav1d
     - libwebp
@@ -2216,6 +2246,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@d11/react-native-fast-image"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
+  RNGoogleMobileAds:
+    :path: "../node_modules/react-native-google-mobile-ads"
   RNScreens:
     :path: "../node_modules/react-native-screens"
   RNSVG:
@@ -2233,6 +2265,8 @@ SPEC CHECKSUMS:
   FBLazyVector: 732df79fea96f10cc14477969cea05707026d2fd
   fmt: ba0886e864ebb21d14c98b2e12e164b8002f5b93
   glog: 3cf7cb46f743c4bc758ae3e6d9c15bd1b4cfd6d4
+  Google-Mobile-Ads-SDK: 8e764c4990ef82c2727fd32e0c4143817b443603
+  GoogleUserMessagingPlatform: befe603da6501006420c206222acd449bba45a9c
   hermes-engine: 6a26e94b4a974cbadc751eed9caa12624c38f226
   libavif: 84bbb62fb232c3018d6f1bab79beea87e35de7b7
   libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
@@ -2321,6 +2355,7 @@ SPEC CHECKSUMS:
   RNDeviceInfo: 4c852998208b60dc192ae3529e5867817719ad1e
   RNFastImage: 57758cc1d6f6edf86452aca702b6a423b983ac05
   RNGestureHandler: f1976ee206660832241a6802c866bc4b019be94d
+  RNGoogleMobileAds: f06a90afceacf8018999272875671c1abcb35a3c
   RNScreens: cffc1add7f801ca6a13eef6b112052e0cd74b26b
   RNSVG: 6c9bcbf53822153be6f6c1484f6b0b57c0040d21
   SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf

@@ -1,6 +1,12 @@
 import React, { memo, useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import LinearGradient from '../../components/LinearGradient';
 import { AppImage } from '../../abase/component';
 import type { HomeRecipeCardProps } from '../../utils/types';
 import { formatEstimatedPrice } from '../../utils/priceUtils';
@@ -9,7 +15,9 @@ const HomeRecipeCard = memo(
   ({
     meal,
     onPress,
-    reviewSummary,
+    onAdd,
+    adding = false,
+    disableAdd = false,
     recommendationReason,
     recommendedServings,
     estimatedPrice,
@@ -17,6 +25,9 @@ const HomeRecipeCard = memo(
     const handlePress = useCallback(() => {
       onPress(meal.id);
     }, [meal.id, onPress]);
+    const handleAdd = useCallback(() => {
+      onAdd?.();
+    }, [onAdd]);
 
     return (
       <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.card}>
@@ -34,7 +45,7 @@ const HomeRecipeCard = memo(
             />
           ) : (
             <View style={[styles.image, styles.imagePlaceholder]}>
-              <Text style={styles.placeholderText}>MealCraft</Text>
+              <Text style={styles.placeholderText}>HealthAndCook</Text>
             </View>
           )}
           <View style={styles.details}>
@@ -67,22 +78,21 @@ const HomeRecipeCard = memo(
           </View>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
-        <View
-          accessible
-          accessibilityLabel={
-            reviewSummary?.total
-              ? `Đánh giá ${reviewSummary.averageRating.toFixed(1)} trên 5 sao`
-              : 'Chưa có đánh giá'
-          }
-          style={styles.reviewRow}
-        >
-          <Text style={styles.ratingStar}>★</Text>
-          <Text style={styles.ratingValue}>
-            {reviewSummary?.total
-              ? reviewSummary.averageRating.toFixed(1)
-              : '—'}
-          </Text>
-        </View>
+        {onAdd ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Thêm ${meal.name} vào bữa`}
+            disabled={disableAdd}
+            onPress={handleAdd}
+            style={[styles.addButton, disableAdd && styles.disabled]}
+          >
+            {adding ? (
+              <ActivityIndicator color="#168653" size="small" />
+            ) : (
+              <Text style={styles.addButtonText}>+</Text>
+            )}
+          </Pressable>
+        ) : null}
       </LinearGradient>
     );
   },
@@ -162,6 +172,27 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingLeft: 10,
   },
+  addButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 1,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5EBE7',
+  },
+  addButtonText: {
+    color: '#168653',
+    fontSize: 24,
+    lineHeight: 27,
+    fontWeight: '500',
+  },
+  disabled: { opacity: 0.55 },
   ratingSummary: {
     flexDirection: 'row',
     alignItems: 'center',

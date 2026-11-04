@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>MealCraft</string>
+	<string>HealthAndCook</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -34,13 +34,17 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>MealCraft dùng vị trí khi bạn đang đi bộ để đo quãng đường, kể cả khi khóa màn hình.</string>
+	<string>HealthAndCook dùng vị trí khi bạn đang đi bộ để đo quãng đường, kể cả khi khóa màn hình.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Cho phép MealCraft tiếp tục ghi nhận quãng đường khi bạn khóa màn hình hoặc chuyển ứng dụng trong buổi đi bộ.</string>
+	<string>Cho phép HealthAndCook tiếp tục ghi nhận quãng đường khi bạn khóa màn hình hoặc chuyển ứng dụng trong buổi đi bộ.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Cho phép MealCraft tiếp tục ghi nhận quãng đường khi bạn khóa màn hình hoặc chuyển ứng dụng trong buổi đi bộ.</string>
+	<string>Cho phép HealthAndCook tiếp tục ghi nhận quãng đường khi bạn khóa màn hình hoặc chuyển ứng dụng trong buổi đi bộ.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>MealCraft dùng dữ liệu chuyển động để đếm bước chân trong buổi đi bộ.</string>
+	<string>HealthAndCook dùng dữ liệu chuyển động để đếm bước chân trong buổi đi bộ.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>HealthAndCook dùng camera để chụp món ăn và ước tính thành phần dinh dưỡng.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>HealthAndCook cần truy cập ảnh bạn chọn để phân tích món ăn và ước tính dinh dưỡng.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

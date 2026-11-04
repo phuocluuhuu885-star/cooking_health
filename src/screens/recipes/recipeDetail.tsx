@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,9 +12,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
+import { useIsFocused } from '@react-navigation/native';
+import { TestIds, useInterstitialAd } from 'react-native-google-mobile-ads';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppImage } from '../../abase/component';
 import LoginRequiredModal from '../component/LoginRequiredModal';
@@ -30,14 +39,20 @@ import { goBack, navigate } from '../../utils/navigation';
 import { fetchCurrentHousehold } from '../../utils/householdApi';
 import { addMealToPlan } from '../../utils/mealPlanApi';
 import ScreenKeys from '../../utils/screenKey';
-import { fetchMealReviewSummaries } from '../../utils/mealReviewApi';
+import {
+  fetchMealReviewSummaries,
+  fetchMealReviews,
+} from '../../utils/mealReviewApi';
 import { createStateSetter } from '../../utils/stateUtils';
 import { formatNumberWithOptionalDecimal } from '../../utils/numberUtils';
+import { localStorage } from '../../utils/storage';
+import { initializeGoogleMobileAds } from '../../utils/googleMobileAds';
 import MealPlanComposerModal from './MealPlanComposerModal';
 import MealReviewModal from './MealReviewModal';
 import type {
   MealPeriod,
   MealPlanDestination,
+  MealReview,
   NutritionItemProps,
   Recipe,
   RecipeDetailMeal,
@@ -52,15 +67,22 @@ const CATEGORY_LABELS: Record<RecipeDetailMeal['category'], string> = {
   DINNER: 'Bữa tối',
   SNACK: 'Ăn nhẹ',
 };
+const INTERSTITIAL_COOLDOWN_MS = 5 * 60 * 1000;
+const INTERSTITIAL_LOAD_TIMEOUT_MS = 10 * 1000;
+const LAST_INTERSTITIAL_SHOWN_KEY = 'recipe-detail-interstitial-last-shown';
 
 const RecipeDetail = (props: RecipeDetailScreenProps) => {
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
   const household = useSelector(selectCurrentHousehold);
   const householdLoaded = useSelector(selectHouseholdLoaded);
   const mealPlanDestination = useSelector(selectMealPlanDestination);
   const [loginPromptVisible, setLoginPromptVisible] = useState(false);
+  const [reviewPreview, setReviewPreview] = useState<MealReview[]>([]);
+  const [adLoadStarted, setAdLoadStarted] = useState(false);
+  const [adGateComplete, setAdGateComplete] = useState(false);
   const [state, setState] = useState<RecipeDetailState>({
     servings: 1,
     reloadIndex: 0,
@@ -82,6 +104,18 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
     reviewModalVisible,
     reviewSummary,
   } = state;
+  const {
+    status: interstitialStatus,
+    error: interstitialError,
+    load: loadInterstitial,
+    show: showInterstitial,
+  } = useInterstitialAd({
+    adUnitId: TestIds.INTERSTITIAL,
+    autoLoad: false,
+    requestOptions: { requestNonPersonalizedAdsOnly: true },
+  });
+  const adLoadStartedRef = useRef(false);
+  const adShowAttemptedRef = useRef(false);
   const setComposerVisible = useMemo(
     () => createStateSetter(setState, 'composerVisible'),
     [setState],
@@ -99,6 +133,93 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
     [setState],
   );
   const mealId = props.route.params.mealId;
+  useEffect(() => {
+    if (adLoadStartedRef.current || adGateComplete) {
+      return;
+    }
+
+    if (!user?.accessToken) {
+      setAdGateComplete(true);
+      return;
+    }
+
+    const lastShownAt =
+      localStorage.getNumber(LAST_INTERSTITIAL_SHOWN_KEY) ?? 0;
+    if (Date.now() - lastShownAt < INTERSTITIAL_COOLDOWN_MS) {
+      setAdGateComplete(true);
+      return;
+    }
+
+    adLoadStartedRef.current = true;
+    setAdLoadStarted(true);
+    initializeGoogleMobileAds()
+      .then(() => {
+        loadInterstitial();
+      })
+      .catch(adError => {
+        console.error('Failed to initialize Google Mobile Ads SDK', adError);
+        setAdGateComplete(true);
+      });
+  }, [adGateComplete, loadInterstitial, user?.accessToken]);
+
+  useEffect(() => {
+    if (
+      !adLoadStarted ||
+      adGateComplete ||
+      interstitialStatus === 'loaded' ||
+      interstitialStatus === 'showing'
+    ) {
+      return undefined;
+    }
+    const timeout = setTimeout(
+      () => setAdGateComplete(true),
+      INTERSTITIAL_LOAD_TIMEOUT_MS,
+    );
+    return () => clearTimeout(timeout);
+  }, [adGateComplete, adLoadStarted, interstitialStatus]);
+
+  useEffect(() => {
+    if (!isFocused || !adLoadStarted || adGateComplete) {
+      return;
+    }
+    if (interstitialStatus === 'loaded' && !adShowAttemptedRef.current) {
+      adShowAttemptedRef.current = true;
+      try {
+        showInterstitial();
+      } catch (adError) {
+        console.error('Failed to show recipe detail interstitial ad', adError);
+        setAdGateComplete(true);
+      }
+      return;
+    }
+    if (
+      interstitialStatus === 'closed' ||
+      interstitialStatus === 'no-fill' ||
+      interstitialStatus === 'error'
+    ) {
+      setAdGateComplete(true);
+    }
+  }, [
+    adGateComplete,
+    adLoadStarted,
+    interstitialStatus,
+    isFocused,
+    showInterstitial,
+  ]);
+
+  useEffect(() => {
+    if (interstitialStatus === 'showing') {
+      localStorage.set(LAST_INTERSTITIAL_SHOWN_KEY, Date.now());
+    }
+  }, [interstitialStatus]);
+
+  useEffect(() => {
+    if (interstitialError) {
+      console.warn('Recipe detail interstitial ad failed', interstitialError);
+      setAdGateComplete(true);
+    }
+  }, [interstitialError]);
+
   const composerRecipe = useMemo<Recipe | null>(
     () =>
       meal
@@ -152,12 +273,19 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
       setState(previous => ({ ...previous, loading: false }));
     };
 
-    loadMeal().catch(() => {
+    loadMeal().catch(loadError => {
+      console.error('Failed to load recipe detail', {
+        mealId,
+        error: loadError,
+      });
       if (isCurrentRequest) {
         setState(previous => ({
           ...previous,
           meal: null,
-          error: 'Không thể kết nối để tải công thức. Vui lòng thử lại.',
+          error:
+            loadError instanceof Error && loadError.message
+              ? loadError.message
+              : 'Không thể kết nối để tải công thức. Vui lòng thử lại.',
           loading: false,
         }));
       }
@@ -171,10 +299,15 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
   useEffect(() => {
     let active = true;
     setReviewSummary(null);
-    fetchMealReviewSummaries([mealId])
-      .then(summaries => {
+    setReviewPreview([]);
+    Promise.all([
+      fetchMealReviewSummaries([mealId]),
+      fetchMealReviews(mealId, user?.accessToken),
+    ])
+      .then(([summaries, reviews]) => {
         if (active) {
           setReviewSummary(summaries[0] ?? null);
+          setReviewPreview(reviews.reviews.slice(0, 3));
         }
       })
       .catch(reviewError => {
@@ -183,7 +316,7 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
     return () => {
       active = false;
     };
-  }, [mealId, setReviewSummary]);
+  }, [mealId, setReviewSummary, user?.accessToken]);
 
   const orderedSteps = useMemo(
     () =>
@@ -201,12 +334,15 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
       reloadIndex: previous.reloadIndex + 1,
     }));
   }, [setState]);
-  const adjustServings = useCallback((amount: number) => {
-    setState(previous => ({
-      ...previous,
-      servings: Math.max(1, Math.min(20, previous.servings + amount)),
-    }));
-  }, [setState]);
+  const adjustServings = useCallback(
+    (amount: number) => {
+      setState(previous => ({
+        ...previous,
+        servings: Math.max(1, Math.min(20, previous.servings + amount)),
+      }));
+    },
+    [setState],
+  );
   const decreaseServings = useCallback(() => {
     adjustServings(-1);
   }, [adjustServings]);
@@ -221,19 +357,25 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
       });
     }
   }, [meal]);
-  const handleReviewSubmitted = useCallback((rating: number) => {
-    setReviewSummary(current => {
-      const total = (current?.total ?? 0) + 1;
-      return {
-        mealId,
-        total,
-        averageRating:
-          ((current?.averageRating ?? 0) * (current?.total ?? 0) + rating) /
+  const handleRateMeal = useCallback(() => {
+    setReviewModalVisible(true);
+  }, [setReviewModalVisible]);
+  const handleReviewSubmitted = useCallback(
+    (rating: number) => {
+      setReviewSummary(current => {
+        const total = (current?.total ?? 0) + 1;
+        return {
+          mealId,
           total,
-      };
-    });
-    setReviewModalVisible(false);
-  }, [mealId, setReviewModalVisible, setReviewSummary]);
+          averageRating:
+            ((current?.averageRating ?? 0) * (current?.total ?? 0) + rating) /
+            total,
+        };
+      });
+      setReviewModalVisible(false);
+    },
+    [mealId, setReviewModalVisible, setReviewSummary],
+  );
   const handleCloseComposer = useCallback(() => {
     if (!composerSaving) {
       setComposerVisible(false);
@@ -255,7 +397,6 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
       return;
     }
 
-    let activeHousehold = household;
     const openForPersonalPlan = () => {
       dispatch(
         setMealPlanDestination({
@@ -284,11 +425,10 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
           );
           return;
         }
-        activeHousehold = householdResponse.data;
         dispatch(
           cacheCurrentHousehold({
             userId: user.id,
-            household: activeHousehold,
+            household: householdResponse.data,
           }),
         );
       } catch {
@@ -304,19 +444,8 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
       }
     }
 
-    if (!activeHousehold && mealPlanDestination === 'HOUSEHOLD') {
-      openForPersonalPlan();
-      return;
-    }
-    setComposerVisible(true);
-  }, [
-    dispatch,
-    household,
-    householdLoaded,
-    mealPlanDestination,
-    setComposerVisible,
-    user,
-  ]);
+    openForPersonalPlan();
+  }, [dispatch, householdLoaded, setComposerVisible, user]);
   const handleDestinationChange = useCallback(
     (destination: MealPlanDestination) => {
       if (user?.id) {
@@ -420,8 +549,13 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
             ? `Món đã được thêm vào danh sách bình chọn cho ngày ${date}. Hạn bình chọn được cài đặt trong màn Thực phẩm gia đình.`
             : `Đã thêm món vào thực đơn ngày ${date}.`,
         );
-      } catch {
-        Alert.alert('Không thể thêm món', 'Vui lòng thử lại sau.');
+      } catch (caughtError) {
+        Alert.alert(
+          'Không thể thêm món',
+          caughtError instanceof Error
+            ? caughtError.message
+            : 'Vui lòng thử lại sau.',
+        );
       } finally {
         setComposerSaving(false);
       }
@@ -437,11 +571,15 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
     ],
   );
 
-  if (loading) {
+  if (!adGateComplete || loading) {
     return (
       <View style={[styles.statusScreen, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={COLORS.green} />
-        <Text style={styles.statusMessage}>Đang tải công thức...</Text>
+        <Text style={styles.statusMessage}>
+          {!adGateComplete
+            ? 'Đang chuẩn bị nội dung...'
+            : 'Đang tải công thức...'}
+        </Text>
       </View>
     );
   }
@@ -474,6 +612,15 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
 
   return (
     <View style={styles.screen}>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Quay lại danh sách công thức"
+        hitSlop={8}
+        onPress={goBack}
+        style={[styles.backButton, { top: insets.top + 12 }]}
+      >
+        <Text style={styles.backButtonText}>‹</Text>
+      </TouchableOpacity>
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -490,19 +637,11 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
             />
           ) : (
             <View style={[styles.heroImage, styles.imagePlaceholder]}>
-              <Text style={styles.imagePlaceholderText}>MealCraft</Text>
+              <Text style={styles.imagePlaceholderText}>HealthAndCook</Text>
             </View>
           )}
           <View style={styles.heroShade} />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Quay lại danh sách công thức"
-            hitSlop={8}
-            onPress={goBack}
-            style={[styles.backButton, { top: insets.top + 12 }]}
-          >
-            <Text style={styles.backButtonText}>‹</Text>
-          </Pressable>
+
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryBadgeText}>
               {CATEGORY_LABELS[meal.category]}
@@ -510,16 +649,41 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
           </View>
         </View>
 
-        <LinearGradient
-          colors={['#FFFFFF', '#F2F8F4']}
-          style={styles.section}
-        >
+        <View style={styles.heroActions}>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Thêm món vào thực đơn"
             onPress={handleOpenComposer}
             style={styles.addToPlanButton}
           >
+            <Text style={styles.addToPlanIcon}>+</Text>
             <Text style={styles.addToPlanButtonText}>Thêm vào thực đơn</Text>
+          </Pressable>
+        </View>
+
+        <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.section}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              reviewSummary?.total
+                ? `Đánh giá món ăn, ${Math.round(
+                    reviewSummary.averageRating,
+                  )} sao. Chạm để đánh giá`
+                : 'Đánh giá món ăn. Chạm để đánh giá'
+            }
+            onPress={handleRateMeal}
+            style={styles.ratingStarsButton}
+          >
+            <Text style={styles.ratingStars}>
+              {reviewSummary?.total
+                ? '★'.repeat(
+                    Math.max(
+                      1,
+                      Math.min(5, Math.round(reviewSummary.averageRating)),
+                    ),
+                  )
+                : '☆'}
+            </Text>
           </Pressable>
           <Text style={styles.title}>{meal.name}</Text>
           {meal.description ? (
@@ -551,44 +715,7 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
           </View>
         </LinearGradient>
 
-        <LinearGradient
-          colors={['#FFFFFF', '#F2F8F4']}
-          style={styles.section}
-        >
-          <Text style={styles.sectionTitle}>Đánh giá món ăn</Text>
-          <View style={styles.reviewSummaryRow}>
-            <Text style={styles.reviewStar}>★</Text>
-            <Text style={styles.reviewAverage}>
-              {reviewSummary?.total
-                ? reviewSummary.averageRating.toFixed(1)
-                : '—'}
-            </Text>
-            <Text style={styles.reviewCount}>
-              {reviewSummary?.total ?? 0} đánh giá
-            </Text>
-          </View>
-          <View style={styles.reviewActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={handleViewReviews}
-              style={styles.viewReviewsButton}
-            >
-              <Text style={styles.viewReviewsText}>Xem đánh giá</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setReviewModalVisible(true)}
-              style={styles.rateButton}
-            >
-              <Text style={styles.rateButtonText}>Đánh giá</Text>
-            </Pressable>
-          </View>
-        </LinearGradient>
-
-        <LinearGradient
-          colors={['#FFFFFF', '#F2F8F4']}
-          style={styles.section}
-        >
+        <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.section}>
           <Text style={styles.sectionTitle}>Khẩu phần</Text>
           <Text style={styles.sectionSubtitle}>
             Nguyên liệu và dinh dưỡng được cập nhật theo số người
@@ -627,10 +754,7 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
           </View>
         </LinearGradient>
 
-        <LinearGradient
-          colors={['#FFFFFF', '#F2F8F4']}
-          style={styles.section}
-        >
+        <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.section}>
           <Text style={styles.sectionTitle}>Dinh dưỡng</Text>
           {nutrition ? (
             <LinearGradient
@@ -682,10 +806,7 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
           )}
         </LinearGradient>
 
-        <LinearGradient
-          colors={['#FFFFFF', '#F2F8F4']}
-          style={styles.section}
-        >
+        <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.section}>
           <View style={styles.sectionHeading}>
             <View>
               <Text style={styles.sectionTitle}>Nguyên liệu</Text>
@@ -711,19 +832,14 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
                 <Text style={styles.ingredientName}>{ingredient.name}</Text>
                 <Text style={styles.ingredientAmount}>
                   {ingredient.formattedAmount ||
-                    `${formatNumberWithOptionalDecimal(
-                      ingredient.amountG,
-                    )} g`}
+                    `${formatNumberWithOptionalDecimal(ingredient.amountG)} g`}
                 </Text>
               </View>
             ))}
           </View>
         </LinearGradient>
 
-        <LinearGradient
-          colors={['#FFFFFF', '#F2F8F4']}
-          style={styles.section}
-        >
+        <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.section}>
           <Text style={styles.sectionTitle}>Cách nấu</Text>
           <Text style={styles.sectionSubtitle}>
             Làm theo từng bước để món ăn đạt kết quả tốt nhất
@@ -753,6 +869,59 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
               </View>
             ))}
           </View>
+        </LinearGradient>
+
+        <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.section}>
+          <View style={styles.reviewsHeading}>
+            <View>
+              <Text style={styles.sectionTitle}>Đánh giá món ăn</Text>
+              <Text style={styles.sectionSubtitle}>
+                {reviewSummary?.total ?? 0} đánh giá
+                {reviewSummary?.total
+                  ? ` · Trung bình ${reviewSummary.averageRating.toFixed(
+                      1,
+                    )} sao`
+                  : ''}
+              </Text>
+            </View>
+          </View>
+          {reviewPreview.length ? (
+            reviewPreview.map(review => (
+              <View key={review.id} style={styles.reviewPreview}>
+                <View style={styles.reviewPreviewHeader}>
+                  <Text style={styles.reviewerName}>{review.userName}</Text>
+                  <Text
+                    accessibilityLabel={`${review.rating} sao`}
+                    style={styles.reviewPreviewStars}
+                  >
+                    {'★'.repeat(Math.max(0, Math.min(5, review.rating)))}
+                  </Text>
+                </View>
+                {review.comment ? (
+                  <Text numberOfLines={3} style={styles.reviewPreviewComment}>
+                    {review.comment}
+                  </Text>
+                ) : (
+                  <Text style={styles.reviewPreviewNoComment}>
+                    Không có bình luận
+                  </Text>
+                )}
+              </View>
+            ))
+          ) : (
+            <Text style={styles.reviewPreviewNoComment}>
+              Chưa có đánh giá nào cho món ăn này.
+            </Text>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Xem tất cả đánh giá"
+            onPress={handleViewReviews}
+            style={styles.moreReviewsButton}
+          >
+            <Text style={styles.moreReviewsIcon}>•••</Text>
+            <Text style={styles.moreReviewsText}>Xem nhiều đánh giá</Text>
+          </Pressable>
         </LinearGradient>
 
         <Text style={styles.disclaimer}>
@@ -853,6 +1022,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
+    zIndex: 10,
     backgroundColor: 'rgba(255,255,255,0.94)',
   },
   backButtonText: {
@@ -921,69 +1091,100 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     backgroundColor: COLORS.border,
   },
-  addToPlanButton: {
+  heroActions: {
     alignItems: 'flex-end',
+    marginHorizontal: 16,
+    marginTop: 10,
+  },
+  addToPlanButton: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    gap: 7,
+    paddingHorizontal: 14,
+    borderRadius: 22,
     backgroundColor: COLORS.green,
-    paddingHorizontal: 12,
+  },
+  addToPlanIcon: {
+    color: COLORS.white,
+    fontSize: 22,
+    lineHeight: 24,
+    fontWeight: '500',
   },
   addToPlanButtonText: {
     color: COLORS.white,
     fontSize: 13,
     fontWeight: '800',
   },
-  reviewSummaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  reviewStar: {
-    color: '#E89B36',
-    fontSize: 20,
-  },
-  reviewAverage: {
-    marginLeft: 5,
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  reviewCount: {
-    marginLeft: 8,
-    color: COLORS.secondary,
-    fontSize: 12,
-  },
-  reviewActions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
-  },
-  viewReviewsButton: {
-    flex: 1,
-    minHeight: 42,
-    alignItems: 'center',
+  ratingStarsButton: {
+    alignSelf: 'flex-start',
+    minHeight: 34,
     justifyContent: 'center',
-    borderRadius: 8,
-    backgroundColor: COLORS.lightGreen,
+    marginBottom: 8,
   },
-  viewReviewsText: {
-    color: COLORS.green,
-    fontSize: 12,
+  ratingStars: {
+    color: '#E89B36',
+    fontSize: 23,
+    letterSpacing: 1,
+  },
+  reviewsHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  reviewPreview: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  reviewPreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  reviewerName: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: 13,
     fontWeight: '700',
   },
-  rateButton: {
-    flex: 1,
+  reviewPreviewStars: {
+    color: '#E89B36',
+    fontSize: 14,
+    letterSpacing: 1,
+  },
+  reviewPreviewComment: {
+    marginTop: 7,
+    color: COLORS.text,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  reviewPreviewNoComment: {
+    paddingVertical: 12,
+    color: COLORS.secondary,
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  moreReviewsButton: {
     minHeight: 42,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
-    backgroundColor: COLORS.green,
+    gap: 8,
+    marginTop: 8,
+    borderRadius: 9,
+    backgroundColor: COLORS.lightGreen,
   },
-  rateButtonText: {
-    color: COLORS.white,
-    fontSize: 12,
+  moreReviewsIcon: {
+    color: COLORS.green,
+    fontSize: 18,
+    lineHeight: 20,
     fontWeight: '800',
   },
+  moreReviewsText: { color: COLORS.green, fontSize: 12, fontWeight: '700' },
   sectionHeading: {
     flexDirection: 'row',
     alignItems: 'center',

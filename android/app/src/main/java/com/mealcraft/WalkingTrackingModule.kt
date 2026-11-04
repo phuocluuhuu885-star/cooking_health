@@ -49,6 +49,14 @@ class WalkingTrackingModule(
               "timestamp",
               intent.getLongExtra(WalkingTrackingService.EXTRA_TIMESTAMP, 0L).toDouble(),
             )
+            payload.putInt(
+              "steps",
+              intent.getIntExtra(WalkingTrackingService.EXTRA_STEPS, 0),
+            )
+            payload.putDouble(
+              "distanceMeters",
+              intent.getDoubleExtra(WalkingTrackingService.EXTRA_DISTANCE_METERS, 0.0),
+            )
           }
           "WalkingTrackingStatus" -> {
             payload.putString("kind", intent.getStringExtra(WalkingTrackingService.EXTRA_KIND))

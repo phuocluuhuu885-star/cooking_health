@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { AppImage } from '../../abase/component';
 import { navigate } from '../../utils/navigation';
 import ScreenKeys from '../../utils/screenKey';

@@ -15,7 +15,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { Calendar } from 'react-native-calendars';
 import type { CalendarProps, DateData } from 'react-native-calendars';
 import '../../utils/calendarLocale';

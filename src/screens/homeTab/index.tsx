@@ -12,10 +12,13 @@ import { selectUserInfo } from '../../reduxs/reduces/user';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import HealthProfile from '../profile/healthProfile';
 import { createStateSetter } from '../../utils/stateUtils';
+import HealthDashboardScreen from '../home/HealthDashboardScreen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const screens = {
   HomeTab: HomeScreen,
   Recipes: RecipeLibrary,
+  Health: HealthDashboardScreen,
   Groceries: Groceries,
   Profile: Profile,
 };
@@ -23,6 +26,7 @@ const Tab = createBottomTabNavigator();
 
 const HomeView = () => {
   const user = useSelector(selectUserInfo);
+  const insets = useSafeAreaInsets();
   const [state, setState] = useState({ visibleHealthProfile: false });
   const { visibleHealthProfile } = state;
   const setVisibleHealthProfile = useMemo(
@@ -58,6 +62,11 @@ const HomeView = () => {
         initialRouteName="HomeTab"
         screenOptions={{
           headerShown: false,
+          tabBarStyle: {
+            height: insets.bottom + 66,
+            backgroundColor: 'transparent',
+            borderTopWidth: 0,
+          },
         }}
         tabBar={renderTabBar}
       >

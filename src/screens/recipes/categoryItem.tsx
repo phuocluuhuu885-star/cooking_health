@@ -1,6 +1,6 @@
 import { memo, useCallback } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import type { CategoryItemProps } from '../../utils/types';
 
 const CategoryItem = memo(({ item, selected, onPress }: CategoryItemProps) => {

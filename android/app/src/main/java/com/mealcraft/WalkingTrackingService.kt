@@ -31,9 +31,11 @@ class WalkingTrackingService : Service(), SensorEventListener, LocationListener 
   private var stepSensor: Sensor? = null
   private var sessionId: String? = null
   private var previousSteps = 0
+  private var lastDistanceSteps = 0
   private var stepBaseline: Int? = null
   private var distanceMeters = 0.0
   private var previousLocation: Location? = null
+  private var stepTrackingAvailable = false
   private val heartbeatHandler = Handler(Looper.getMainLooper())
   private val heartbeat = object : Runnable {
     override fun run() {
@@ -61,6 +63,7 @@ class WalkingTrackingService : Service(), SensorEventListener, LocationListener 
         sessionId = intent.getStringExtra(EXTRA_SESSION_ID)
         previousSteps =
           intent.getIntExtra(EXTRA_STEPS, 0).coerceAtLeast(0)
+        lastDistanceSteps = previousSteps
         distanceMeters =
           intent.getDoubleExtra(EXTRA_DISTANCE_METERS, 0.0).coerceAtLeast(0.0)
         stepBaseline = sessionId?.let {
@@ -128,17 +131,29 @@ class WalkingTrackingService : Service(), SensorEventListener, LocationListener 
       if (previous != null) {
         val elapsedSeconds = (location.time - previous.time) / 1000.0
         val movementMeters = previous.distanceTo(location).toDouble()
-        val minimumMovement = max(1.5, (previous.accuracy + location.accuracy) * 0.15)
+        val minimumMovement = max(4.0, (previous.accuracy + location.accuracy) * 0.35)
+        val stepsSinceLastMovement = previousSteps - lastDistanceSteps
         if (
           elapsedSeconds > 0 &&
           movementMeters >= minimumMovement &&
-          movementMeters / elapsedSeconds <= MAX_WALKING_SPEED_METERS_PER_SECOND
+          movementMeters / elapsedSeconds <= MAX_WALKING_SPEED_METERS_PER_SECOND &&
+          (!stepTrackingAvailable || stepsSinceLastMovement >= MIN_STEPS_PER_MOVEMENT)
         ) {
           distanceMeters += movementMeters
+          lastDistanceSteps = previousSteps
+          previousLocation = location
           preferences.edit().putFloat(KEY_DISTANCE_METERS, distanceMeters.toFloat()).apply()
+        } else if (
+          elapsedSeconds <= 0 ||
+          movementMeters / max(elapsedSeconds, 0.001) >
+            MAX_WALKING_SPEED_METERS_PER_SECOND
+        ) {
+          return
         }
+      } else {
+        lastDistanceSteps = previousSteps
+        previousLocation = location
       }
-      previousLocation = location
       broadcast(
         "WalkingLocationUpdate",
         mapOf(
@@ -146,6 +161,8 @@ class WalkingTrackingService : Service(), SensorEventListener, LocationListener 
           EXTRA_LONGITUDE to location.longitude,
           EXTRA_ACCURACY to location.accuracy.toDouble(),
           EXTRA_TIMESTAMP to location.time,
+          EXTRA_STEPS to previousSteps,
+          EXTRA_DISTANCE_METERS to distanceMeters,
         ),
       )
     }
@@ -173,6 +190,7 @@ class WalkingTrackingService : Service(), SensorEventListener, LocationListener 
   private fun restoreTrackingState() {
     sessionId = preferences.getString(KEY_SESSION_ID, null)
     previousSteps = preferences.getInt(KEY_STEPS, 0)
+    lastDistanceSteps = previousSteps
     distanceMeters = preferences.getFloat(KEY_DISTANCE_METERS, 0f).toDouble()
     if (sessionId != null) {
       preferences.edit().putBoolean(KEY_RUNNING, true).apply()
@@ -182,12 +200,14 @@ class WalkingTrackingService : Service(), SensorEventListener, LocationListener 
   private fun startSensors(enableSteps: Boolean) {
     stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
     if (enableSteps && stepSensor != null) {
-      sensorManager.registerListener(
+      stepTrackingAvailable = sensorManager.registerListener(
         this,
         stepSensor,
         SensorManager.SENSOR_DELAY_NORMAL,
       )
+      if (!stepTrackingAvailable) broadcastStatus("steps", "unavailable")
     } else {
+      stepTrackingAvailable = false
       broadcastStatus("steps", "unavailable")
     }
 
@@ -222,6 +242,7 @@ class WalkingTrackingService : Service(), SensorEventListener, LocationListener 
     if (::sensorManager.isInitialized) sensorManager.unregisterListener(this)
     if (::locationManager.isInitialized) locationManager.removeUpdates(this)
     stepSensor = null
+    stepTrackingAvailable = false
   }
 
   private fun stopTracking() {
@@ -327,6 +348,7 @@ class WalkingTrackingService : Service(), SensorEventListener, LocationListener 
     private const val NOTIFICATION_ID = 61027
     private const val LOCATION_INTERVAL_MS = 1000L
     private const val HEARTBEAT_INTERVAL_MS = 15000L
+    private const val MIN_STEPS_PER_MOVEMENT = 2
     private const val MAX_GPS_ACCURACY_METERS = 35f
     private const val MAX_WALKING_SPEED_METERS_PER_SECOND = 5.5
   }

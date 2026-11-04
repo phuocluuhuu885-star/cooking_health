@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -810,7 +810,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.background,
-    marginBottom: 48,
   },
   container: {
     paddingHorizontal: 16,

@@ -13,10 +13,15 @@ import WalkingScreen from '../screens/walking/WalkingScreen';
 import PersonalInfoScreen from '../screens/profile/PersonalInfoScreen';
 import DailyConsumedMealsScreen from '../screens/profile/DailyConsumedMealsScreen';
 import AiMealRecommendationsScreen from '../screens/home/AiMealRecommendationsScreen';
+import AiMealChatScreen from '../screens/home/AiMealChatScreen';
+import AiMealScanScreen from '../screens/home/AiMealScanScreen';
 import WeeklyMealPlanScreen from '../screens/home/WeeklyMealPlanScreen';
 import EatingProgressScreen from '../screens/home/EatingProgressScreen';
 import SmartShoppingScreen from '../screens/home/SmartShoppingScreen';
 import DailyPlannedMealsScreen from '../screens/home/DailyPlannedMealsScreen';
+import HealthDashboardScreen from '../screens/home/HealthDashboardScreen';
+import ExpenseManagementScreen from '../screens/profile/ExpenseManagementScreen';
+import ExpenseReportScreen from '../screens/profile/ExpenseReportScreen';
 
 const HomeStack = createStackNavigator<RootStackParamList>({
   initialRouteName: ScreenKeys.PRIVACY_POLICY,
@@ -30,6 +35,8 @@ const HomeStack = createStackNavigator<RootStackParamList>({
     [ScreenKeys.PERSONAL_INFO]: PersonalInfoScreen,
     [ScreenKeys.DAILY_CONSUMED_MEALS]: DailyConsumedMealsScreen,
     [ScreenKeys.AI_MEAL_RECOMMENDATIONS]: AiMealRecommendationsScreen,
+    [ScreenKeys.AI_MEAL_CHAT]: AiMealChatScreen,
+    [ScreenKeys.AI_MEAL_SCAN]: AiMealScanScreen,
     [ScreenKeys.WEEKLY_MEAL_PLAN]: WeeklyMealPlanScreen,
     [ScreenKeys.EATING_PROGRESS]: EatingProgressScreen,
     [ScreenKeys.SMART_SHOPPING]: SmartShoppingScreen,
@@ -37,6 +44,9 @@ const HomeStack = createStackNavigator<RootStackParamList>({
     [ScreenKeys.FAMILY]: HouseholdScreen,
     [ScreenKeys.HOUSEHOLD_CHAT]: HouseholdChatScreen,
     [ScreenKeys.NOTIFICATIONS]: HouseholdNotificationsScreen,
+    [ScreenKeys.HEALTH_DASHBOARD]: HealthDashboardScreen,
+    [ScreenKeys.EXPENSES]: ExpenseManagementScreen,
+    [ScreenKeys.EXPENSE_REPORT]: ExpenseReportScreen,
   },
   screenOptions: {
     headerShown: false,

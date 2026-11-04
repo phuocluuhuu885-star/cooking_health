@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -15,11 +15,32 @@ import apiConst from '../../abase/constant/apiConst';
 import ScreenHeader from '../component/ScreenHeader';
 import { selectUserInfo } from '../../reduxs/reduces/user';
 import { getUtcDateKey } from '../../utils/dateUtils';
+import { navigate } from '../../utils/navigation';
+import ScreenKeys from '../../utils/screenKey';
 import { setSyncUser, syncApi } from '../../utils/syncUtils';
-import { formatNumberWithOptionalDecimal } from '../../utils/numberUtils';
-import type { ConsumptionReportData } from '../../utils/types';
+import { formatLocalizedNumber } from '../../utils/numberUtils';
+import type {
+  ConsumptionReportData,
+  ConsumptionReportPeriod,
+} from '../../utils/types';
 
-const formatDate = (date: string) =>
+const PERIOD_OPTIONS: Array<{
+  id: ConsumptionReportPeriod;
+  label: string;
+}> = [
+  { id: 'WEEK', label: 'Tuần này' },
+  { id: 'MONTH', label: 'Tháng này' },
+];
+
+const formatDate = (date: string, includeYear = false) =>
+  new Date(`${date}T00:00:00.000Z`).toLocaleDateString('vi-VN', {
+    day: 'numeric',
+    month: 'numeric',
+    ...(includeYear ? { year: 'numeric' as const } : {}),
+    timeZone: 'UTC',
+  });
+
+const formatWeekday = (date: string) =>
   new Date(`${date}T00:00:00.000Z`).toLocaleDateString('vi-VN', {
     weekday: 'short',
     day: 'numeric',
@@ -30,9 +51,11 @@ const EatingProgressScreen = () => {
   const insets = useSafeAreaInsets();
   const user = useSelector(selectUserInfo);
   const requestId = useRef(0);
+  const [period, setPeriod] = useState<ConsumptionReportPeriod>('WEEK');
   const [report, setReport] = useState<ConsumptionReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const calorieTarget = user?.healthProfile?.dailyCaloriesTarget ?? 0;
 
   const loadReport = useCallback(async () => {
     const currentRequestId = ++requestId.current;
@@ -41,12 +64,13 @@ const EatingProgressScreen = () => {
       setError('Đăng nhập để xem tiến độ dinh dưỡng của bạn.');
       return;
     }
+
     setSyncUser(user);
     setLoading(true);
     setError('');
     try {
       const response = await syncApi(apiConst.getConsumptionReport, {
-        period: 'MONTH',
+        period,
         date: getUtcDateKey(new Date()),
       });
       if (currentRequestId !== requestId.current) return;
@@ -66,7 +90,7 @@ const EatingProgressScreen = () => {
     } finally {
       if (currentRequestId === requestId.current) setLoading(false);
     }
-  }, [user]);
+  }, [period, user]);
 
   useFocusEffect(
     useCallback(() => {
@@ -77,50 +101,54 @@ const EatingProgressScreen = () => {
     }, [loadReport]),
   );
 
-  const analysis = useMemo(() => {
-    const activeDays =
-      report?.days.filter(
-        day =>
-          day.consumedItems > 0 &&
-          day.unavailableNutritionItems === 0 &&
-          day.nutrition.calories > 0,
-      ) ?? [];
-    const recentDays = activeDays.slice(-7);
-    const target = user?.healthProfile?.dailyCaloriesTarget ?? 0;
-    const averageCalories = recentDays.length
-      ? recentDays.reduce((sum, day) => sum + day.nutrition.calories, 0) /
-        recentDays.length
+  const summary = useMemo(() => {
+    const daysWithIntake =
+      report?.days.filter(day => day.consumedItems > 0) ?? [];
+    const daysWithCalories = daysWithIntake.filter(
+      day => day.nutrition.calories > 0,
+    );
+    const average = daysWithCalories.length
+      ? daysWithCalories.reduce(
+          (total, day) => total + day.nutrition.calories,
+          0,
+        ) / daysWithCalories.length
       : 0;
-    const inTargetDays =
-      target > 0
-        ? recentDays.filter(
-            day =>
-              day.nutrition.calories >= target * 0.9 &&
-              day.nutrition.calories <= target * 1.1,
-          ).length
-        : 0;
-    const first = recentDays[0];
-    const last = recentDays[recentDays.length - 1];
-    const calorieChange =
-      first && last && first.date !== last.date
-        ? last.nutrition.calories - first.nutrition.calories
-        : null;
+    const maxCalories = Math.max(
+      1,
+      ...(report?.days.map(day => day.nutrition.calories) ?? []),
+      calorieTarget,
+    );
+
     return {
-      activeDays,
-      recentDays,
-      target,
-      averageCalories,
-      inTargetDays,
-      calorieChange,
+      daysWithIntake,
+      daysWithCalories,
+      average,
+      maxCalories,
     };
-  }, [report, user?.healthProfile?.dailyCaloriesTarget]);
+  }, [calorieTarget, report]);
+
+  const handlePeriodChange = useCallback(
+    (nextPeriod: ConsumptionReportPeriod) => {
+      if (nextPeriod !== period) {
+        setPeriod(nextPeriod);
+        setReport(null);
+      }
+    },
+    [period],
+  );
+  const openConsumedMeals = useCallback(() => {
+    navigate(ScreenKeys.DAILY_CONSUMED_MEALS);
+  }, []);
+
+  const dateRange =
+    report && `${formatDate(report.startDate)} – ${formatDate(report.endDate)}`;
 
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        eyebrow="MEALCRAFT AI COACH"
+        eyebrow="DINH DƯỠNG CỦA BẠN"
         title="Tiến độ ăn uống"
-        subtitle="Tổng quan 7 ngày gần nhất"
+        subtitle="Hiểu thói quen qua những bữa bạn đã ghi nhận"
       />
       <ScrollView
         contentContainerStyle={[
@@ -129,132 +157,302 @@ const EatingProgressScreen = () => {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        <Text style={styles.intro}>
+          Báo cáo này tổng hợp năng lượng và dưỡng chất từ các món bạn đã xác
+          nhận đã ăn. Ghi nhận bữa ăn đều đặn để theo dõi xu hướng sát thực tế
+          hơn.
+        </Text>
+
+        <View style={styles.periodPicker} accessibilityRole="tablist">
+          {PERIOD_OPTIONS.map(option => {
+            const selected = period === option.id;
+            return (
+              <Pressable
+                key={option.id}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                onPress={() => handlePeriodChange(option.id)}
+                style={[
+                  styles.periodButton,
+                  selected && styles.periodButtonSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.periodButtonText,
+                    selected && styles.periodButtonTextSelected,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         {loading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={COLORS.green} />
+            <Text style={styles.loadingText}>Đang tổng hợp bữa ăn...</Text>
           </View>
         ) : error ? (
           <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
             <Text style={styles.error}>{error}</Text>
-            <Pressable onPress={loadReport} style={styles.retryButton}>
-              <Text style={styles.retryText}>Thử tải lại</Text>
-            </Pressable>
+            {user?.accessToken ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={loadReport}
+                style={styles.actionButton}
+              >
+                <Text style={styles.actionButtonText}>Thử tải lại</Text>
+              </Pressable>
+            ) : null}
           </LinearGradient>
-        ) : (
+        ) : report ? (
           <>
             <LinearGradient
               colors={['#FFFFFF', '#EAF6EE']}
               style={styles.summaryCard}
             >
-              <Text style={styles.summaryLabel}>
-                TRUNG BÌNH KHI CÓ GHI NHẬN
+              <Text style={styles.periodLabel}>
+                {period === 'WEEK' ? 'TỔNG QUAN TUẦN' : 'TỔNG QUAN THÁNG'}
               </Text>
-              <Text style={styles.average}>
-                {formatNumberWithOptionalDecimal(analysis.averageCalories)}
-                <Text style={styles.unit}> kcal/ngày</Text>
-              </Text>
-              <Text style={styles.summaryHint}>
-                Tính trên {analysis.recentDays.length} ngày có dữ liệu đầy đủ
-                trong 7 ngày gần nhất.
-              </Text>
-              {analysis.target > 0 ? (
-                <View style={styles.targetRow}>
-                  <Text style={styles.targetText}>
-                    Mục tiêu {analysis.target} kcal/ngày
-                  </Text>
-                  <Text style={styles.targetText}>
-                    {analysis.inTargetDays}/{analysis.recentDays.length} ngày
-                    trong khoảng ±10%
+              <Text style={styles.dateRange}>{dateRange}</Text>
+
+              <View style={styles.summaryMain}>
+                <View style={styles.summaryMetric}>
+                  <Text style={styles.metricLabel}>Tổng năng lượng</Text>
+                  <Text style={styles.totalValue}>
+                    {formatLocalizedNumber(report.totals.calories)}
+                    <Text style={styles.unit}> kcal</Text>
                   </Text>
                 </View>
-              ) : null}
+                <View style={styles.summaryMetricRight}>
+                  <Text style={styles.metricLabel}>Trung bình mỗi ngày</Text>
+                  <Text style={styles.averageValue}>
+                    {formatLocalizedNumber(summary.average)}
+                    <Text style={styles.averageUnit}> kcal</Text>
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.summaryDivider} />
+              <Text style={styles.coverage}>
+                Đã ghi nhận bữa ăn trong{' '}
+                <Text style={styles.coverageStrong}>
+                  {summary.daysWithIntake.length}/{report.days.length} ngày
+                </Text>
+                {summary.daysWithCalories.length
+                  ? ` · Trung bình tính trên ${summary.daysWithCalories.length} ngày có dữ liệu calo`
+                  : ''}
+              </Text>
             </LinearGradient>
 
-            <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
-              <Text style={styles.cardTitle}>Lượng calo theo ngày</Text>
-              {analysis.recentDays.length ? (
-                analysis.recentDays.map(day => {
-                  const progress =
-                    analysis.target > 0
-                      ? Math.min(day.nutrition.calories / analysis.target, 1)
-                      : 0;
-                  return (
-                    <View key={day.date} style={styles.dayRow}>
-                      <Text style={styles.dayLabel}>
-                        {formatDate(day.date)}
-                      </Text>
-                      <View style={styles.track}>
-                        <View
-                          style={[
-                            styles.bar,
-                            { width: `${Math.max(progress * 100, 2)}%` },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.dayCalories}>
-                        {Math.round(day.nutrition.calories)}
-                      </Text>
+            {calorieTarget > 0 ? (
+              <LinearGradient
+                colors={['#FFFFFF', '#F4F8FF']}
+                style={styles.targetCard}
+              >
+                <View style={styles.targetHeader}>
+                  <View style={styles.targetIcon}>
+                    <Text style={styles.targetIconText}>◎</Text>
+                  </View>
+                  <View style={styles.targetCopy}>
+                    <Text style={styles.cardTitle}>
+                      So với mục tiêu cá nhân
+                    </Text>
+                    <Text style={styles.targetDescription}>
+                      Mục tiêu tham khảo: {formatLocalizedNumber(calorieTarget)}{' '}
+                      kcal/ngày
+                    </Text>
+                  </View>
+                </View>
+                {summary.average > 0 ? (
+                  <>
+                    <View style={styles.targetTrack}>
+                      <View
+                        style={[
+                          styles.targetFill,
+                          {
+                            width: `${Math.min(
+                              (summary.average / calorieTarget) * 100,
+                              100,
+                            )}%`,
+                          },
+                        ]}
+                      />
                     </View>
-                  );
-                })
-              ) : (
-                <Text style={styles.empty}>
-                  Chưa có đủ dữ liệu để phân tích. Ghi nhận món đã ăn để bắt đầu
-                  theo dõi.
+                    <Text style={styles.targetInsight}>
+                      Trung bình đang ở mức{' '}
+                      {Math.round((summary.average / calorieTarget) * 100)}% mục
+                      tiêu
+                      {summary.average < calorieTarget
+                        ? ` · thấp hơn ${formatLocalizedNumber(
+                            calorieTarget - summary.average,
+                          )} kcal/ngày`
+                        : summary.average > calorieTarget
+                        ? ` · cao hơn ${formatLocalizedNumber(
+                            summary.average - calorieTarget,
+                          )} kcal/ngày`
+                        : ' · bằng mục tiêu'}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.targetInsight}>
+                    Chưa đủ dữ liệu calo trong kỳ để so sánh với mục tiêu.
+                  </Text>
+                )}
+                <Text style={styles.targetDisclaimer}>
+                  Mục tiêu chỉ để tham khảo thói quen, không phải đánh giá tốt
+                  hay xấu về chế độ ăn.
                 </Text>
-              )}
-              {analysis.calorieChange !== null ? (
-                <Text style={styles.change}>
-                  So với ngày đầu trong khoảng này:{' '}
-                  {analysis.calorieChange > 0 ? '+' : ''}
-                  {Math.round(analysis.calorieChange)} kcal.
+              </LinearGradient>
+            ) : (
+              <LinearGradient
+                colors={['#FFFFFF', '#F4F8FF']}
+                style={styles.targetCard}
+              >
+                <Text style={styles.cardTitle}>Chưa có mục tiêu calo</Text>
+                <Text style={styles.targetDisclaimer}>
+                  Thiết lập hồ sơ sức khỏe để xem số liệu trung bình bên cạnh
+                  mục tiêu riêng của bạn.
+                </Text>
+              </LinearGradient>
+            )}
+
+            <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
+              <View style={styles.sectionHeading}>
+                <View style={styles.sectionHeadingCopy}>
+                  <Text style={styles.cardTitle}>Từng ngày trong kỳ</Text>
+                  <Text style={styles.sectionHint}>
+                    Số liệu bên cạnh thanh là lượng kcal đã ghi nhận.
+                  </Text>
+                </View>
+                <View style={styles.legend}>
+                  <View style={styles.legendDot} />
+                  <Text style={styles.legendText}>kcal</Text>
+                </View>
+              </View>
+              {report.days.map(day => {
+                const hasIntake = day.consumedItems > 0;
+                const hasCalories = day.nutrition.calories > 0;
+                const barWidth = hasCalories
+                  ? Math.max(
+                      3,
+                      Math.min(
+                        (day.nutrition.calories / summary.maxCalories) * 100,
+                        100,
+                      ),
+                    )
+                  : 0;
+                return (
+                  <View key={day.date} style={styles.dayRow}>
+                    <Text style={styles.dayLabel}>
+                      {period === 'WEEK'
+                        ? formatWeekday(day.date)
+                        : formatDate(day.date)}
+                    </Text>
+                    <View style={styles.barTrack}>
+                      {hasCalories ? (
+                        <View
+                          style={[styles.barFill, { width: `${barWidth}%` }]}
+                        />
+                      ) : null}
+                    </View>
+                    <Text
+                      style={[
+                        styles.dayCalories,
+                        !hasCalories && styles.dayCaloriesEmpty,
+                      ]}
+                    >
+                      {hasCalories
+                        ? formatLocalizedNumber(day.nutrition.calories)
+                        : hasIntake
+                        ? 'Thiếu số liệu'
+                        : 'Chưa ghi nhận'}
+                    </Text>
+                  </View>
+                );
+              })}
+              {calorieTarget > 0 ? (
+                <Text style={styles.chartNote}>
+                  Thanh so sánh các ngày trong kỳ; mục tiêu cá nhân được xem ở
+                  thẻ phía trên.
                 </Text>
               ) : null}
             </LinearGradient>
 
             <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
-              <Text style={styles.cardTitle}>Trung bình dinh dưỡng</Text>
-              {analysis.recentDays.length ? (
-                <View style={styles.macros}>
-                  {(
-                    [
-                      ['Đạm', 'proteinG'],
-                      ['Tinh bột', 'carbsG'],
-                      ['Chất béo', 'fatG'],
-                    ] as const
-                  ).map(([label, key]) => {
-                    const average =
-                      analysis.recentDays.reduce(
-                        (sum, day) => sum + day.nutrition[key],
-                        0,
-                      ) / analysis.recentDays.length;
-                    return (
-                      <View key={key} style={styles.macro}>
-                        <Text style={styles.macroLabel}>{label}</Text>
-                        <Text style={styles.macroValue}>
-                          {formatNumberWithOptionalDecimal(average)} g
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              ) : (
-                <Text style={styles.empty}>
-                  Chưa có dữ liệu dinh dưỡng để tổng hợp.
-                </Text>
-              )}
-            </LinearGradient>
-            {report?.days.some(day => day.unavailableNutritionItems > 0) ? (
-              <Text style={styles.note}>
-                Ngày có món thiếu dữ liệu dinh dưỡng không được dùng để tính
-                trung bình.
+              <Text style={styles.cardTitle}>Dưỡng chất đã ghi nhận</Text>
+              <Text style={styles.sectionHint}>
+                Tổng lượng trong {period === 'WEEK' ? 'tuần' : 'tháng'}, không
+                phải lượng mỗi ngày.
               </Text>
+              <View style={styles.macros}>
+                {(
+                  [
+                    ['Đạm', 'proteinG', COLORS.protein],
+                    ['Tinh bột', 'carbsG', COLORS.carbs],
+                    ['Chất béo', 'fatG', COLORS.fat],
+                  ] as const
+                ).map(([label, key, color]) => (
+                  <View key={key} style={styles.macro}>
+                    <View
+                      style={[styles.macroDot, { backgroundColor: color }]}
+                    />
+                    <Text style={styles.macroLabel}>{label}</Text>
+                    <Text style={styles.macroValue}>
+                      {formatLocalizedNumber(report.totals[key])} g
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </LinearGradient>
+
+            {report.unavailableNutritionItems > 0 ? (
+              <View style={styles.dataNotice}>
+                <Text style={styles.noticeIcon}>i</Text>
+                <Text style={styles.noticeText}>
+                  {report.unavailableNutritionItems} món đã ghi nhận chưa có đủ
+                  thông tin dinh dưỡng nên chưa được cộng vào tổng. Số liệu hiện
+                  tại có thể thấp hơn thực tế.
+                </Text>
+              </View>
             ) : null}
+
+            {summary.daysWithIntake.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>
+                  Chưa có bữa ăn được ghi nhận
+                </Text>
+                <Text style={styles.emptyDescription}>
+                  Thêm món bạn đã ăn để bắt đầu theo dõi năng lượng và dưỡng
+                  chất trong kỳ này.
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={openConsumedMeals}
+                  style={styles.actionButton}
+                >
+                  <Text style={styles.actionButtonText}>Ghi nhận bữa ăn</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                onPress={openConsumedMeals}
+                style={styles.secondaryAction}
+              >
+                <Text style={styles.secondaryActionText}>
+                  Xem hoặc ghi nhận món đã ăn
+                </Text>
+                <Text style={styles.actionArrow}>›</Text>
+              </Pressable>
+            )}
           </>
-        )}
+        ) : null}
+
         <Text style={styles.disclaimer}>
-          Thống kê phản ánh những gì bạn đã ghi nhận, không phải chẩn đoán hay
-          tư vấn y tế.
+          Báo cáo phản ánh những gì bạn đã ghi nhận, không thay thế tư vấn y tế.
         </Text>
       </ScrollView>
     </View>
@@ -272,6 +470,9 @@ const COLORS = {
   lightGreen: '#E7F4EC',
   border: '#E5EBE7',
   danger: '#B42318',
+  protein: '#168653',
+  carbs: '#E89B36',
+  fat: '#5D8FE8',
 };
 
 const styles = StyleSheet.create({
@@ -280,146 +481,308 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingHorizontal: 18,
   },
-  header: {
+  content: { paddingTop: 4 },
+  intro: {
+    marginBottom: 14,
+    color: COLORS.secondary,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  periodPicker: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingBottom: 8,
-  },
-  backButton: {
-    width: 40,
-    height: 42,
-    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 14,
+    padding: 4,
     borderRadius: 12,
+    backgroundColor: '#EAF0EC',
+  },
+  periodButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  periodButtonSelected: {
     backgroundColor: COLORS.white,
+    shadowColor: COLORS.text,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  backText: {
-    color: COLORS.green,
-    fontSize: 34,
-    lineHeight: 38,
-    textAlign: 'center',
+  periodButtonText: {
+    color: COLORS.secondary,
+    fontSize: 13,
+    fontWeight: '700',
   },
-  headerCopy: { flex: 1 },
-  eyebrow: {
-    color: COLORS.green,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+  periodButtonTextSelected: { color: COLORS.green },
+  loading: {
+    minHeight: 240,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  title: { marginTop: 2, color: COLORS.text, fontSize: 19, fontWeight: '800' },
-  subtitle: { marginTop: 3, color: COLORS.secondary, fontSize: 11 },
-  content: { paddingTop: 8 },
-  loading: { minHeight: 220, alignItems: 'center', justifyContent: 'center' },
+  loadingText: {
+    marginTop: 10,
+    color: COLORS.secondary,
+    fontSize: 13,
+  },
   summaryCard: {
-    padding: 17,
     marginBottom: 12,
+    padding: 17,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  summaryLabel: {
-    color: COLORS.secondary,
-    fontSize: 9,
+  periodLabel: {
+    color: COLORS.green,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.7,
   },
-  average: {
-    marginTop: 8,
+  dateRange: {
+    marginTop: 4,
+    color: COLORS.secondary,
+    fontSize: 12,
+  },
+  summaryMain: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 17,
+  },
+  summaryMetric: { flex: 1 },
+  summaryMetricRight: { flex: 1, alignItems: 'flex-end' },
+  metricLabel: { color: COLORS.secondary, fontSize: 11 },
+  totalValue: {
+    marginTop: 4,
     color: COLORS.text,
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '900',
   },
   unit: { fontSize: 13, fontWeight: '700' },
-  summaryHint: {
-    marginTop: 6,
+  averageValue: {
+    marginTop: 7,
+    color: COLORS.green,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  averageUnit: { fontSize: 11, fontWeight: '700' },
+  summaryDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginTop: 14,
+    backgroundColor: COLORS.border,
+  },
+  coverage: {
+    marginTop: 10,
+    color: COLORS.secondary,
+    fontSize: 11,
+    lineHeight: 17,
+  },
+  coverageStrong: { color: COLORS.text, fontWeight: '800' },
+  targetCard: {
+    marginBottom: 12,
+    padding: 15,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  targetHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  targetIcon: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: '#EAF1FF',
+  },
+  targetIconText: { color: '#4779C8', fontSize: 20, fontWeight: '800' },
+  targetCopy: { flex: 1 },
+  cardTitle: { color: COLORS.text, fontSize: 15, fontWeight: '800' },
+  targetDescription: {
+    marginTop: 3,
+    color: COLORS.secondary,
+    fontSize: 11,
+  },
+  targetTrack: {
+    height: 8,
+    overflow: 'hidden',
+    marginTop: 15,
+    borderRadius: 8,
+    backgroundColor: '#E8EDF5',
+  },
+  targetFill: {
+    height: '100%',
+    borderRadius: 8,
+    backgroundColor: '#5D8FE8',
+  },
+  targetInsight: {
+    marginTop: 9,
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  targetDisclaimer: {
+    marginTop: 8,
     color: COLORS.secondary,
     fontSize: 11,
     lineHeight: 16,
   },
-  targetRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.border,
-  },
-  targetText: {
-    flexShrink: 1,
-    color: COLORS.green,
-    fontSize: 10,
-    fontWeight: '700',
-  },
   card: {
-    padding: 15,
     marginBottom: 12,
+    padding: 15,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  cardTitle: {
-    marginBottom: 12,
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: '800',
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 13,
   },
+  sectionHeadingCopy: { flex: 1 },
+  sectionHint: {
+    marginTop: 4,
+    color: COLORS.secondary,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  legend: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: COLORS.green,
+  },
+  legendText: { color: COLORS.secondary, fontSize: 10 },
   dayRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 11,
+    minHeight: 30,
+    marginBottom: 5,
   },
-  dayLabel: { width: 64, color: COLORS.secondary, fontSize: 10 },
-  track: {
+  dayLabel: { width: 62, color: COLORS.secondary, fontSize: 11 },
+  barTrack: {
     flex: 1,
     height: 8,
     overflow: 'hidden',
     borderRadius: 8,
-    backgroundColor: '#EAF0EC',
+    backgroundColor: '#EDF2EE',
   },
-  bar: { height: '100%', borderRadius: 8, backgroundColor: COLORS.green },
+  barFill: {
+    height: '100%',
+    borderRadius: 8,
+    backgroundColor: COLORS.green,
+  },
   dayCalories: {
-    width: 40,
+    width: 94,
     color: COLORS.text,
     fontSize: 10,
     fontWeight: '700',
     textAlign: 'right',
   },
-  change: {
-    marginTop: 5,
+  dayCaloriesEmpty: { color: '#8A9790', fontWeight: '500' },
+  chartNote: {
+    marginTop: 8,
     color: COLORS.secondary,
     fontSize: 10,
     lineHeight: 15,
   },
-  macros: { flexDirection: 'row', gap: 6 },
+  macros: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 14,
+  },
   macro: {
     flex: 1,
-    padding: 9,
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     borderRadius: 10,
     backgroundColor: COLORS.lightGreen,
   },
+  macroDot: { width: 8, height: 8, marginBottom: 6, borderRadius: 4 },
   macroLabel: { color: COLORS.secondary, fontSize: 10 },
   macroValue: {
-    marginTop: 5,
+    marginTop: 4,
     color: COLORS.text,
     fontSize: 12,
     fontWeight: '800',
   },
-  empty: { color: COLORS.secondary, fontSize: 11, lineHeight: 17 },
-  error: { color: COLORS.danger, fontSize: 12, lineHeight: 18 },
-  retryButton: { alignSelf: 'flex-start', marginTop: 9 },
-  retryText: { color: COLORS.green, fontSize: 11, fontWeight: '800' },
-  note: {
-    marginBottom: 10,
-    color: COLORS.secondary,
-    fontSize: 10,
-    lineHeight: 15,
+  dataNotice: {
+    flexDirection: 'row',
+    gap: 9,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#FFF8E8',
   },
+  noticeIcon: {
+    width: 18,
+    height: 18,
+    overflow: 'hidden',
+    borderRadius: 9,
+    backgroundColor: '#F3D69A',
+    color: '#694E16',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  noticeText: {
+    flex: 1,
+    color: '#694E16',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  emptyCard: {
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  emptyTitle: { color: COLORS.text, fontSize: 15, fontWeight: '800' },
+  emptyDescription: {
+    marginTop: 6,
+    color: COLORS.secondary,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  actionButton: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: COLORS.green,
+  },
+  actionButtonText: { color: COLORS.white, fontSize: 12, fontWeight: '800' },
+  secondaryAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: '#EAF6EE',
+  },
+  secondaryActionText: {
+    color: COLORS.green,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  actionArrow: { color: COLORS.green, fontSize: 22, lineHeight: 24 },
+  error: { color: COLORS.danger, fontSize: 13, lineHeight: 19 },
   disclaimer: {
     paddingVertical: 8,
     color: COLORS.secondary,
     fontSize: 10,
+    lineHeight: 15,
     textAlign: 'center',
   },
 });

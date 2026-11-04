@@ -19,6 +19,8 @@ type API = {
   addConsumedMeal: ApiType;
   getConsumptionReport: ApiType;
   getAiMealRecommendations: ApiType;
+  postAiMealChatMessage: ApiType;
+  postAiMealScan: ApiType;
   saveWeeklyMealPlan: ApiType;
   getFamilyMealRecommendations: ApiType;
   saveFamilyWeeklyMealPlan: ApiType;
@@ -33,6 +35,7 @@ type API = {
   getHouseholdMealPlan: ApiType;
   addMealToHouseholdPlan: ApiType;
   updateHouseholdMealPollDeadline: ApiType;
+  updateHouseholdMealVoting: ApiType;
   updateHouseholdMealConsumption: ApiType;
   completeHouseholdMealPeriod: ApiType;
   deleteHouseholdPlannedMeal: ApiType;
@@ -45,6 +48,19 @@ type API = {
   finishWalkingWorkout: ApiType;
   getWalkingWorkoutHistory: ApiType;
   getWalkingSummary: ApiType;
+  getWaterIntake: ApiType;
+  addWaterIntake: ApiType;
+  getExpenses: ApiType;
+  addExpense: ApiType;
+  updateExpense: ApiType;
+  deleteExpense: ApiType;
+  getIncomes: ApiType;
+  addIncome: ApiType;
+  updateIncome: ApiType;
+  deleteIncome: ApiType;
+  getMealBudgets: ApiType;
+  upsertMealBudget: ApiType;
+  deleteMealBudget: ApiType;
 };
 
 const apiConst: API = {
@@ -119,7 +135,17 @@ const apiConst: API = {
   getAiMealRecommendations: {
     method: 'post',
     url: 'api/ai/meal-recommendations',
-    timeout: 60000,
+    timeout: 20000,
+  },
+  postAiMealChatMessage: {
+    method: 'post',
+    url: 'api/ai/chat',
+    timeout: 20000,
+  },
+  postAiMealScan: {
+    method: 'post',
+    url: 'api/ai/meal-scan',
+    timeout: 190000,
   },
   saveWeeklyMealPlan: {
     method: 'post',
@@ -128,7 +154,7 @@ const apiConst: API = {
   getFamilyMealRecommendations: {
     method: 'post',
     url: 'api/household/ai/meal-recommendations',
-    timeout: 60000,
+    timeout: 20000,
   },
   saveFamilyWeeklyMealPlan: {
     method: 'post',
@@ -178,6 +204,10 @@ const apiConst: API = {
     method: 'put',
     url: 'api/household/meal-plan/poll/deadline',
   },
+  updateHouseholdMealVoting: {
+    method: 'put',
+    url: 'api/household/meal-plan/poll/enabled',
+  },
   updateHouseholdMealConsumption: {
     method: 'put',
     url: 'api/household/meal-plan/:id/consumption',
@@ -225,6 +255,58 @@ const apiConst: API = {
   getWalkingSummary: {
     method: 'get',
     url: 'api/walking-workouts/summary',
+  },
+  getWaterIntake: {
+    method: 'get',
+    url: 'api/water-intake',
+  },
+  addWaterIntake: {
+    method: 'post',
+    url: 'api/water-intake',
+  },
+  getExpenses: {
+    method: 'get',
+    url: 'api/expenses',
+  },
+  addExpense: {
+    method: 'post',
+    url: 'api/expenses',
+  },
+  updateExpense: {
+    method: 'put',
+    url: 'api/expenses/:id',
+  },
+  deleteExpense: {
+    method: 'delete',
+    url: 'api/expenses/:id',
+  },
+  getIncomes: {
+    method: 'get',
+    url: 'api/incomes',
+  },
+  addIncome: {
+    method: 'post',
+    url: 'api/incomes',
+  },
+  updateIncome: {
+    method: 'put',
+    url: 'api/incomes/:id',
+  },
+  deleteIncome: {
+    method: 'delete',
+    url: 'api/incomes/:id',
+  },
+  getMealBudgets: {
+    method: 'get',
+    url: 'api/meal-budgets',
+  },
+  upsertMealBudget: {
+    method: 'put',
+    url: 'api/meal-budgets',
+  },
+  deleteMealBudget: {
+    method: 'delete',
+    url: 'api/meal-budgets/:mealPeriod',
   },
 };
 

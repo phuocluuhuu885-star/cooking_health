@@ -18,7 +18,7 @@ import {
   Vibration,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useSelector } from 'react-redux';
 import { selectUserInfo } from '../../reduxs/reduces/user';
 import { fetchCurrentHousehold } from '../../utils/householdApi';

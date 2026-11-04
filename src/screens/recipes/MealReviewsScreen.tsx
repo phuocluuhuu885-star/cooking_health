@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ScreenHeader from '../component/ScreenHeader';
 import { useSelector } from 'react-redux';

@@ -1,7 +1,4 @@
-export type WalkingWorkoutStatus =
-  | 'IN_PROGRESS'
-  | 'PAUSED'
-  | 'FINISHED';
+export type WalkingWorkoutStatus = 'IN_PROGRESS' | 'PAUSED' | 'FINISHED';
 
 export type WalkingWorkout = {
   id: string;
@@ -66,6 +63,8 @@ export type WalkingLocationPoint = {
   longitude: number;
   accuracy: number;
   timestamp: number;
+  steps: number;
+  distanceMeters: number;
 };
 
 export type WalkingStepUpdate = { steps: number };

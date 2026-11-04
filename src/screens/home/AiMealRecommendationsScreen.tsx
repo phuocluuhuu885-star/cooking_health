@@ -8,13 +8,27 @@ import {
   Text,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import apiConst from '../../abase/constant/apiConst';
+import {
+  cacheCurrentHousehold,
+  invalidateCachedHouseholdMealPlan,
+  invalidateCachedMealPlan,
+  selectCurrentHousehold,
+  selectHouseholdLoaded,
+  selectMealPlanDestination,
+  setMealPlanDestination,
+} from '../../reduxs/reduces/appData';
 import { selectUserInfo } from '../../reduxs/reduces/user';
+import { useAppDispatch } from '../../reduxs/store';
+import { fetchMealBudgets } from '../../utils/expenseApi';
+import { fetchCurrentHousehold } from '../../utils/householdApi';
 import { navigate } from '../../utils/navigation';
+import { addMealToPlan } from '../../utils/mealPlanApi';
+import { scaleEstimatedPrice } from '../../utils/priceUtils';
 import ScreenKeys from '../../utils/screenKey';
 import {
   hasAiRecommendationConsent,
@@ -24,6 +38,7 @@ import { getUtcDateKey } from '../../utils/dateUtils';
 import { getApiError } from '../../utils/homeUtils';
 import { setSyncUser, syncApi } from '../../utils/syncUtils';
 import type {
+  AiMealRecommendation,
   AiMealRecommendationsResponse,
   MealPeriod,
 } from '../../utils/types';
@@ -37,16 +52,27 @@ type ScreenState = {
 };
 
 const PERIODS: MealPeriod[] = ['LUNCH', 'DINNER'];
+const getEstimatedMealPrice = (recommendation: AiMealRecommendation) =>
+  recommendation.estimatedPrice ??
+  scaleEstimatedPrice(
+    recommendation.estimatedPricePerServing,
+    recommendation.recommendedServings,
+  );
 
 const AiMealRecommendationsScreen = () => {
   const insets = useSafeAreaInsets();
+  const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
+  const household = useSelector(selectCurrentHousehold);
+  const householdLoaded = useSelector(selectHouseholdLoaded);
+  const destination = useSelector(selectMealPlanDestination);
   const requestId = useRef(0);
   const [state, setState] = useState<ScreenState>({
     recommendations: null,
     loading: false,
     error: '',
   });
+  const [addingKey, setAddingKey] = useState<string | null>(null);
 
   const loadRecommendations = useCallback(async () => {
     if (!user?.accessToken || !user.id) {
@@ -68,25 +94,77 @@ const AiMealRecommendationsScreen = () => {
     setSyncUser(user);
     setState(previous => ({ ...previous, loading: true, error: '' }));
     try {
-      const response = (await syncApi(apiConst.getAiMealRecommendations, {
-        date: getUtcDateKey(new Date()),
-        consent: true,
-      })) as AiMealRecommendationsResponse;
-      if (currentRequestId !== requestId.current) return;
-      if (!response?.success || !response.data?.recommendations) {
-        setState(previous => ({
-          ...previous,
-          loading: false,
-          error:
-            response?.message ||
-            response?.ErrorMessage ||
-            'Không thể tạo gợi ý AI lúc này.',
-        }));
-        return;
+      const date = getUtcDateKey(new Date());
+      const budgetResponse = await fetchMealBudgets(user, 'PERSONAL');
+      if (!budgetResponse.success || !budgetResponse.data) {
+        throw new Error(
+          budgetResponse.message || 'Không thể tải ngân sách bữa ăn.',
+        );
       }
+      const mealBudgets = Object.fromEntries(
+        budgetResponse.data.map(budget => [budget.mealPeriod, budget.limitVnd]),
+      ) as Partial<Record<MealPeriod, number>>;
+      const hasBudgets = PERIODS.some(
+        period => mealBudgets[period] !== undefined,
+      );
+      const periodsToRequest: Array<MealPeriod | undefined> = hasBudgets
+        ? PERIODS
+        : [undefined];
+      const recommendationResponses = await Promise.all(
+        periodsToRequest.map(async period => {
+          const limitVnd = period ? mealBudgets[period] : undefined;
+          const response = (await syncApi(apiConst.getAiMealRecommendations, {
+            date,
+            consent: true,
+            ...(limitVnd !== undefined
+              ? { budget: { minVnd: 0, maxVnd: limitVnd } }
+              : {}),
+          })) as AiMealRecommendationsResponse;
+          if (!response?.success || !response.data?.recommendations) {
+            throw new Error(
+              response?.message ||
+                response?.ErrorMessage ||
+                `Không thể tạo gợi ý ${
+                  period === 'LUNCH'
+                    ? 'bữa trưa'
+                    : period === 'DINNER'
+                    ? 'bữa tối'
+                    : 'AI'
+                } lúc này.`,
+            );
+          }
+          return { period, data: response.data };
+        }),
+      );
+      if (currentRequestId !== requestId.current) return;
+      const recommendations = { LUNCH: [], DINNER: [] } as NonNullable<
+        AiMealRecommendationsResponse['data']
+      >['recommendations'];
+      recommendationResponses.forEach(({ period, data }) => {
+        const periods = period ? [period] : PERIODS;
+        periods.forEach(mealPeriod => {
+          const periodRecommendations = data.recommendations[mealPeriod];
+          const limitVnd = mealBudgets[mealPeriod];
+          recommendations[mealPeriod] =
+            limitVnd === undefined
+              ? periodRecommendations
+              : periodRecommendations.filter(recommendation => {
+                  const estimatedPrice = getEstimatedMealPrice(recommendation);
+                  return (
+                    estimatedPrice !== null && estimatedPrice.maxVnd <= limitVnd
+                  );
+                });
+        });
+      });
+      const firstResponseData = recommendationResponses[0].data;
       setState(previous => ({
         ...previous,
-        recommendations: response.data ?? null,
+        recommendations: {
+          ...firstResponseData,
+          date,
+          mealBudgets,
+          recommendations,
+        },
         loading: false,
         error: '',
       }));
@@ -127,7 +205,7 @@ const AiMealRecommendationsScreen = () => {
     }));
     Alert.alert(
       'Đồng ý dùng gợi ý AI?',
-      'Nếu tiếp tục, MealCraft sẽ gửi mục tiêu kcal và dinh dưỡng, tổng món đã ăn hôm nay cùng thông tin các món phù hợp đến Google Gemini để xếp hạng. Không gửi tên, email, mã tài khoản, tuổi, giới tính, chiều cao, cân nặng hoặc BMI. Bạn có thể từ chối và vẫn xem gợi ý món thông thường.',
+      'Nếu tiếp tục, Health&Cook sẽ gửi mục tiêu kcal và dinh dưỡng, tổng món đã ăn hôm nay cùng thông tin các món phù hợp đến Google Gemini để xếp hạng. Không gửi tên, email, mã tài khoản, tuổi, giới tính, chiều cao, cân nặng hoặc BMI. Bạn có thể từ chối và vẫn xem gợi ý món thông thường.',
       [
         { text: 'Để sau', style: 'cancel' },
         {
@@ -154,18 +232,165 @@ const AiMealRecommendationsScreen = () => {
     navigate(ScreenKeys.RECIPE_DETAIL, { mealId });
   }, []);
 
+  const addRecommendationsToPlan = useCallback(
+    async (
+      period: MealPeriod,
+      recommendations: AiMealRecommendation[],
+      actionKey: string,
+    ) => {
+      if (!user?.accessToken || !user.id) {
+        Alert.alert('Cần đăng nhập', 'Đăng nhập để thêm món vào thực đơn.');
+        return;
+      }
+      if (!recommendations.length) return;
+      setAddingKey(actionKey);
+      let activeHousehold = destination === 'HOUSEHOLD' ? household : null;
+      let addedCount = 0;
+      let addedDirectlyToPlan = false;
+      const date = state.recommendations?.date ?? getUtcDateKey(new Date());
+      const invalidateMealPlan = () => {
+        dispatch(
+          setMealPlanDestination({
+            userId: user.id,
+            destination,
+          }),
+        );
+        if (destination === 'HOUSEHOLD' && activeHousehold) {
+          dispatch(
+            invalidateCachedHouseholdMealPlan({
+              userId: user.id,
+              householdId: activeHousehold.id,
+              date,
+            }),
+          );
+        } else {
+          dispatch(invalidateCachedMealPlan({ userId: user.id, date }));
+        }
+      };
+      try {
+        if (destination === 'HOUSEHOLD' && !householdLoaded) {
+          const householdResponse = await fetchCurrentHousehold(user);
+          if (
+            !householdResponse?.success ||
+            householdResponse.data === undefined
+          ) {
+            throw new Error(
+              householdResponse?.message ||
+                'Không thể kiểm tra gia đình. Vui lòng thử lại.',
+            );
+          }
+          activeHousehold = householdResponse.data;
+          dispatch(
+            cacheCurrentHousehold({
+              userId: user.id,
+              household: activeHousehold,
+            }),
+          );
+        }
+        if (destination === 'HOUSEHOLD' && !activeHousehold) {
+          throw new Error(
+            'Hãy tạo hoặc tham gia gia đình trước khi thêm món vào thực đơn chung.',
+          );
+        }
+        for (const recommendation of recommendations) {
+          const response = await addMealToPlan(user, destination, {
+            mealId: recommendation.meal.id,
+            date,
+            mealPeriod: period,
+          });
+          if (!response?.success) {
+            throw new Error(response?.message || 'Vui lòng thử lại.');
+          }
+          addedCount += 1;
+          addedDirectlyToPlan =
+            addedDirectlyToPlan || Boolean(response.data?.addedDirectlyToPlan);
+        }
+        invalidateMealPlan();
+        const destinationText =
+          destination === 'HOUSEHOLD'
+            ? addedDirectlyToPlan
+              ? 'đã thêm vào thực đơn gia đình'
+              : 'đã gửi đề xuất cho gia đình'
+            : 'đã thêm vào thực đơn';
+        Alert.alert(
+          'Đã thêm món',
+          `${addedCount} món ${destinationText} ngày ${date}.`,
+        );
+      } catch (error) {
+        if (addedCount > 0) invalidateMealPlan();
+        const message =
+          error instanceof Error ? error.message : 'Vui lòng thử lại.';
+        Alert.alert(
+          addedCount > 0 ? 'Đã thêm một phần món' : 'Không thể thêm món',
+          addedCount > 0
+            ? `Đã thêm ${addedCount}/${recommendations.length} món. ${message}`
+            : message,
+        );
+      } finally {
+        setAddingKey(null);
+      }
+    },
+    [
+      destination,
+      dispatch,
+      household,
+      householdLoaded,
+      state.recommendations?.date,
+      user,
+    ],
+  );
+  const addMealHandlers = React.useMemo(
+    () =>
+      new Map(
+        PERIODS.flatMap(period =>
+          (state.recommendations?.recommendations[period] ?? []).map(
+            recommendation => {
+              const actionKey = `${period}:${recommendation.meal.id}`;
+              return [
+                actionKey,
+                () =>
+                  addRecommendationsToPlan(period, [recommendation], actionKey),
+              ] as const;
+            },
+          ),
+        ),
+      ),
+    [addRecommendationsToPlan, state.recommendations],
+  );
+  const addAllLunch = useCallback(
+    () =>
+      addRecommendationsToPlan(
+        'LUNCH',
+        state.recommendations?.recommendations.LUNCH ?? [],
+        'LUNCH',
+      ),
+    [addRecommendationsToPlan, state.recommendations],
+  );
+  const addAllDinner = useCallback(
+    () =>
+      addRecommendationsToPlan(
+        'DINNER',
+        state.recommendations?.recommendations.DINNER ?? [],
+        'DINNER',
+      ),
+    [addRecommendationsToPlan, state.recommendations],
+  );
+
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        eyebrow="MEALCRAFT AI COACH"
+        eyebrow="HEALTH AI COACH"
         title="Gợi ý món ăn bằng AI"
         rightAction={
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Làm mới gợi ý"
-            disabled={state.loading}
+            disabled={state.loading || addingKey !== null}
             onPress={requestRecommendations}
-            style={[styles.refreshButton, state.loading && styles.disabled]}
+            style={[
+              styles.refreshButton,
+              (state.loading || addingKey !== null) && styles.disabled,
+            ]}
           >
             {state.loading ? (
               <ActivityIndicator color={COLORS.green} />
@@ -228,12 +453,28 @@ const AiMealRecommendationsScreen = () => {
                   <Text style={styles.periodTitle}>
                     {period === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'}
                   </Text>
+                  {state.recommendations?.mealBudgets?.[period] ? (
+                    <Text style={styles.budgetHint}>
+                      Gợi ý ưu tiên trong ngân sách{' '}
+                      {Math.round(
+                        state.recommendations.mealBudgets[period]!,
+                      ).toLocaleString('vi-VN')}
+                      đ cho cả bữa
+                    </Text>
+                  ) : null}
                   {recommendations.length ? (
                     recommendations.map(recommendation => (
                       <HomeRecipeCard
                         key={recommendation.meal.id}
                         meal={recommendation.meal}
                         onPress={openRecipe}
+                        onAdd={addMealHandlers.get(
+                          `${period}:${recommendation.meal.id}`,
+                        )}
+                        adding={
+                          addingKey === `${period}:${recommendation.meal.id}`
+                        }
+                        disableAdd={state.loading || addingKey !== null}
                         recommendationReason={
                           recommendation.recommendationReason
                         }
@@ -245,9 +486,36 @@ const AiMealRecommendationsScreen = () => {
                     <Text style={styles.emptyText}>
                       {state.recommendations?.consumedPeriods.includes(period)
                         ? 'Đã ghi nhận bữa này.'
+                        : state.recommendations?.mealBudgets?.[period]
+                        ? `Chưa có món phù hợp với dinh dưỡng và ngân sách ${Math.round(
+                            state.recommendations.mealBudgets[period]!,
+                          ).toLocaleString('vi-VN')}đ.`
                         : 'Chưa có món trong thư viện phù hợp với lượng dinh dưỡng còn lại.'}
                     </Text>
                   )}
+                  {recommendations.length ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Thêm tất cả món vào ${
+                        period === 'LUNCH' ? 'bữa trưa' : 'bữa tối'
+                      }`}
+                      disabled={state.loading || addingKey !== null}
+                      onPress={period === 'LUNCH' ? addAllLunch : addAllDinner}
+                      style={[
+                        styles.addAllButton,
+                        (state.loading || addingKey !== null) &&
+                          styles.disabled,
+                      ]}
+                    >
+                      {addingKey === period ? (
+                        <ActivityIndicator color={COLORS.white} size="small" />
+                      ) : (
+                        <Text style={styles.addAllButtonText}>
+                          Thêm tất cả
+                        </Text>
+                      )}
+                    </Pressable>
+                  ) : null}
                 </View>
               );
             })}
@@ -277,6 +545,7 @@ const COLORS = {
   green: '#168653',
   border: '#E5EBE7',
   danger: '#B42318',
+  lightGreen: '#E7F4EC',
 };
 
 const styles = StyleSheet.create({
@@ -373,6 +642,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: COLORS.text,
     fontSize: 13,
+    fontWeight: '800',
+  },
+  budgetHint: {
+    color: COLORS.green,
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  addAllButton: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+    borderRadius: 8,
+    backgroundColor: COLORS.green,
+  },
+  addAllButtonText: {
+    color: COLORS.white,
+    fontSize: 12,
     fontWeight: '800',
   },
   emptyText: { color: COLORS.secondary, fontSize: 11, lineHeight: 16 },

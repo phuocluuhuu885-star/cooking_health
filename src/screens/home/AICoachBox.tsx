@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 type Props = {
@@ -8,6 +8,8 @@ type Props = {
   onWeeklyPlan: () => void;
   onProgressAnalysis: () => void;
   onSmartShopping: () => void;
+  onAiChat: () => void;
+  onMealScan: () => void;
 };
 
 const FEATURES = [
@@ -31,6 +33,16 @@ const FEATURES = [
     title: 'Đi chợ thông minh',
     subtitle: 'Tổng hợp nguyên liệu',
   },
+  {
+    icon: 'chat',
+    title: 'Hỏi đáp AI',
+    subtitle: 'Hỏi về thực đơn và dinh dưỡng',
+  },
+  {
+    icon: 'scan',
+    title: 'Quét món ăn',
+    subtitle: 'Ước tính thành phần và calo',
+  },
 ] as const;
 
 const FeatureIcon = ({ kind }: { kind: (typeof FEATURES)[number]['icon'] }) => (
@@ -44,7 +56,12 @@ const FeatureIcon = ({ kind }: { kind: (typeof FEATURES)[number]['icon'] }) => (
     strokeLinecap="round"
     strokeLinejoin="round"
   >
-    {kind === 'meal' ? (
+    {kind === 'scan' ? (
+      <>
+        <Path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
+        <Path d="M8 12h8M12 8v8" />
+      </>
+    ) : kind === 'meal' ? (
       <Path d="M5 3v7M8 3v7M11 3v7M5 7h6M8 10v11M17 3v18M17 3c3 2 3 6 0 8" />
     ) : kind === 'calendar' ? (
       <>
@@ -53,11 +70,16 @@ const FeatureIcon = ({ kind }: { kind: (typeof FEATURES)[number]['icon'] }) => (
       </>
     ) : kind === 'chart' ? (
       <Path d="M3 20h18M5 16v-4M10 16V9M15 16v-6M20 16V4M4 10l5-4 4 2 6-5" />
-    ) : (
+    ) : kind === 'cart' ? (
       <>
         <Path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h8.8a2 2 0 0 0 1.9-1.4L22 9H6" />
         <Circle cx="10" cy="20" r="1" />
         <Circle cx="18" cy="20" r="1" />
+      </>
+    ) : (
+      <>
+        <Path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-5 4v-6.5A2.5 2.5 0 0 1 4 11z" />
+        <Path d="M8 8h8M8 11h5" />
       </>
     )}
   </Svg>
@@ -68,12 +90,16 @@ const AICoachBox = ({
   onWeeklyPlan,
   onProgressAnalysis,
   onSmartShopping,
+  onAiChat,
+  onMealScan,
 }: Props) => {
   const actions = [
     onMealSuggestions,
     onWeeklyPlan,
     onProgressAnalysis,
     onSmartShopping,
+    onAiChat,
+    onMealScan,
   ];
 
   return (
@@ -88,7 +114,7 @@ const AICoachBox = ({
           <Text style={styles.sparkleText}>✧</Text>
         </View>
         <View style={styles.headingCopy}>
-          <Text style={styles.title}>MealCraft AI Coach</Text>
+          <Text style={styles.title}>HEALTH AI Coach</Text>
           <Text style={styles.subtitle}>Trợ lý dinh dưỡng cá nhân của bạn</Text>
         </View>
         <View style={styles.premiumBadge}>
@@ -118,7 +144,7 @@ const AICoachBox = ({
         ))}
       </View>
       <Text style={styles.disclaimer}>
-        Gợi ý dựa trên dữ liệu dinh dưỡng và món ăn có trong MealCraft; chỉ mang
+        Gợi ý dựa trên dữ liệu dinh dưỡng và món ăn có trong Health&Cook chỉ mang
         tính tham khảo, không thay thế tư vấn y tế.
       </Text>
     </LinearGradient>

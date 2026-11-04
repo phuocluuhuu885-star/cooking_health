@@ -1,6 +1,6 @@
 import React, { memo, useCallback } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import type { HomeMealPeriodButtonProps } from '../../utils/types';
 
 const HomeMealPeriodButton = memo(

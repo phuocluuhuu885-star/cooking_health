@@ -19,12 +19,23 @@ export const aggregateMealIngredients = (
       const existingIngredient = ingredientTotals.get(normalizedName);
       if (existingIngredient) {
         existingIngredient.amountG += ingredient.amountG;
+        if (
+          !existingIngredient.mealNames?.some(
+            name => name.toLocaleLowerCase() === meal.name.toLocaleLowerCase(),
+          )
+        ) {
+          existingIngredient.mealNames = [
+            ...(existingIngredient.mealNames ?? []),
+            meal.name,
+          ];
+        }
         return;
       }
 
       ingredientTotals.set(normalizedName, {
         name: ingredient.name.trim(),
         amountG: ingredient.amountG,
+        mealNames: [meal.name],
       });
     });
   });

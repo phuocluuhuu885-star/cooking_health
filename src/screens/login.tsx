@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../components/LinearGradient';
 import { resetTo } from '../utils/navigation';
 import ScreenKeys from '../utils/screenKey';
 import { setSyncUser, syncApi } from '../utils/syncUtils';

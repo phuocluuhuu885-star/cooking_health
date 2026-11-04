@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { createMealReview, fetchMealReviews } from '../../utils/mealReviewApi';
 import type { MyMealReview } from '../../utils/types';
 import { createStateSetter } from '../../utils/stateUtils';

@@ -72,3 +72,25 @@ export const updateHouseholdMealPollDeadline = async (
     };
   };
 };
+
+export const updateHouseholdMealVoting = async (
+  user: UserInfo,
+  enabled: boolean,
+): Promise<{
+  success: boolean;
+  message?: string;
+  ErrorMessage?: string;
+  IsError?: boolean;
+  data?: { mealVotingEnabled: boolean };
+}> => {
+  setSyncUser(user);
+  return (await syncApi(apiConst.updateHouseholdMealVoting, {
+    enabled,
+  })) as {
+    success: boolean;
+    message?: string;
+    ErrorMessage?: string;
+    IsError?: boolean;
+    data?: { mealVotingEnabled: boolean };
+  };
+};

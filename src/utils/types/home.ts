@@ -50,6 +50,9 @@ export type HomeMealPeriodButtonProps = {
 export type HomeRecipeCardProps = {
   meal: BackendMeal;
   onPress: (mealId: string) => void;
+  onAdd?: () => void;
+  adding?: boolean;
+  disableAdd?: boolean;
   reviewSummary?: MealReviewSummary;
   recommendationReason?: string;
   recommendedServings?: number;
@@ -59,6 +62,7 @@ export type HomeRecipeCardProps = {
 export type HomeAggregatedIngredient = {
   name: string;
   amountG: number;
+  mealNames?: string[];
 };
 
 export type HomeIngredientSummaryModalProps = {
@@ -67,6 +71,8 @@ export type HomeIngredientSummaryModalProps = {
   ingredients: HomeAggregatedIngredient[];
   loading: boolean;
   error: string;
+  shoppingListDate?: string;
+  shoppingListUserId?: string;
   onClose: () => void;
   onRetry: () => void;
 };

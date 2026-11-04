@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  memo
 } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -16,7 +17,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ScreenHeader from '../component/ScreenHeader';
 import { useSelector } from 'react-redux';
@@ -325,7 +326,7 @@ const WalkingScreen = () => {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: insets.bottom + 28 },
+          { paddingBottom: insets.bottom + 16 },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -683,14 +684,14 @@ const WalkingScreen = () => {
   );
 };
 
-const Metric = ({ label, value }: { label: string; value: string }) => (
+const Metric = memo(({ label, value }: { label: string; value: string }) => (
   <View style={styles.metric}>
     <Text style={styles.metricValue}>{value}</Text>
     <Text style={styles.metricLabel}>{label}</Text>
   </View>
-);
+));
 
-const ActionButton = ({
+const ActionButton = memo(({ 
   label,
   onPress,
   disabled,
@@ -723,12 +724,9 @@ const ActionButton = ({
       {label}
     </Text>
   </Pressable>
-);
+));
 
-const StatusLine = ({
-  label,
-  status,
-}: {
+const StatusLine = memo(({ label, status }: {
   label: string;
   status: 'checking' | 'available' | 'denied' | 'unavailable';
 }) => {
@@ -754,9 +752,9 @@ const StatusLine = ({
       </Text>
     </View>
   );
-};
+});
 
-const HistoryRow = ({ workout }: { workout: WalkingWorkout }) => (
+const HistoryRow = memo(({ workout }: { workout: WalkingWorkout }) => (
   <View style={styles.historyRow}>
     <View style={styles.historyCopy}>
       <Text style={styles.historyDate}>{formatWorkoutDate(workout.startedAt)}</Text>
@@ -772,7 +770,7 @@ const HistoryRow = ({ workout }: { workout: WalkingWorkout }) => (
         : `${Math.round(workout.caloriesBurned)} kcal`}
     </Text>
   </View>
-);
+));
 
 const COLORS = {
   background: '#F5F7F5',

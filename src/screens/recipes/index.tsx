@@ -55,6 +55,7 @@ import MealPlanComposerModal from './MealPlanComposerModal';
 import { fetchMealReviewSummaries } from '../../utils/mealReviewApi';
 import { findRecipe, toRecipe } from '../../utils/recipeScreenUtils';
 import { createStateSetter } from '../../utils/stateUtils';
+import TestBannerAd from '../component/TestBannerAd';
 
 const CATEGORIES: Category[] = [
   { id: 'all', title: 'Tất cả' },
@@ -345,6 +346,12 @@ const RecipeLibrary = () => {
         return;
       }
       const openComposer = () => {
+        dispatch(
+          setMealPlanDestination({
+            userId: user.id,
+            destination: 'PERSONAL',
+          }),
+        );
         setSelectedRecipe(recipe);
         setComposerVisible(true);
       };
@@ -515,8 +522,11 @@ const RecipeLibrary = () => {
             ? `Món đã được thêm vào danh sách bình chọn cho ngày ${date}. Hạn bình chọn được cài đặt trong màn Thực phẩm gia đình.`
             : `Đã thêm món vào thực đơn ngày ${date}.`,
         );
-      } catch {
-        Alert.alert('Không thể thêm món', 'Vui lòng thử lại sau.');
+      } catch (error) {
+        Alert.alert(
+          'Không thể thêm món',
+          error instanceof Error ? error.message : 'Vui lòng thử lại sau.',
+        );
       } finally {
         setComposerSaving(false);
       }
@@ -792,6 +802,7 @@ const RecipeLibrary = () => {
             }
           />
         )}
+        <TestBannerAd />
       </View>
       <MealPlanComposerModal
         visible={composerVisible}
@@ -820,7 +831,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F5F8F5',
-    marginBottom: 48,
   },
   list: {
     paddingTop: 7,

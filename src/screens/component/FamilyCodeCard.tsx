@@ -1,6 +1,6 @@
 import { memo, useCallback } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { colors } from '../../abase/constant';
 import { useSelector } from 'react-redux';
 import { selectUserInfo } from '../../reduxs/reduces/user';

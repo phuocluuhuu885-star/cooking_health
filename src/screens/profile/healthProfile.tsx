@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { syncApi } from '../../utils/syncUtils';
 import { onHideLoading, onShowLoading } from '../../components/loading';
 import apiConst from '../../abase/constant/apiConst';

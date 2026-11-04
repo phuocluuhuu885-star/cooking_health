@@ -77,6 +77,17 @@ When you want to forcefully reload, for example to reset the state of your app, 
 
 You've successfully run and modified your React Native App. :partying_face:
 
+## Expense management
+
+Signed-in users can open **Profile > Chi tiêu > Quản lý chi tiêu** to:
+
+- Record, edit, and delete personal or shared household expenses.
+- Link an expense to a recipe in the app while entering the amount actually paid.
+- Review monthly totals and leading expense categories.
+- Set recurring total limits for lunch and dinner; meal recommendations prioritize recipes whose estimated total cost fits those limits.
+
+The mobile app uses the authenticated `/api/expenses` and `/api/meal-budgets` endpoints in the backend. Apply the backend Prisma migration before using these endpoints.
+
 ### Now what?
 
 - If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).

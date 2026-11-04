@@ -8,7 +8,6 @@ import React, {
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -18,7 +17,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ScreenHeader from '../component/ScreenHeader';
@@ -41,8 +40,8 @@ import {
   formatHouseholdChatTime,
   mergeHouseholdMessages,
 } from '../../utils/householdScreenUtils';
-import { getAvatarUri } from '../../utils/avatarImageUtils';
-import { getInitials } from '../../utils/stringUtils';
+import HouseholdChatAvatar from './components/HouseholdChatAvatar';
+import { COLORS } from './components/styles';
 
 type Props = StackScreenProps<
   RootStackParamList,
@@ -51,42 +50,6 @@ type Props = StackScreenProps<
 
 const PAGE_SIZE = 30;
 const MAX_MESSAGE_LENGTH = 2000;
-const COLORS = {
-  background: '#F5F7F5',
-  white: '#FFFFFF',
-  text: '#172B23',
-  secondary: '#66756D',
-  green: '#168653',
-  lightGreen: '#E7F4EC',
-  border: '#E5EBE7',
-  danger: '#B42318',
-};
-
-const ChatAvatar = ({
-  avatar,
-  name,
-}: {
-  avatar: string | null | undefined;
-  name: string;
-}) => {
-  const [imageFailed, setImageFailed] = useState(false);
-  const uri = getAvatarUri(avatar);
-
-  return (
-    <View style={styles.avatar}>
-      {uri && !imageFailed ? (
-        <Image
-          source={{ uri }}
-          style={styles.avatarImage}
-          onError={() => setImageFailed(true)}
-        />
-      ) : (
-        <Text style={styles.avatarText}>{getInitials(name) || 'M'}</Text>
-      )}
-    </View>
-  );
-};
-
 const HouseholdChatScreen = ({ route }: Props) => {
   const insets = useSafeAreaInsets();
   const user = useSelector(selectUserInfo);
@@ -402,7 +365,7 @@ const HouseholdChatScreen = ({ route }: Props) => {
           {mine ? null : (
             <View style={styles.avatarSlot}>
               {!groupedWithPrevious ? (
-                <ChatAvatar
+                <HouseholdChatAvatar
                   key={avatar || avatarName}
                   avatar={avatar}
                   name={avatarName}
@@ -437,7 +400,7 @@ const HouseholdChatScreen = ({ route }: Props) => {
           {mine ? (
             <View style={styles.avatarSlot}>
               {!groupedWithPrevious ? (
-                <ChatAvatar
+                <HouseholdChatAvatar
                   key={avatar || avatarName}
                   avatar={avatar}
                   name={avatarName}
@@ -603,17 +566,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatar: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderRadius: 16,
-    backgroundColor: COLORS.lightGreen,
-  },
-  avatarImage: { width: '100%', height: '100%' },
-  avatarText: { color: COLORS.green, fontSize: 11, fontWeight: '800' },
   messageBubble: {
     maxWidth: '78%',
     paddingHorizontal: 12,

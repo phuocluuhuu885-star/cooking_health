@@ -1,44 +1,33 @@
-import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-import apiConst from '../../abase/constant/apiConst';
+import { useFocusEffect } from '@react-navigation/native';
 import { logOutUser, selectUserInfo } from '../../reduxs/reduces/user';
-import {
-  cacheConsumptionReport,
-  getConsumptionReportCacheKey,
-  selectCurrentHousehold,
-  selectConsumptionReport,
-} from '../../reduxs/reduces/appData';
 import { useAppDispatch } from '../../reduxs/store';
-import { setSyncUser, syncApi } from '../../utils/syncUtils';
 import ScreenKeys from '../../utils/screenKey';
 import { navigate, resetTo } from '../../utils/navigation';
-import { formatNumberWithOptionalDecimal } from '../../utils/numberUtils';
 import { getInitials } from '../../utils/stringUtils';
 import { getAvatarUri } from '../../utils/avatarImageUtils';
-import type { GlobalState } from '../../type/global';
-import type { ActivityLevel, BmiCategory, Goal } from '../../type/user';
-import type {
-  ConsumptionReportResponse,
-  DailyConsumedMealsResponse,
-  HealthProfileHistoryResponse,
-  ProfileScreenState,
-} from '../../utils/types';
+import { setSyncUser } from '../../utils/syncUtils';
+import {
+  hasAiRecommendationConsent,
+  saveAiRecommendationConsent,
+} from '../../utils/aiRecommendationConsent';
+import { deleteUserAccount } from '../../utils/userApi';
 import HealthProfile from './healthProfile';
-import ConsumptionReport from './consumptionReport';
-import HealthMetricHistory from './HealthMetricHistory';
 
 const COLORS = {
   background: '#F5F7F5',
@@ -48,127 +37,295 @@ const COLORS = {
   green: '#168653',
   lightGreen: '#E7F4EC',
   border: '#E5EBE7',
-  muted: '#A5B1AA',
+  danger: '#B42318',
 };
 
-const GOAL_LABELS: Record<Goal, string> = {
-  LOSE_WEIGHT: 'Giảm cân',
-  MAINTAIN: 'Duy trì cân nặng',
-  GAIN_MUSCLE: 'Tăng cơ',
-};
+const ACCOUNT_OPTIONS = [
+  {
+    id: 'BASIC',
+    title: 'Thông tin cơ bản',
+    description: 'Cập nhật tên hiển thị và ảnh đại diện',
+    icon: 'profile',
+  },
+  {
+    id: 'PASSWORD',
+    title: 'Đổi mật khẩu',
+    description: 'Bảo vệ tài khoản bằng mật khẩu mới',
+    icon: 'lock',
+  },
+  {
+    id: 'PRIVACY',
+    title: 'Chính sách & quyền riêng tư',
+    description: 'Tìm hiểu cách HealthAndCook sử dụng dữ liệu',
+    icon: 'shield',
+  },
+  {
+    id: 'GEMINI',
+    title: 'Chia sẻ dữ liệu với Gemini',
+    description: 'Quản lý sự đồng ý dùng dữ liệu cho gợi ý AI',
+    icon: 'sparkle',
+  },
+  {
+    id: 'DELETE',
+    title: 'Xóa tài khoản',
+    description: 'Xóa tài khoản và dữ liệu liên quan vĩnh viễn',
+    icon: 'delete',
+  },
+] as const;
 
-const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
-  SEDENTARY: 'Ít vận động',
-  LIGHT: 'Vận động nhẹ',
-  MODERATE: 'Vận động vừa',
-  ACTIVE: 'Năng động',
-  VERY_ACTIVE: 'Rất năng động',
-};
-
-const BMI_LABELS: Record<BmiCategory, string> = {
-  UNDERWEIGHT: 'Thiếu cân',
-  NORMAL_WEIGHT: 'Bình thường',
-  OVERWEIGHT: 'Thừa cân',
-  OBESITY_CLASS_I: 'Béo phì độ I',
-  OBESITY_CLASS_II: 'Béo phì độ II',
-  OBESITY_CLASS_III: 'Béo phì độ III',
-};
-
-const MacroItem = memo(
-  ({
-    label,
-    value,
-    color,
-    marker,
-  }: {
-    label: string;
-    value: number;
-    color: string;
-    marker: string;
-  }) => (
-    <View style={styles.macroItem}>
-      <View style={styles.macroLabelRow}>
-        <View style={[styles.macroMarker, { backgroundColor: color }]}>
-          <Text style={styles.macroMarkerText}>{marker}</Text>
-        </View>
-        <Text style={styles.macroLabel}>{label}</Text>
-      </View>
-      <Text style={styles.macroValue}>
-        {formatNumberWithOptionalDecimal(value)} g
-      </Text>
+const ProfileOptionIcon = ({
+  name,
+  danger = false,
+}: {
+  name: string;
+  danger?: boolean;
+}) => {
+  const color = danger ? COLORS.danger : COLORS.green;
+  return (
+    <View style={[styles.optionIcon, danger && styles.deleteOptionIcon]}>
+      <Svg width={22} height={22} viewBox="0 0 24 24">
+        {name === 'profile' ? (
+          <>
+            <Circle
+              cx={12}
+              cy={8}
+              r={3.2}
+              fill="none"
+              stroke={color}
+              strokeWidth={1.8}
+            />
+            <Path
+              d="M5.5 20a6.5 6.5 0 0 1 13 0"
+              fill="none"
+              stroke={color}
+              strokeLinecap="round"
+              strokeWidth={1.8}
+            />
+          </>
+        ) : null}
+        {name === 'lock' ? (
+          <>
+            <Path
+              d="M6 10h12v10H6zM9 10V7a3 3 0 0 1 6 0v3"
+              fill="none"
+              stroke={color}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.8}
+            />
+            <Circle cx={12} cy={15} r={1} fill={color} />
+          </>
+        ) : null}
+        {name === 'shield' ? (
+          <Path
+            d="M12 3 19 6v5c0 4.7-3 8-7 10-4-2-7-5.3-7-10V6l7-3Zm-3 9 2 2 4-4"
+            fill="none"
+            stroke={color}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.8}
+          />
+        ) : null}
+        {name === 'sparkle' ? (
+          <>
+            <Path
+              d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"
+              fill="none"
+              stroke={color}
+              strokeLinejoin="round"
+              strokeWidth={1.7}
+            />
+            <Path
+              d="m19 15 .9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z"
+              fill="none"
+              stroke={color}
+              strokeLinejoin="round"
+              strokeWidth={1.4}
+            />
+          </>
+        ) : null}
+        {name === 'delete' ? (
+          <>
+            <Path
+              d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m3 3v7m6-7v7"
+              fill="none"
+              stroke={color}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.8}
+            />
+          </>
+        ) : null}
+        {name === 'health' ? (
+          <Path
+            d="M20.5 8.8c0 4.2-8.5 10-8.5 10s-8.5-5.8-8.5-10A4.3 4.3 0 0 1 12 6.4a4.3 4.3 0 0 1 8.5 2.4ZM7 12h3l1.2-2.2 2.1 4.4 1.2-2.2H18"
+            fill="none"
+            stroke={color}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.6}
+          />
+        ) : null}
+        {name === 'money' ? (
+          <Path
+            d="M12 3v18m4-14H9.8a3.3 3.3 0 0 0 0 6.6h4.4a3.3 3.3 0 0 1 0 6.6H7"
+            fill="none"
+            stroke={color}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.8}
+          />
+        ) : null}
+        {name === 'report' ? (
+          <>
+            <Path
+              d="M4 19h16M6 16V9m6 7V5m6 11v-4"
+              fill="none"
+              stroke={color}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.8}
+            />
+            <Circle cx={6} cy={7} r={1.5} fill={color} />
+            <Circle cx={18} cy={10} r={1.5} fill={color} />
+          </>
+        ) : null}
+        {name === 'logout' ? (
+          <Path
+            d="M10 4H5v16h5m4-4 4-4-4-4m4 4H9"
+            fill="none"
+            stroke={color}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.9}
+          />
+        ) : null}
+      </Svg>
     </View>
-  ),
-);
-
-const DetailRow = memo(
-  ({
-    label,
-    value,
-    last = false,
-  }: {
-    label: string;
-    value: string;
-    last?: boolean;
-  }) => (
-    <View style={[styles.detailRow, !last && styles.detailRowBorder]}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value}</Text>
-    </View>
-  ),
-);
+  );
+};
 
 const Profile = () => {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
-  const household = useSelector(selectCurrentHousehold);
-  const healthProfile = user?.healthProfile ?? null;
-  const reportDate = new Date().toISOString().slice(0, 10);
-  const [state, setState] = useState<ProfileScreenState>({
-    isHealthProfileVisible: false,
-    consumptionPeriod: 'WEEK',
-    reportLoading: true,
-    reportError: '',
-    dailyMeals: [],
-    dailyMealsLoading: true,
-    dailyMealsError: '',
-    healthHistory: [],
-    healthHistoryLoading: true,
-    healthHistoryError: '',
-  });
-  const reportCacheKey = getConsumptionReportCacheKey(
-    state.consumptionPeriod,
-    reportDate,
+  const [healthProfileVisible, setHealthProfileVisible] = useState(false);
+  const [deleteAccountVisible, setDeleteAccountVisible] = useState(false);
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [geminiConsentGranted, setGeminiConsentGranted] = useState(() =>
+    Boolean(user?.id && hasAiRecommendationConsent(user.id)),
   );
-  const cachedConsumptionReport = useSelector((root: GlobalState) =>
-    selectConsumptionReport(root, reportCacheKey),
-  );
-  const refs = useRef({
-    reportCache: cachedConsumptionReport,
-    reportRequestId: 0,
-    dailyMealsRequestId: 0,
-    healthHistoryRequestId: 0,
-  });
-  refs.current.reportCache = cachedConsumptionReport;
-  const fullName = user?.fullName?.trim() || 'Thành viên MealCraft';
-  const openFamily = useCallback(() => {
-    navigate(ScreenKeys.FAMILY);
-  }, []);
-  const openDailyConsumedMeals = useCallback(() => {
-    navigate(ScreenKeys.DAILY_CONSUMED_MEALS);
-  }, []);
+  const fullName = user?.fullName?.trim() || 'Thành viên HealthAndCook';
 
-  const changeConsumptionPeriod = useCallback(
-    (consumptionPeriod: ProfileScreenState['consumptionPeriod']) => {
-      setState(previous => ({
-        ...previous,
-        consumptionPeriod,
-        reportLoading: true,
-        reportError: '',
-      }));
-    },
-    [],
+  useFocusEffect(
+    useCallback(() => {
+      setGeminiConsentGranted(
+        Boolean(user?.id && hasAiRecommendationConsent(user.id)),
+      );
+    }, [user?.id]),
   );
+
+  const handleAccountOption = useCallback(
+    (optionId: (typeof ACCOUNT_OPTIONS)[number]['id']) => {
+      if (optionId === 'BASIC' || optionId === 'PASSWORD') {
+        navigate(ScreenKeys.PERSONAL_INFO, { section: optionId });
+        return;
+      }
+      if (optionId === 'PRIVACY') {
+        navigate(ScreenKeys.PRIVACY_POLICY, { mode: 'view' });
+        return;
+      }
+      if (optionId === 'DELETE') {
+        Alert.alert(
+          'Xóa tài khoản vĩnh viễn?',
+          'Hồ sơ, dữ liệu sức khỏe, lịch sử đi bộ và thực đơn gắn với tài khoản sẽ bị xóa. Thao tác này không thể hoàn tác.',
+          [
+            { text: 'Hủy', style: 'cancel' },
+            {
+              text: 'Tiếp tục',
+              style: 'destructive',
+              onPress: () => setDeleteAccountVisible(true),
+            },
+          ],
+        );
+        return;
+      }
+
+      if (!user?.id) return;
+      if (!geminiConsentGranted) {
+        Alert.alert(
+          'Chưa bật đồng ý chia sẻ',
+          'Hiện không có đồng ý chia sẻ với Gemini đang bật trên thiết bị này.',
+        );
+        return;
+      }
+      Alert.alert(
+        'Thu hồi đồng ý dùng gợi ý AI?',
+        'HealthAndCook sẽ ngừng gửi dữ liệu dinh dưỡng cho Gemini trên thiết bị này. Gợi ý AI đã tải sẽ bị xóa khỏi màn hình.',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Thu hồi',
+            style: 'destructive',
+            onPress: () => {
+              saveAiRecommendationConsent(user.id, false);
+              setGeminiConsentGranted(false);
+            },
+          },
+        ],
+      );
+    },
+    [geminiConsentGranted, user],
+  );
+  const submitAccountDeletion = useCallback(async () => {
+    if (!user?.accessToken) {
+      Alert.alert('Cần đăng nhập', 'Vui lòng đăng nhập lại để xóa tài khoản.');
+      return;
+    }
+    if (!deleteAccountPassword) {
+      Alert.alert('Thiếu mật khẩu', 'Nhập mật khẩu để xác nhận xóa tài khoản.');
+      return;
+    }
+
+    setDeletingAccount(true);
+    try {
+      const response = await deleteUserAccount(user, deleteAccountPassword);
+      if (!response.success) {
+        Alert.alert(
+          'Không thể xóa tài khoản',
+          response.message || 'Vui lòng thử lại.',
+        );
+        return;
+      }
+      setDeleteAccountVisible(false);
+      setDeleteAccountPassword('');
+      dispatch(logOutUser());
+      setSyncUser(null);
+      resetTo(ScreenKeys.LOGIN);
+      Alert.alert(
+        'Đã xóa tài khoản',
+        response.warning ||
+          response.message ||
+          'Dữ liệu tài khoản đã được xóa.',
+      );
+    } catch (error) {
+      Alert.alert(
+        'Không thể xóa tài khoản',
+        error instanceof Error ? error.message : 'Vui lòng thử lại sau.',
+      );
+    } finally {
+      setDeletingAccount(false);
+    }
+  }, [deleteAccountPassword, dispatch, user]);
+
+  const closeDeleteAccountModal = useCallback(() => {
+    if (!deletingAccount) {
+      setDeleteAccountVisible(false);
+      setDeleteAccountPassword('');
+    }
+  }, [deletingAccount]);
+
   const confirmLogOut = useCallback(() => {
     Alert.alert(
       'Đăng xuất',
@@ -188,1013 +345,550 @@ const Profile = () => {
     );
   }, [dispatch]);
 
-  const loadConsumptionReport = useCallback(async () => {
-    const requestId = ++refs.current.reportRequestId;
-    setSyncUser(user ?? null);
-
-    if (!user?.accessToken) {
-      setState(previous => ({
-        ...previous,
-        reportLoading: false,
-        reportError: '',
-      }));
-      return;
-    }
-
-    if (refs.current.reportCache) {
-      setState(previous => ({
-        ...previous,
-        reportLoading: false,
-        reportError: '',
-      }));
-      return;
-    }
-
-    setState(previous => ({
-      ...previous,
-      reportLoading: true,
-      reportError: '',
-    }));
-    try {
-      const response = (await syncApi(apiConst.getConsumptionReport, {
-        period: state.consumptionPeriod,
-        date: reportDate,
-      })) as ConsumptionReportResponse;
-
-      if (requestId !== refs.current.reportRequestId) {
-        return;
-      }
-      if (!response?.success || !response.data) {
-        setState(previous => ({
-          ...previous,
-          reportLoading: false,
-          reportError: response?.message || 'Không thể tải báo cáo.',
-        }));
-        return;
-      }
-      dispatch(
-        cacheConsumptionReport({
-          userId: user.id,
-          key: reportCacheKey,
-          report: response.data,
-        }),
-      );
-      setState(previous => ({
-        ...previous,
-        reportLoading: false,
-      }));
-    } catch {
-      if (requestId === refs.current.reportRequestId) {
-        setState(previous => ({
-          ...previous,
-          reportLoading: false,
-          reportError: 'Không thể kết nối để tải báo cáo.',
-        }));
-      }
-    }
-  }, [dispatch, reportCacheKey, reportDate, state.consumptionPeriod, user]);
-
-  const retryConsumptionReport = useCallback(() => {
-    loadConsumptionReport();
-  }, [loadConsumptionReport]);
-
-  const loadDailyConsumedMeals = useCallback(async () => {
-    const requestId = ++refs.current.dailyMealsRequestId;
-    setSyncUser(user ?? null);
-    if (!user?.accessToken) {
-      setState(previous => ({
-        ...previous,
-        dailyMeals: [],
-        dailyMealsLoading: false,
-        dailyMealsError: '',
-      }));
-      return;
-    }
-    setState(previous => ({
-      ...previous,
-      dailyMealsLoading: true,
-      dailyMealsError: '',
-    }));
-    try {
-      const response = (await syncApi(apiConst.getDailyConsumedMeals, {
-        date: reportDate,
-      })) as DailyConsumedMealsResponse;
-      if (requestId !== refs.current.dailyMealsRequestId) {
-        return;
-      }
-      if (
-        !response?.success ||
-        !response.data ||
-        response.data.date !== reportDate ||
-        !Array.isArray(response.data.items)
-      ) {
-        setState(previous => ({
-          ...previous,
-          dailyMealsLoading: false,
-          dailyMealsError:
-            response?.message || 'Không thể tải thực phẩm đã tiêu thụ hôm nay.',
-        }));
-        return;
-      }
-      const dailyMeals = response.data.items;
-      setState(previous => ({
-        ...previous,
-        dailyMeals,
-        dailyMealsLoading: false,
-        dailyMealsError: '',
-      }));
-    } catch {
-      if (requestId === refs.current.dailyMealsRequestId) {
-        setState(previous => ({
-          ...previous,
-          dailyMealsLoading: false,
-          dailyMealsError: 'Không thể kết nối để tải thực phẩm đã tiêu thụ.',
-        }));
-      }
-    }
-  }, [reportDate, user]);
-
-  const loadHealthHistory = useCallback(async () => {
-    const requestId = ++refs.current.healthHistoryRequestId;
-    setSyncUser(user ?? null);
-    if (!user?.accessToken) {
-      setState(previous => ({
-        ...previous,
-        healthHistory: [],
-        healthHistoryLoading: false,
-        healthHistoryError: '',
-      }));
-      return;
-    }
-
-    setState(previous => ({
-      ...previous,
-      healthHistoryLoading: true,
-      healthHistoryError: '',
-    }));
-    try {
-      const response = (await syncApi(
-        apiConst.getHealthProfileHistory,
-      )) as HealthProfileHistoryResponse;
-      if (requestId !== refs.current.healthHistoryRequestId) return;
-      if (!response?.success || !response.data?.history) {
-        setState(previous => ({
-          ...previous,
-          healthHistoryLoading: false,
-          healthHistoryError:
-            response?.message || 'Không thể tải lịch sử cân nặng và BMI.',
-        }));
-        return;
-      }
-      setState(previous => ({
-        ...previous,
-        healthHistory: response.data?.history ?? [],
-        healthHistoryLoading: false,
-        healthHistoryError: '',
-      }));
-    } catch {
-      if (requestId === refs.current.healthHistoryRequestId) {
-        setState(previous => ({
-          ...previous,
-          healthHistoryLoading: false,
-          healthHistoryError: 'Không thể kết nối để tải lịch sử sức khỏe.',
-        }));
-      }
-    }
-  }, [user]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadConsumptionReport();
-      loadDailyConsumedMeals();
-      loadHealthHistory();
-      return () => {
-        refs.current.reportRequestId += 1;
-        refs.current.dailyMealsRequestId += 1;
-        refs.current.healthHistoryRequestId += 1;
-      };
-    }, [loadConsumptionReport, loadDailyConsumedMeals, loadHealthHistory]),
-  );
-
-  const bmiLabel = useMemo(() => {
-    if (!healthProfile) {
-      return 'Chưa có hồ sơ';
-    }
-    if (healthProfile.bmiCategory) {
-      return BMI_LABELS[healthProfile.bmiCategory];
-    }
-    return healthProfile.age < 18
-      ? 'Chưa phân loại theo tuổi'
-      : 'Chưa có dữ liệu';
-  }, [healthProfile]);
-
-  const healthyWeightRange =
-    healthProfile?.healthyWeightMinKg != null &&
-    healthProfile.healthyWeightMaxKg != null
-      ? `${formatNumberWithOptionalDecimal(
-          healthProfile.healthyWeightMinKg,
-        )}–${formatNumberWithOptionalDecimal(
-          healthProfile.healthyWeightMaxKg,
-        )} kg`
-      : healthProfile?.age != null && healthProfile.age < 18
-      ? 'Không áp dụng dưới 18 tuổi'
-      : 'Chưa có dữ liệu';
-
   return (
     <View style={styles.screen}>
+      <LinearGradient
+        colors={['#168653', '#2CA36D', '#BEEAD2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.heroBackground, { height: insets.top + 270 }]}
+      />
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 96 },
+          { paddingBottom: insets.bottom + 112 },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.pageHeader}>
-          <View>
-            <Text style={styles.pageTitle}>Hồ sơ cá nhân</Text>
-            <Text style={styles.pageSubtitle}>
-              Thông tin và mục tiêu sức khỏe
-            </Text>
+        <View
+          style={[
+            styles.heroHeader,
+            { paddingTop: insets.top + 18, height: insets.top + 210 },
+          ]}
+        >
+          <Text style={styles.heroEyebrow}>HealthAndCook</Text>
+          <Text style={styles.pageTitle}>Tài khoản</Text>
+          <Text style={styles.pageSubtitle}>
+            Quản lý thông tin và tùy chọn cá nhân
+          </Text>
+          <View pointerEvents="none" style={styles.heroDecoration}>
+            <ProfileOptionIcon name="profile" />
           </View>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Mở thông tin cá nhân"
-          onPress={() => navigate(ScreenKeys.PERSONAL_INFO)}
-        >
-          <LinearGradient
-            colors={['#FFFFFF', '#F3FAF5']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.identityCard}
-          >
-            <View style={styles.avatar}>
-              {user?.avatar ? (
-                <Image
-                  source={{ uri: getAvatarUri(user.avatar) }}
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <Text style={styles.avatarText}>
-                  {getInitials(fullName) || 'M'}
-                </Text>
-              )}
-            </View>
-            <View style={styles.identityDetails}>
-              <Text style={styles.name} numberOfLines={1}>
-                {fullName}
-              </Text>
-              <Text style={styles.email} numberOfLines={1}>
-                {user?.email || 'Chưa có email'}
-              </Text>
-              <View style={styles.memberBadge}>
-                <Text style={styles.memberBadgeText}>MEALCRAFT MEMBER</Text>
-              </View>
-            </View>
-            <Text style={styles.identityChevron}>›</Text>
-          </LinearGradient>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={
-            household ? 'Mở màn hình gia đình' : 'Tạo hoặc tham gia gia đình'
-          }
-          onPress={openFamily}
-          style={({ pressed }) => pressed && styles.consumedDestinationPressed}
-        >
-          <LinearGradient
-            colors={['#FFFFFF', '#F3FAF5']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.consumedDestinationCard}
-          >
-            <View style={styles.consumedDestinationTop}>
-              <View style={styles.consumedDestinationCopy}>
-                <Text style={styles.sectionTitle}>Gia đình</Text>
-                <Text style={styles.consumedDestinationDescription}>
-                  {household
-                    ? `Tạo món ăn cho gia đình ${household.name}`
-                    : 'Tạo hoặc tham gia gia đình để cùng lập thực đơn'}
-                </Text>
-              </View>
-              <Text style={styles.consumedDestinationChevron}>›</Text>
-            </View>
-          </LinearGradient>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => navigate(ScreenKeys.WALKING)}
-          style={({ pressed }) => [
-            styles.walkingButton,
-            pressed && styles.buttonPressed,
-          ]}
-        >
-          <View style={styles.walkingButtonCopy}>
-            <Text style={styles.walkingButtonTitle}>Bắt đầu đi bộ</Text>
-            <Text style={styles.walkingButtonSubtitle}>
-              Cải thiện sức khỏe, tính toán quãng đường và calo tiêu hao
-            </Text>
-          </View>
-          <Text style={styles.editButtonArrow}>›</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Xem thực phẩm đã tiêu thụ hôm nay"
-          onPress={openDailyConsumedMeals}
-          style={({ pressed }) => pressed && styles.consumedDestinationPressed}
-        >
-          <LinearGradient
-            colors={['#FFFFFF', '#F3FAF5']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.consumedDestinationCard}
-          >
-            <View style={styles.consumedDestinationTop}>
-              <View style={styles.consumedDestinationIcon}>
-                <Text style={styles.consumedDestinationIconText}>✓</Text>
-              </View>
-              <View style={styles.consumedDestinationCopy}>
-                <Text style={styles.sectionTitle}>
-                  Thực phẩm đã tiêu thụ hôm nay
-                </Text>
-                <Text style={styles.consumedDestinationDescription}>
-                  {state.dailyMealsLoading
-                    ? 'Đang cập nhật danh sách món ăn'
-                    : state.dailyMealsError
-                    ? state.dailyMealsError
-                    : state.dailyMeals.length > 0
-                    ? `${state.dailyMeals.length} món đã được ghi nhận`
-                    : 'Xem danh sách những món bạn đã ăn'}
-                </Text>
-              </View>
-              {state.dailyMealsLoading ? (
-                <ActivityIndicator color={COLORS.green} size="small" />
-              ) : (
-                <Text style={styles.consumedDestinationChevron}>›</Text>
-              )}
-            </View>
-          </LinearGradient>
-        </Pressable>
-
-        <ConsumptionReport
-          period={state.consumptionPeriod}
-          report={cachedConsumptionReport}
-          loading={state.reportLoading}
-          error={state.reportError}
-          isLoggedIn={Boolean(user?.accessToken)}
-          dailyCaloriesTarget={healthProfile?.dailyCaloriesTarget}
-          onChangePeriod={changeConsumptionPeriod}
-          onRetry={retryConsumptionReport}
-        />
-        {user?.accessToken ? (
-          <HealthMetricHistory
-            history={state.healthHistory}
-            loading={state.healthHistoryLoading}
-            error={state.healthHistoryError}
-            onRetry={loadHealthHistory}
-          />
-        ) : null}
-
-        {healthProfile ? (
-          <>
-            <LinearGradient
-              colors={['#FFFFFF', '#EAF6EE']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.calorieCard}
-            >
-              <View style={styles.calorieCardTop}>
-                <View>
-                  <Text style={styles.eyebrow}>MỤC TIÊU MỖI NGÀY</Text>
-                  <Text style={styles.calorieValue}>
-                    {healthProfile.dailyCaloriesTarget}
-                    <Text style={styles.calorieUnit}> kcal</Text>
-                  </Text>
-                </View>
-                <View style={styles.goalBadge}>
-                  <Text style={styles.goalBadgeText}>
-                    {GOAL_LABELS[healthProfile.goal]}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.calorieCaption}>
-                Mức năng lượng được đề xuất theo hồ sơ sức khỏe của bạn.
-              </Text>
-            </LinearGradient>
-
-            <View style={styles.sectionHeading}>
-              <Text style={styles.sectionTitle}>Chỉ số cơ thể</Text>
-              <Text style={styles.sectionHint}>Theo hồ sơ sức khỏe</Text>
-            </View>
-            <LinearGradient
-              colors={['#FFFFFF', '#F3FAF5']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.bodyCard}
-            >
-              <View style={styles.measurements}>
-                <View style={styles.measurement}>
-                  <Text style={styles.measurementLabel}>CHIỀU CAO</Text>
-                  <Text style={styles.measurementValue}>
-                    {formatNumberWithOptionalDecimal(healthProfile.heightCm)}
-                    <Text style={styles.measurementUnit}> cm</Text>
-                  </Text>
-                </View>
-                <View style={styles.measurementDivider} />
-                <View style={styles.measurement}>
-                  <Text style={styles.measurementLabel}>CÂN NẶNG</Text>
-                  <Text style={styles.measurementValue}>
-                    {formatNumberWithOptionalDecimal(healthProfile.weightKg)}
-                    <Text style={styles.measurementUnit}> kg</Text>
-                  </Text>
-                </View>
-                <View style={styles.measurementDivider} />
-                <View style={styles.measurement}>
-                  <Text style={styles.measurementLabel}>BMI</Text>
-                  <Text style={styles.measurementValue}>
-                    {formatNumberWithOptionalDecimal(healthProfile.bmi)}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.bmiInfo}>
-                <Text style={styles.bmiInfoLabel}>Phân loại BMI</Text>
-                <View style={styles.bmiBadge}>
-                  <Text style={styles.bmiBadgeText}>{bmiLabel}</Text>
-                </View>
-              </View>
-              <DetailRow
-                label="Khoảng cân nặng khỏe mạnh"
-                value={healthyWeightRange}
-                last
-              />
-            </LinearGradient>
-
-            <View style={styles.sectionHeading}>
-              <Text style={styles.sectionTitle}>Mục tiêu dinh dưỡng</Text>
-              <Text style={styles.sectionHint}>Mỗi ngày</Text>
-            </View>
-            <LinearGradient
-              colors={['#FFFFFF', '#F3FAF5']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.macroCard}
-            >
-              <MacroItem
-                label="Chất đạm"
-                value={healthProfile.targetProteinG}
-                color="#168653"
-                marker="P"
-              />
-              <MacroItem
-                label="Tinh bột"
-                value={healthProfile.targetCarbsG}
-                color="#E89B36"
-                marker="C"
-              />
-              <MacroItem
-                label="Chất béo"
-                value={healthProfile.targetFatG}
-                color="#5D8FE8"
-                marker="F"
-              />
-            </LinearGradient>
-
-            <View style={styles.sectionHeading}>
-              <Text style={styles.sectionTitle}>Thông tin sức khỏe</Text>
-            </View>
-            <LinearGradient
-              colors={['#FFFFFF', '#F3FAF5']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.detailsCard}
-            >
-              <DetailRow label="Tuổi" value={`${healthProfile.age}`} />
-              <DetailRow
-                label="Giới tính"
-                value={healthProfile.gender === 'MALE' ? 'Nam' : 'Nữ'}
-              />
-              <DetailRow
-                label="Mức độ vận động"
-                value={ACTIVITY_LABELS[healthProfile.activityLevel]}
-              />
-              <DetailRow
-                label="Mục tiêu"
-                value={GOAL_LABELS[healthProfile.goal]}
-                last
-              />
-            </LinearGradient>
-          </>
-        ) : (
-          <LinearGradient
-            colors={['#FFFFFF', '#F3FAF5']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.emptyCard}
-          >
-            <View style={styles.emptyIcon}>
-              <Text style={styles.emptyIconText}>+</Text>
-            </View>
-            <Text style={styles.emptyTitle}>Hoàn thiện hồ sơ sức khỏe</Text>
-            <Text style={styles.emptyDescription}>
-              Thêm chiều cao, cân nặng và mục tiêu để nhận gợi ý dinh dưỡng phù
-              hợp.
-            </Text>
-          </LinearGradient>
-        )}
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() =>
-            setState(previous => ({
-              ...previous,
-              isHealthProfileVisible: true,
-            }))
-          }
-          style={({ pressed }) => [
-            styles.editButton,
-            pressed && styles.buttonPressed,
-          ]}
-        >
-          <Text style={styles.editButtonText}>
-            {healthProfile
-              ? 'Cập nhật hồ sơ sức khỏe'
-              : 'Thiết lập hồ sơ sức khỏe'}
-          </Text>
-          <Text style={styles.editButtonArrow}>›</Text>
-        </Pressable>
-        <Text style={styles.footerNote}>
-          Các chỉ số sức khỏe chỉ mang tính tham khảo.
-        </Text>
-        {user?.accessToken ? (
+        <View style={styles.surface}>
           <Pressable
             accessibilityRole="button"
-            onPress={confirmLogOut}
-            style={({ pressed }) => [
-              styles.logOutButton,
-              pressed && styles.buttonPressed,
-            ]}
+            accessibilityLabel="Mở thông tin cá nhân"
+            onPress={() =>
+              navigate(ScreenKeys.PERSONAL_INFO, { section: 'BASIC' })
+            }
+            style={({ pressed }) => pressed && styles.pressed}
           >
-            <Text style={styles.logOutButtonText}>Đăng xuất</Text>
+            <LinearGradient
+              colors={['#FFFFFF', '#F6FCF8']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.identityCard}
+            >
+              <View style={styles.avatarRing}>
+                <View style={styles.avatar}>
+                  {user?.avatar ? (
+                    <Image
+                      source={{ uri: getAvatarUri(user.avatar) }}
+                      style={styles.avatarImage}
+                    />
+                  ) : (
+                    <Text style={styles.avatarText}>
+                      {getInitials(fullName) || 'M'}
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <View style={styles.identityDetails}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {fullName}
+                </Text>
+                <Text style={styles.email} numberOfLines={1}>
+                  {user?.email || 'Chưa có email'}
+                </Text>
+              </View>
+              <Text style={styles.editPill}>Sửa</Text>
+            </LinearGradient>
           </Pressable>
-        ) : null}
+
+          <Text style={styles.sectionHeading}>Sức khỏe</Text>
+          <View style={styles.optionsCard}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setHealthProfileVisible(true)}
+              style={({ pressed }) => [
+                styles.optionRow,
+                pressed && styles.optionPressed,
+              ]}
+            >
+              <ProfileOptionIcon name="health" />
+              <View style={styles.optionCopy}>
+                <Text style={styles.optionTitle}>Hồ sơ sức khỏe</Text>
+                <Text style={styles.optionDescription}>
+                  {user?.healthProfile
+                    ? 'Cập nhật thông tin và mục tiêu sức khỏe'
+                    : 'Thiết lập thông tin để cá nhân hóa trải nghiệm'}
+                </Text>
+              </View>
+              <Text style={styles.optionChevron}>›</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.sectionHeading}>Chi tiêu</Text>
+          <View style={styles.optionsCard}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigate(ScreenKeys.EXPENSES)}
+              style={({ pressed }) => [
+                styles.optionRow,
+                pressed && styles.optionPressed,
+              ]}
+            >
+              <ProfileOptionIcon name="money" />
+              <View style={styles.optionCopy}>
+                <Text style={styles.optionTitle}>Quản lý chi tiêu</Text>
+                <Text style={styles.optionDescription}>
+                  Theo dõi khoản chi và đặt ngân sách cho bữa ăn
+                </Text>
+              </View>
+              <Text style={styles.optionChevron}>›</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigate(ScreenKeys.EXPENSE_REPORT)}
+              style={({ pressed }) => [
+                styles.optionRow,
+                styles.optionRowDivider,
+                pressed && styles.optionPressed,
+              ]}
+            >
+              <ProfileOptionIcon name="report" />
+              <View style={styles.optionCopy}>
+                <Text style={styles.optionTitle}>Báo cáo thu chi</Text>
+                <Text style={styles.optionDescription}>
+                  Xem biểu đồ chi tiêu theo danh mục từng tháng
+                </Text>
+              </View>
+              <Text style={styles.optionChevron}>›</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.sectionHeading}>Tài khoản & quyền riêng tư</Text>
+          <View style={styles.optionsCard}>
+            {ACCOUNT_OPTIONS.map((option, index) => {
+              const description =
+                option.id === 'GEMINI'
+                  ? geminiConsentGranted
+                    ? 'Đang bật · chạm để thu hồi đồng ý'
+                    : 'Chưa bật đồng ý chia sẻ trên thiết bị này'
+                  : option.description;
+              return (
+                <Pressable
+                  key={option.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${option.title}. ${description}`}
+                  onPress={() => handleAccountOption(option.id)}
+                  style={({ pressed }) => [
+                    styles.optionRow,
+                    index < ACCOUNT_OPTIONS.length - 1 &&
+                      styles.optionRowDivider,
+                    pressed && styles.optionPressed,
+                  ]}
+                >
+                  <ProfileOptionIcon
+                    name={option.icon}
+                    danger={option.id === 'DELETE'}
+                  />
+                  <View style={styles.optionCopy}>
+                    <Text
+                      style={[
+                        styles.optionTitle,
+                        option.id === 'DELETE' && styles.deleteOptionTitle,
+                      ]}
+                    >
+                      {option.title}
+                    </Text>
+                    <Text style={styles.optionDescription}>{description}</Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.optionChevron,
+                      option.id === 'DELETE' && styles.deleteOptionTitle,
+                    ]}
+                  >
+                    ›
+                  </Text>
+                </Pressable>
+              );
+            })}
+
+            {user?.accessToken ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={confirmLogOut}
+                style={({ pressed }) => [
+                  styles.optionRow,
+                  styles.logoutRow,
+                  pressed && styles.optionPressed,
+                ]}
+              >
+                <ProfileOptionIcon name="logout" />
+                <View style={styles.optionCopy}>
+                  <Text style={styles.optionTitle}>Đăng xuất</Text>
+                  <Text style={styles.optionDescription}>
+                    Đăng xuất khỏi tài khoản HealthAndCook
+                  </Text>
+                </View>
+                <Text style={styles.optionChevron}>›</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <Text style={styles.versionText}>HealthAndCook</Text>
+        </View>
       </ScrollView>
 
       <HealthProfile
-        visible={state.isHealthProfileVisible}
-        onUpdated={loadHealthHistory}
-        onClose={() =>
-          setState(previous => ({
-            ...previous,
-            isHealthProfileVisible: false,
-          }))
-        }
+        visible={healthProfileVisible}
+        onClose={() => setHealthProfileVisible(false)}
       />
+      <Modal
+        animationType="fade"
+        onRequestClose={closeDeleteAccountModal}
+        transparent
+        visible={deleteAccountVisible}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.deleteAccountModal}>
+            <Text style={styles.modalTitle}>Xác nhận danh tính</Text>
+            <Text style={styles.modalDescription}>
+              Nhập mật khẩu hiện tại để tiếp tục xóa tài khoản.
+            </Text>
+            <TextInput
+              accessibilityLabel="Mật khẩu hiện tại"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!deletingAccount}
+              onChangeText={setDeleteAccountPassword}
+              placeholder="Mật khẩu hiện tại"
+              placeholderTextColor="#A5B1AA"
+              secureTextEntry
+              style={styles.passwordInput}
+              value={deleteAccountPassword}
+            />
+            <View style={styles.modalActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={deletingAccount}
+                onPress={closeDeleteAccountModal}
+                style={styles.cancelDeleteButton}
+              >
+                <Text style={styles.cancelDeleteText}>Hủy</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={deletingAccount}
+                onPress={submitAccountDeletion}
+                style={[
+                  styles.confirmDeleteButton,
+                  deletingAccount && styles.disabledButton,
+                ]}
+              >
+                <Text style={styles.confirmDeleteText}>
+                  {deletingAccount ? 'Đang xóa…' : 'Xóa tài khoản'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
+export default Profile;
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
+  },
+  heroBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
   content: {
-    paddingHorizontal: 18,
+    paddingBottom: 24,
   },
-  pageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 18,
+  heroHeader: {
+    position: 'relative',
+    overflow: 'hidden',
+    paddingHorizontal: 24,
   },
   pageTitle: {
-    color: COLORS.text,
-    fontSize: 25,
-    lineHeight: 31,
+    marginTop: 5,
+    color: COLORS.white,
+    fontSize: 27,
+    lineHeight: 34,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   pageSubtitle: {
-    marginTop: 3,
-    color: COLORS.secondary,
+    marginTop: 4,
+    color: '#E8F7EE',
     fontSize: 13,
   },
-  headerMark: {
-    width: 40,
-    height: 40,
+  heroEyebrow: {
+    color: '#D5F1E0',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+  },
+  heroDecoration: {
+    position: 'absolute',
+    right: 26,
+    top: 54,
+    width: 76,
+    height: 76,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: COLORS.lightGreen,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    transform: [{ rotate: '-8deg' }],
   },
-  headerMarkText: {
-    color: COLORS.green,
-    fontSize: 13,
-    fontWeight: '800',
+  surface: {
+    minHeight: 560,
+    marginTop: -24,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 18,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: '#FBFEFC',
   },
   identityCard: {
-    minHeight: 92,
+    minHeight: 112,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    gap: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    borderRadius: 20,
+    shadowColor: '#1C6A46',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    elevation: 3,
   },
-  consumedDestinationCard: {
-    padding: 15,
-    marginTop: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  consumedDestinationPressed: { opacity: 0.84 },
-  consumedDestinationTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  consumedDestinationIcon: {
-    width: 42,
-    height: 42,
+  avatarRing: {
+    width: 68,
+    height: 68,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: COLORS.lightGreen,
-  },
-  consumedDestinationIconText: {
-    color: COLORS.green,
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  consumedDestinationCopy: { flex: 1 },
-  consumedDestinationDescription: {
-    marginTop: 4,
-    color: COLORS.secondary,
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  consumedDestinationChevron: {
-    color: COLORS.green,
-    fontSize: 28,
-    lineHeight: 30,
-    fontWeight: '400',
+    borderRadius: 34,
+    backgroundColor: '#E5F6EC',
   },
   avatar: {
-    width: 58,
-    height: 58,
+    width: 54,
+    height: 54,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: COLORS.lightGreen,
+    overflow: 'hidden',
+    borderRadius: 27,
+    backgroundColor: '#62C586',
   },
   avatarImage: {
-    width: 58,
-    height: 58,
-    borderRadius: 12,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
   },
   avatarText: {
-    color: COLORS.green,
+    color: COLORS.white,
     fontSize: 20,
     fontWeight: '800',
   },
   identityDetails: {
     flex: 1,
-    marginLeft: 13,
+    minWidth: 0,
+  },
+  identityLabel: {
+    marginBottom: 4,
+    color: '#82968B',
+    fontSize: 11,
   },
   name: {
     color: COLORS.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   email: {
-    marginTop: 3,
+    marginTop: 4,
     color: COLORS.secondary,
     fontSize: 12,
   },
-  memberBadge: {
-    alignSelf: 'flex-start',
-    marginTop: 7,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    backgroundColor: COLORS.lightGreen,
-  },
-  memberBadgeText: {
+  editPill: {
+    overflow: 'hidden',
     color: COLORS.green,
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  identityChevron: {
-    marginLeft: 8,
-    color: COLORS.muted,
-    fontSize: 25,
-  },
-  calorieCard: {
-    marginTop: 14,
-    padding: 18,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  calorieCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  eyebrow: {
-    color: COLORS.secondary,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  calorieValue: {
-    marginTop: 6,
-    color: COLORS.text,
-    fontSize: 32,
-    lineHeight: 38,
-    fontWeight: '800',
-  },
-  calorieUnit: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  goalBadge: {
-    maxWidth: 132,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 12,
-    backgroundColor: COLORS.lightGreen,
-  },
-  goalBadgeText: {
-    color: COLORS.green,
-    fontSize: 11,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  calorieCaption: {
-    marginTop: 11,
-    color: COLORS.secondary,
     fontSize: 12,
-    lineHeight: 18,
+    fontWeight: '700',
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: '#E8F7EE',
   },
   sectionHeading: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    marginTop: 22,
+    marginTop: 21,
     marginBottom: 10,
-  },
-  sectionTitle: {
     color: COLORS.text,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  sectionHint: {
-    color: COLORS.secondary,
-    fontSize: 11,
-  },
-  bodyCard: {
-    paddingHorizontal: 14,
-    paddingTop: 16,
-    paddingBottom: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  measurements: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingBottom: 15,
-  },
-  measurement: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  measurementLabel: {
-    color: COLORS.secondary,
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-  },
-  measurementValue: {
-    marginTop: 6,
-    color: COLORS.text,
-    fontSize: 19,
+    fontSize: 15,
     fontWeight: '800',
   },
-  measurementUnit: {
-    color: COLORS.secondary,
-    fontSize: 10,
-    fontWeight: '500',
+  optionsCard: {
+    overflow: 'hidden',
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    shadowColor: '#1C6A46',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.055,
+    shadowRadius: 13,
+    elevation: 2,
   },
-  measurementDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 39,
-    backgroundColor: COLORS.border,
-  },
-  bmiInfo: {
-    minHeight: 45,
+  optionRow: {
+    minHeight: 78,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.border,
+    gap: 14,
+    marginHorizontal: 15,
+    paddingVertical: 11,
   },
-  bmiInfoLabel: {
-    color: COLORS.secondary,
-    fontSize: 12,
-  },
-  bmiBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: COLORS.lightGreen,
-  },
-  bmiBadgeText: {
-    color: COLORS.green,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  detailRow: {
-    minHeight: 45,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  detailRowBorder: {
+  optionRowDivider: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: '#E8EFEB',
   },
-  detailLabel: {
-    flex: 1,
-    color: COLORS.secondary,
-    fontSize: 12,
+  optionPressed: {
+    opacity: 0.72,
   },
-  detailValue: {
-    flexShrink: 1,
-    color: COLORS.text,
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'right',
-  },
-  macroCard: {
-    flexDirection: 'row',
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  macroItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  macroLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  macroMarker: {
-    width: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-  },
-  macroMarkerText: {
-    color: COLORS.white,
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  macroLabel: {
-    color: COLORS.secondary,
-    fontSize: 10,
-  },
-  macroValue: {
-    marginTop: 8,
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  detailsCard: {
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  emptyCard: {
-    alignItems: 'center',
-    marginTop: 18,
-    paddingHorizontal: 24,
-    paddingVertical: 25,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  emptyIcon: {
+  optionIcon: {
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: COLORS.lightGreen,
+    borderRadius: 22,
+    backgroundColor: '#E7F7ED',
   },
-  emptyIconText: {
-    color: COLORS.green,
-    fontSize: 25,
-    fontWeight: '500',
-  },
-  emptyTitle: {
-    marginTop: 12,
-    color: COLORS.text,
-    fontSize: 15,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  emptyDescription: {
-    marginTop: 6,
-    color: COLORS.secondary,
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  editButton: {
-    minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 18,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: COLORS.green,
-  },
-  walkingButton: {
-    minHeight: 68,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 11,
-    marginTop: 14,
-    borderRadius: 8,
-    backgroundColor: COLORS.green,
-  },
-  walkingButtonCopy: {
+  optionCopy: {
     flex: 1,
+    minWidth: 0,
   },
-  walkingButtonTitle: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  walkingButtonSubtitle: {
-    marginTop: 4,
-    color: '#E1F1E8',
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  buttonPressed: {
-    opacity: 0.82,
-  },
-  editButtonText: {
-    color: COLORS.white,
-    fontSize: 14,
+  optionTitle: {
+    color: '#263A31',
+    fontSize: 13,
     fontWeight: '700',
   },
-  editButtonArrow: {
-    marginLeft: 8,
-    color: COLORS.white,
-    fontSize: 21,
-    lineHeight: 22,
+  optionDescription: {
+    marginTop: 4,
+    color: '#879A90',
+    fontSize: 11,
+    lineHeight: 15,
   },
-  footerNote: {
-    marginTop: 12,
-    color: COLORS.secondary,
-    fontSize: 10,
+  optionChevron: {
+    color: '#718C7E',
+    fontSize: 26,
+    lineHeight: 28,
+  },
+  deleteOptionIcon: {
+    backgroundColor: '#FDEEEE',
+  },
+  deleteOptionTitle: {
+    color: COLORS.danger,
+  },
+  logoutRow: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E8EFEB',
+  },
+  versionText: {
+    marginTop: 28,
+    color: '#8CA096',
+    fontSize: 11,
     textAlign: 'center',
   },
-  logOutButton: {
-    minHeight: 50,
+  modalBackdrop: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
-    marginBottom: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#F1C9C6',
+    padding: 22,
+    backgroundColor: 'rgba(17, 35, 27, 0.48)',
+  },
+  deleteAccountModal: {
+    width: '100%',
+    padding: 20,
+    borderRadius: 18,
     backgroundColor: COLORS.white,
   },
-  logOutButtonText: {
-    color: '#B42318',
+  modalTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  modalDescription: {
+    marginTop: 7,
+    color: COLORS.secondary,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  passwordInput: {
+    minHeight: 48,
+    marginTop: 16,
+    paddingHorizontal: 13,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 11,
+    color: COLORS.text,
     fontSize: 14,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  cancelDeleteButton: {
+    flex: 1,
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 11,
+  },
+  cancelDeleteText: {
+    color: COLORS.secondary,
+    fontSize: 13,
     fontWeight: '700',
   },
+  confirmDeleteButton: {
+    flex: 1,
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+    backgroundColor: COLORS.danger,
+  },
+  confirmDeleteText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  pressed: {
+    opacity: 0.82,
+  },
 });
-
-export default Profile;

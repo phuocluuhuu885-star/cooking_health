@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -53,6 +53,7 @@ type ScreenState = {
   days: PlanDay[];
   selectedDate: string;
   selectedMeals: Record<string, boolean>;
+  mealBudgets: Partial<Record<MealPeriod, number>>;
   loading: boolean;
   saving: boolean;
   error: string;
@@ -179,6 +180,7 @@ const WeeklyMealPlanScreen = () => {
     days: [],
     selectedDate: '',
     selectedMeals: {},
+    mealBudgets: {},
     loading: false,
     saving: false,
     error: '',
@@ -191,6 +193,7 @@ const WeeklyMealPlanScreen = () => {
       days: [],
       selectedDate: '',
       selectedMeals: {},
+      mealBudgets: {},
       error: '',
       message: '',
     }));
@@ -265,7 +268,7 @@ const WeeklyMealPlanScreen = () => {
     if (adultConsentRequired && !hasAiRecommendationConsent(user.id)) {
       Alert.alert(
         'Đồng ý dùng gợi ý AI?',
-        'Để tạo kế hoạch, MealCraft gửi mục tiêu kcal/macro, dinh dưỡng đã ghi nhận theo ngày và thông tin món trong thư viện đến Google Gemini. Không gửi tên, email, mã tài khoản, tuổi, giới tính, chiều cao, cân nặng hoặc BMI. Bạn có thể từ chối và vẫn dùng gợi ý dinh dưỡng xử lý nội bộ.',
+        'Để tạo kế hoạch, HealthAndCook gửi mục tiêu kcal/macro, dinh dưỡng đã ghi nhận theo ngày và thông tin món trong thư viện đến Google Gemini. Không gửi tên, email, mã tài khoản, tuổi, giới tính, chiều cao, cân nặng hoặc BMI. Bạn có thể từ chối và vẫn dùng gợi ý dinh dưỡng xử lý nội bộ.',
         [
           { text: 'Để sau', style: 'cancel' },
           {
@@ -354,6 +357,7 @@ const WeeklyMealPlanScreen = () => {
         days,
         selectedDate: dates[0],
         selectedMeals,
+        mealBudgets: todayRecommendations.mealBudgets ?? {},
         loading: false,
         error: '',
         message: '',
@@ -815,7 +819,7 @@ const WeeklyMealPlanScreen = () => {
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        eyebrow="MEALCRAFT AI COACH"
+        eyebrow="HEALTH AI COACH"
         title="Thực đơn 7 ngày"
         rightAction={
           state.days.length ? (
@@ -886,6 +890,18 @@ const WeeklyMealPlanScreen = () => {
             {PRICE_BUDGETS.map(renderBudgetOption)}
           </View>
         ) : null}
+        <Text style={styles.savedMealBudgetHint}>
+          {Object.keys(state.mealBudgets).length
+            ? `Ngân sách tổng đã lưu: ${PERIODS.filter(period => state.mealBudgets[period] !== undefined)
+                .map(
+                  period =>
+                    `${period === 'LUNCH' ? 'trưa' : 'tối'} ${Math.round(
+                      state.mealBudgets[period]!,
+                    ).toLocaleString('vi-VN')}đ`,
+                )
+                .join(' · ')}. Gợi ý được ưu tiên theo giới hạn này.`
+            : 'Có thể đặt ngân sách tổng cho từng bữa trong mục Quản lý chi tiêu.'}
+        </Text>
         {planMode === 'FAMILY' && !household ? (
           <LinearGradient
             colors={['#FFFFFF', '#F3FAF5']}
@@ -1105,6 +1121,12 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
     fontSize: 9,
     lineHeight: 13,
+  },
+  savedMealBudgetHint: {
+    marginBottom: 10,
+    color: COLORS.green,
+    fontSize: 10,
+    lineHeight: 15,
   },
   modeHint: {
     marginBottom: 10,

@@ -13,7 +13,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -41,6 +41,7 @@ import type { GlobalState } from '../../type/global';
 import ScreenKeys from '../../utils/screenKey';
 import { navigate } from '../../utils/navigation';
 import { setSyncUser, syncApi } from '../../utils/syncUtils';
+import { fetchExpenses } from '../../utils/expenseApi';
 import { fetchCurrentHousehold } from '../../utils/householdApi';
 import { fetchHouseholdChatUnreadCount } from '../../utils/householdChatApi';
 import { fetchHouseholdNotificationUnreadCount } from '../../utils/householdNotificationApi';
@@ -51,7 +52,7 @@ import {
   getDefaultMealPeriod,
 } from '../../utils/homeUtils';
 import { getUtcDateKey, getVietnamDateKey } from '../../utils/dateUtils';
-import { getInitials, welcomeTextTime } from '../../utils/stringUtils';
+import { welcomeTextTime } from '../../utils/stringUtils';
 import { isHouseholdPlan as isHouseholdMealPlan } from '../../utils/mealPlanScreenUtils';
 import type {
   ConsumptionReportResponse,
@@ -59,12 +60,14 @@ import type {
   HomeDashboardState,
   MealPlanResponse,
   MealsResponse,
+  ExpenseMonthData,
 } from '../../utils/types';
 import HomeMealPeriod from './homeMealPeriod';
 import HomeNutritionCard from './homeNutritionCard';
 import HomeRecipeCard from './homeRecipeCard';
 import AICoachBox from './AICoachBox';
 import HouseholdChatButton from '../household/HouseholdChatButton';
+import HouseholdHomeButton from '../household/HouseholdHomeButton';
 import HouseholdNotificationButton from '../household/HouseholdNotificationButton';
 import { createStateSetter } from '../../utils/stateUtils';
 
@@ -77,6 +80,14 @@ const COLORS = {
   lightGreen: '#E7F4EC',
   border: '#E5EBE7',
 };
+
+const getCurrentMonthKey = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const formatExpenseMoney = (amount: number) =>
+  `${Math.round(amount).toLocaleString('vi-VN')}đ`;
 
 const HomeScreen = () => {
   const insets = useSafeAreaInsets();
@@ -144,6 +155,10 @@ const HomeScreen = () => {
     notificationUnreadCount: 0,
     reviewSummaries: {},
   }));
+  const [monthlyExpenses, setMonthlyExpenses] = useState(0);
+  const [expenseSummaryLoading, setExpenseSummaryLoading] = useState(true);
+  const [expenseSummaryError, setExpenseSummaryError] = useState('');
+  const expenseMonth = getCurrentMonthKey();
   const { chatUnreadCount, notificationUnreadCount, reviewSummaries } = state;
   const setChatUnreadCount = useMemo(
     () => createStateSetter(setState, 'chatUnreadCount'),
@@ -158,6 +173,54 @@ const HomeScreen = () => {
     [setState],
   );
   const reviewMealIds = mealCatalog.map(meal => meal.id).join(',');
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (!user?.accessToken || !user.id) {
+        setMonthlyExpenses(0);
+        setExpenseSummaryError('Đăng nhập để xem tổng chi tháng.');
+        setExpenseSummaryLoading(false);
+        return () => {
+          active = false;
+        };
+      }
+
+      setExpenseSummaryLoading(true);
+      setExpenseSummaryError('');
+      fetchExpenses(user, 'PERSONAL', expenseMonth)
+        .then(
+          (response: {
+            success: boolean;
+            message?: string;
+            data?: ExpenseMonthData;
+          }) => {
+            if (!active) return;
+            if (!response.success || !response.data) {
+              throw new Error(
+                response.message || 'Không thể tải tổng chi tháng.',
+              );
+            }
+            setMonthlyExpenses(response.data.totalAmountVnd);
+          },
+        )
+        .catch(loadError => {
+          if (!active) return;
+          setExpenseSummaryError(
+            loadError instanceof Error
+              ? loadError.message
+              : 'Không thể tải tổng chi tháng.',
+          );
+        })
+        .finally(() => {
+          if (active) setExpenseSummaryLoading(false);
+        });
+
+      return () => {
+        active = false;
+      };
+    }, [expenseMonth, user]),
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -522,7 +585,7 @@ const HomeScreen = () => {
     carbsG: healthProfile?.targetCarbsG,
     fatG: healthProfile?.targetFatG,
   };
-  const fullName = user?.fullName?.trim() || 'Thành viên MealCraft';
+  const fullName = user?.fullName?.trim() || 'Thành viên HealthAndCook';
   const todayLabel = formatDateLabel(state.date);
   const lunchItems = cachedMealPlan?.meals.LUNCH.items ?? [];
   const dinnerItems = cachedMealPlan?.meals.DINNER.items ?? [];
@@ -541,6 +604,12 @@ const HomeScreen = () => {
   const openAiMealRecommendations = useCallback(() => {
     navigate(ScreenKeys.AI_MEAL_RECOMMENDATIONS);
   }, []);
+  const openAiMealChat = useCallback(() => {
+    navigate(ScreenKeys.AI_MEAL_CHAT);
+  }, []);
+  const openAiMealScan = useCallback(() => {
+    navigate(ScreenKeys.AI_MEAL_SCAN);
+  }, []);
 
   const onHouseholdChat = useCallback(() => {
     if (!household) return;
@@ -552,43 +621,52 @@ const HomeScreen = () => {
   const openNotifications = useCallback(() => {
     navigate(ScreenKeys.NOTIFICATIONS);
   }, []);
+  const openFamily = useCallback(() => {
+    navigate(ScreenKeys.FAMILY);
+  }, []);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingHorizontal: insets.left + 16,
+            paddingRight: insets.right + 16,
+          },
+        ]}
+      >
+        <View style={styles.headerCopy}>
+          <Text style={styles.greeting}>{welcomeTextTime()}</Text>
+          <Text numberOfLines={1} style={styles.userName}>
+            {fullName}
+          </Text>
+          <Text style={styles.date}>{todayLabel}</Text>
+        </View>
+        {user?.accessToken ? (
+          <View style={styles.headerActions}>
+            {household ? (
+              <HouseholdChatButton
+                unreadCount={chatUnreadCount}
+                onPress={onHouseholdChat}
+              />
+            ) : null}
+            <HouseholdHomeButton
+              hasHousehold={Boolean(household)}
+              onPress={openFamily}
+            />
+            <HouseholdNotificationButton
+              unreadCount={notificationUnreadCount}
+              onPress={openNotifications}
+            />
+          </View>
+        ) : null}
+      </View>
       <ScrollView
         ref={homeScrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {getInitials(fullName) || 'M'}
-            </Text>
-          </View>
-          <View style={styles.headerCopy}>
-            <Text style={styles.greeting}>{welcomeTextTime()}</Text>
-            <Text numberOfLines={1} style={styles.userName}>
-              {fullName}
-            </Text>
-            <Text style={styles.date}>{todayLabel}</Text>
-          </View>
-          {user?.accessToken ? (
-            <View style={styles.headerActions}>
-              {household ? (
-                <HouseholdChatButton
-                  unreadCount={chatUnreadCount}
-                  onPress={onHouseholdChat}
-                />
-              ) : null}
-              <HouseholdNotificationButton
-                unreadCount={notificationUnreadCount}
-                onPress={openNotifications}
-              />
-            </View>
-          ) : null}
-        </View>
-
         <HomeNutritionCard
           loading={state.loading}
           error={state.consumptionError}
@@ -602,11 +680,54 @@ const HomeScreen = () => {
           onRetry={loadDashboard}
         />
 
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Mở quản lý chi tiêu"
+          onPress={() => navigate(ScreenKeys.EXPENSES)}
+          style={({ pressed }) => pressed && styles.expenseSummaryPressed}
+        >
+          <LinearGradient
+            colors={['#FFFFFF', '#F1FAF4']}
+            style={styles.expenseSummaryCard}
+          >
+            <View style={styles.expenseSummaryCopy}>
+              <Text style={styles.expenseSummaryLabel}>TỔNG CHI THÁNG NÀY</Text>
+              {expenseSummaryLoading ? (
+                <ActivityIndicator
+                  color={COLORS.green}
+                  size="small"
+                  style={styles.expenseSummarySpinner}
+                />
+              ) : (
+                <Text
+                  style={[
+                    styles.expenseSummaryAmount,
+                    Boolean(expenseSummaryError) && styles.expenseSummaryError,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {expenseSummaryError
+                    ? expenseSummaryError
+                    : formatExpenseMoney(monthlyExpenses)}
+                </Text>
+              )}
+              <Text style={styles.expenseSummaryHint}>
+                Chi tiêu cá nhân · Chạm để xem chi tiết
+              </Text>
+            </View>
+            <View style={styles.expenseSummaryIcon}>
+              <Text style={styles.expenseSummaryIconText}>₫</Text>
+            </View>
+          </LinearGradient>
+        </Pressable>
+
         <AICoachBox
           onMealSuggestions={openAiMealRecommendations}
           onWeeklyPlan={() => navigate(ScreenKeys.WEEKLY_MEAL_PLAN)}
           onProgressAnalysis={() => navigate(ScreenKeys.EATING_PROGRESS)}
           onSmartShopping={() => navigate(ScreenKeys.SMART_SHOPPING)}
+          onAiChat={openAiMealChat}
+          onMealScan={openAiMealScan}
         />
 
         <View style={styles.sectionHeader}>
@@ -737,7 +858,7 @@ const styles = StyleSheet.create({
   },
   greeting: {
     color: COLORS.secondary,
-    fontSize: 11,
+    fontSize: 12,
   },
   userName: {
     marginTop: 2,
@@ -758,6 +879,53 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     overflow: 'hidden',
   },
+  expenseSummaryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  expenseSummaryCopy: { flex: 1, paddingRight: 12 },
+  expenseSummaryLabel: {
+    color: COLORS.secondary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  expenseSummaryAmount: {
+    marginTop: 6,
+    color: COLORS.text,
+    fontSize: 23,
+    fontWeight: '800',
+  },
+  expenseSummaryError: {
+    color: '#A43C36',
+    fontSize: 12,
+  },
+  expenseSummaryHint: {
+    marginTop: 4,
+    color: COLORS.secondary,
+    fontSize: 10,
+  },
+  expenseSummarySpinner: { alignSelf: 'flex-start', marginTop: 10 },
+  expenseSummaryIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: COLORS.lightGreen,
+  },
+  expenseSummaryIconText: {
+    color: COLORS.green,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  expenseSummaryPressed: { opacity: 0.8 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',

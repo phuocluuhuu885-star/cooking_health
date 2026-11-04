@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -8,13 +8,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { HomeIngredientSummaryModalProps } from '../../utils/types';
 import {
   formatLocalizedNumber,
   formatLocalizedWeight,
 } from '../../utils/numberUtils';
+import { localStorage } from '../../utils/storage';
 
 const HomeIngredientSummaryModal = memo(
   (props: HomeIngredientSummaryModalProps) => {
@@ -25,9 +25,12 @@ const HomeIngredientSummaryModal = memo(
       ingredients,
       loading,
       error,
+      shoppingListDate,
+      shoppingListUserId,
       onClose,
       onRetry,
     } = props;
+    const [checked, setChecked] = useState<Record<string, boolean>>({});
     const totalServings = selectedMeals.reduce(
       (total, meal) => total + meal.servings,
       0,
@@ -36,6 +39,50 @@ const HomeIngredientSummaryModal = memo(
       (total, ingredient) => total + ingredient.amountG,
       0,
     );
+    const canCheckIngredients = Boolean(shoppingListDate && shoppingListUserId);
+
+    useEffect(() => {
+      if (!visible || !canCheckIngredients) {
+        return;
+      }
+      setChecked(
+        Object.fromEntries(
+          ingredients.map(ingredient => [
+            ingredient.name,
+            localStorage.getBoolean(
+              `smart-shopping:${shoppingListUserId}:${shoppingListDate}:${ingredient.name}`,
+            ) === true,
+          ]),
+        ),
+      );
+    }, [
+      canCheckIngredients,
+      ingredients,
+      shoppingListDate,
+      shoppingListUserId,
+      visible,
+    ]);
+
+    const toggleIngredient = useCallback(
+      (name: string) => {
+        if (!shoppingListDate || !shoppingListUserId) {
+          return;
+        }
+        const nextChecked = !checked[name];
+        localStorage.set(
+          `smart-shopping:${shoppingListUserId}:${shoppingListDate}:${name}`,
+          nextChecked,
+        );
+        setChecked(previous => ({
+          ...previous,
+          [name]: nextChecked,
+        }));
+      },
+      [checked, shoppingListDate, shoppingListUserId],
+    );
+    const checkedCount = ingredients.filter(
+      ingredient => checked[ingredient.name],
+    ).length;
 
     return (
       <Modal
@@ -44,23 +91,19 @@ const HomeIngredientSummaryModal = memo(
         presentationStyle="pageSheet"
         onRequestClose={onClose}
       >
-        <View style={styles.container}>
-          <View
-            style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}
-          >
+        <View style={styles.screen}>
+          <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
             <View style={styles.headerCopy}>
-              <Text style={styles.eyebrow}>CHUẨN BỊ BỮA ĂN</Text>
+              <Text style={styles.eyebrow}>CHUẨN BỊ THỰC ĐƠN</Text>
               <Text style={styles.title}>Danh sách nguyên liệu</Text>
               <Text style={styles.subtitle}>
                 {selectedMeals.length} món ·{' '}
-                {formatLocalizedNumber(totalServings)} khẩu
-                phần
+                {formatLocalizedNumber(totalServings)} khẩu phần
               </Text>
             </View>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Đóng danh sách nguyên liệu"
-              hitSlop={8}
               onPress={onClose}
               style={styles.closeButton}
             >
@@ -68,149 +111,122 @@ const HomeIngredientSummaryModal = memo(
             </Pressable>
           </View>
 
-          <ScrollView
-            contentContainerStyle={[
-              styles.content,
-              { paddingBottom: Math.max(insets.bottom, 24) },
-            ]}
-            showsVerticalScrollIndicator={false}
-          >
-            <LinearGradient
-              colors={['#FFFFFF', '#F2F8F4']}
-              style={styles.mealsCard}
+          {!loading && !error && ingredients.length > 0 ? (
+            <View style={styles.summary}>
+              <Text style={styles.summaryText}>
+                {canCheckIngredients
+                  ? `${checkedCount} / ${ingredients.length} đã có hoặc đã mua`
+                  : `${ingredients.length} loại nguyên liệu · Tổng khối lượng ${formatLocalizedWeight(totalAmountG)}`}
+              </Text>
+            </View>
+          ) : null}
+
+          {loading && ingredients.length === 0 ? (
+            <View style={styles.status}>
+              <ActivityIndicator color={COLORS.green} />
+              <Text style={styles.statusText}>
+                Đang tổng hợp nguyên liệu…
+              </Text>
+            </View>
+          ) : (
+            <ScrollView
+              contentContainerStyle={[
+                styles.content,
+                { paddingBottom: insets.bottom + 24 },
+              ]}
+              showsVerticalScrollIndicator={false}
             >
-              <View style={styles.cardHeading}>
-                <View style={styles.headingCopy}>
-                  <Text style={styles.sectionTitle}>Món trong bữa</Text>
-                  <Text style={styles.sectionSubtitle}>
-                    Định lượng được tính theo khẩu phần đã chọn
-                  </Text>
-                </View>
-                <View style={styles.countBadge}>
-                  <Text style={styles.countBadgeText}>
-                    {selectedMeals.length}
-                  </Text>
-                </View>
-              </View>
-              {selectedMeals.map((meal, index) => (
-                <View
-                  key={meal.id}
-                  style={[styles.mealRow, index === 0 && styles.firstMealRow]}
-                >
-                  <View style={styles.mealNumber}>
-                    <Text style={styles.mealNumberText}>{index + 1}</Text>
-                  </View>
-                  <Text style={styles.mealName}>{meal.name}</Text>
-                  <Text style={styles.mealServings}>
-                    {formatLocalizedNumber(meal.servings)} phần
-                  </Text>
-                </View>
-              ))}
-            </LinearGradient>
-
-            <LinearGradient
-              colors={['#FFFFFF', '#F2F8F4']}
-              style={styles.ingredientsCard}
-            >
-              <View style={styles.cardHeading}>
-                <View style={styles.headingCopy}>
-                  <Text style={styles.sectionTitle}>Cần chuẩn bị</Text>
-                  <Text style={styles.sectionSubtitle}>
-                    Nguyên liệu trùng tên đã được gộp
-                  </Text>
-                </View>
-                {!loading && !error && ingredients.length > 0 ? (
-                  <View style={styles.countBadge}>
-                    <Text style={styles.countBadgeText}>
-                      {ingredients.length}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-
-              {!loading && !error && ingredients.length > 0 ? (
-                <LinearGradient
-                  colors={['#F2F8F4', '#E7F4EC']}
-                  style={styles.summaryStats}
-                >
-                  <View style={styles.statCell}>
-                    <Text style={styles.statValue}>{ingredients.length}</Text>
-                    <Text style={styles.statLabel}>loại nguyên liệu</Text>
-                  </View>
-                  <View style={styles.statDivider} />
-                  <View style={styles.statCell}>
-                    <Text style={styles.statValue}>
-                      {formatLocalizedWeight(totalAmountG)}
-                    </Text>
-                    <Text style={styles.statLabel}>tổng khối lượng</Text>
-                  </View>
-                </LinearGradient>
-              ) : null}
-
-              {loading ? (
-                <View style={styles.status}>
-                  <ActivityIndicator color="#168653" />
-                  <Text style={styles.statusText}>
-                    Đang tính định lượng nguyên liệu...
-                  </Text>
-                </View>
-              ) : error ? (
-                <View style={styles.errorState}>
+              {error ? (
+                <View style={styles.errorCard}>
                   <Text style={styles.errorText}>{error}</Text>
                   <Pressable
                     accessibilityRole="button"
                     onPress={onRetry}
                     style={styles.retryButton}
                   >
-                    <Text style={styles.retryText}>Thử tải lại</Text>
+                    <Text style={styles.retryText}>Thử lại</Text>
                   </Pressable>
                 </View>
               ) : ingredients.length > 0 ? (
-                <View style={styles.ingredientList}>
-                  {ingredients.map((ingredient, index) => (
-                    <View
-                      key={ingredient.name}
-                      accessible
-                      accessibilityLabel={`${
-                        ingredient.name
-                      }, ${formatLocalizedWeight(
-                        ingredient.amountG,
-                      )}`}
-                      style={[
-                        styles.ingredientRow,
-                        index === 0 && styles.firstIngredientRow,
-                      ]}
-                    >
-                      <View style={styles.ingredientNumber}>
-                        <Text style={styles.ingredientNumberText}>
+                ingredients.map((ingredient, index) => (
+                  <Pressable
+                    key={ingredient.name}
+                    accessibilityRole={
+                      canCheckIngredients ? 'checkbox' : undefined
+                    }
+                    accessibilityLabel={`${ingredient.name}, ${formatLocalizedWeight(ingredient.amountG)}${
+                      checked[ingredient.name] ? ', đã có hoặc đã mua' : ''
+                    }`}
+                    accessibilityState={
+                      canCheckIngredients
+                        ? { checked: Boolean(checked[ingredient.name]) }
+                        : undefined
+                    }
+                    disabled={!canCheckIngredients}
+                    onPress={() => toggleIngredient(ingredient.name)}
+                    style={({ pressed }) => [
+                      styles.item,
+                      checked[ingredient.name] && styles.itemChecked,
+                      pressed && canCheckIngredients && styles.pressed,
+                    ]}
+                  >
+                    {canCheckIngredients ? (
+                      <View
+                        style={[
+                          styles.checkbox,
+                          checked[ingredient.name] && styles.checkboxChecked,
+                        ]}
+                      >
+                        {checked[ingredient.name] ? (
+                          <Text style={styles.checkmark}>✓</Text>
+                        ) : null}
+                      </View>
+                    ) : (
+                      <View style={styles.ingredientMarker}>
+                        <Text style={styles.ingredientMarkerText}>
                           {index + 1}
                         </Text>
                       </View>
-                      <Text style={styles.ingredientName}>
+                    )}
+                    <View style={styles.itemCopy}>
+                      <Text
+                        style={[
+                          styles.itemName,
+                          checked[ingredient.name] && styles.itemNameChecked,
+                        ]}
+                      >
                         {ingredient.name}
                       </Text>
-                      <View style={styles.amountBadge}>
-                        <Text style={styles.ingredientAmount}>
-                          {formatLocalizedWeight(ingredient.amountG)}
+                      {ingredient.mealNames?.length ? (
+                        <Text style={styles.mealNames} numberOfLines={2}>
+                          Dùng cho: {ingredient.mealNames.join(', ')}
                         </Text>
-                      </View>
+                      ) : null}
                     </View>
-                  ))}
-                </View>
+                    <Text
+                      style={[
+                        styles.amount,
+                        checked[ingredient.name] && styles.itemNameChecked,
+                      ]}
+                    >
+                      {formatLocalizedWeight(ingredient.amountG)}
+                    </Text>
+                  </Pressable>
+                ))
               ) : (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyTitle}>Chưa có định lượng</Text>
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyTitle}>Chưa có nguyên liệu</Text>
                   <Text style={styles.statusText}>
                     Món đã chọn chưa có dữ liệu nguyên liệu để tổng hợp.
                   </Text>
                 </View>
               )}
-            </LinearGradient>
-            <Text style={styles.note}>
-              Khối lượng chỉ mang tính tham khảo và thay đổi theo khẩu phần từng
-              món.
-            </Text>
-          </ScrollView>
+              <Text style={styles.note}>
+                Khối lượng chỉ mang tính tham khảo và thay đổi theo khẩu phần
+                từng món.
+              </Text>
+            </ScrollView>
+          )}
         </View>
       </Modal>
     );
@@ -219,271 +235,206 @@ const HomeIngredientSummaryModal = memo(
 
 export default HomeIngredientSummaryModal;
 
+const COLORS = {
+  background: '#F5F7F5',
+  white: '#FFFFFF',
+  text: '#172B23',
+  secondary: '#66756D',
+  green: '#168653',
+  lightGreen: '#E7F4EC',
+  border: '#E5EBE7',
+  danger: '#B42318',
+};
+
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#F5F7F5',
+    backgroundColor: COLORS.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 18,
-    paddingBottom: 18,
+    paddingBottom: 16,
+    backgroundColor: COLORS.white,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5EBE7',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: COLORS.border,
   },
   headerCopy: {
     flex: 1,
     paddingRight: 12,
   },
   eyebrow: {
-    marginBottom: 5,
-    color: '#168653',
-    fontSize: 14,
+    color: COLORS.green,
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
   title: {
-    color: '#172B23',
-    fontSize: 18,
+    marginTop: 4,
+    color: COLORS.text,
+    fontSize: 21,
     fontWeight: '800',
   },
   subtitle: {
-    marginTop: 5,
-    color: '#66756D',
+    marginTop: 4,
+    color: COLORS.secondary,
     fontSize: 11,
-    lineHeight: 16,
   },
   closeButton: {
-    minHeight: 40,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     borderRadius: 8,
-    backgroundColor: '#E7F4EC',
+    backgroundColor: COLORS.lightGreen,
   },
   closeText: {
-    color: '#168653',
+    color: COLORS.green,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
+  },
+  summary: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  summaryText: {
+    color: COLORS.green,
+    fontSize: 12,
+    fontWeight: '800',
   },
   content: {
+    flexGrow: 1,
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 4,
+    gap: 9,
   },
-  mealsCard: {
-    padding: 16,
-    marginBottom: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5EBE7',
-    overflow: 'hidden',
-  },
-  ingredientsCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5EBE7',
-    overflow: 'hidden',
-  },
-  cardHeading: {
+  item: {
+    minHeight: 72,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
   },
-  headingCopy: {
+  itemChecked: {
+    borderColor: '#D5E7DB',
+    backgroundColor: '#F4FAF6',
+  },
+  pressed: {
+    opacity: 0.78,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 11,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: '#A8B7AE',
+    backgroundColor: COLORS.white,
+  },
+  checkboxChecked: {
+    borderColor: COLORS.green,
+    backgroundColor: COLORS.green,
+  },
+  checkmark: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  ingredientMarker: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 11,
+    borderRadius: 7,
+    backgroundColor: COLORS.lightGreen,
+  },
+  ingredientMarkerText: {
+    color: COLORS.green,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  itemCopy: {
     flex: 1,
+    paddingRight: 8,
   },
-  sectionTitle: {
-    color: '#172B23',
+  itemName: {
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: '800',
   },
-  sectionSubtitle: {
+  itemNameChecked: {
+    color: '#85938A',
+    textDecorationLine: 'line-through',
+  },
+  mealNames: {
     marginTop: 4,
-    color: '#66756D',
-    fontSize: 12,
-    lineHeight: 18,
+    color: COLORS.secondary,
+    fontSize: 10,
+    lineHeight: 14,
   },
-  countBadge: {
-    minWidth: 30,
-    height: 30,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: '#E7F4EC',
-  },
-  countBadgeText: {
-    color: '#168653',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  mealRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 48,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5EBE7',
-  },
-  firstMealRow: {
-    borderTopWidth: 0,
-  },
-  mealNumber: {
-    width: 26,
-    height: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-    borderRadius: 12,
-    backgroundColor: '#F0F5F1',
-  },
-  mealNumberText: {
-    color: '#66756D',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  mealName: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingRight: 8,
-    color: '#35463D',
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '600',
-  },
-  mealServings: {
-    color: '#66756D',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  summaryStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    marginBottom: 2,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  statCell: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  statValue: {
-    color: '#168653',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  statLabel: {
-    marginTop: 4,
-    color: '#66756D',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  statDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 34,
-    backgroundColor: '#D8E4DC',
-  },
-  ingredientList: {
-    marginTop: 10,
-  },
-  ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 54,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5EBE7',
-  },
-  firstIngredientRow: {
-    borderTopWidth: 0,
-  },
-  ingredientNumber: {
-    width: 26,
-    height: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-    borderRadius: 12,
-    backgroundColor: '#F5F7F5',
-  },
-  ingredientNumberText: {
-    color: '#7A8580',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  ingredientName: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingRight: 8,
-    color: '#35463D',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  amountBadge: {
-    minHeight: 30,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: '#E7F4EC',
-  },
-  ingredientAmount: {
-    color: '#168653',
+  amount: {
+    color: COLORS.green,
     fontSize: 12,
     fontWeight: '800',
   },
   status: {
+    flex: 1,
     alignItems: 'center',
-    paddingVertical: 28,
+    justifyContent: 'center',
+    gap: 10,
   },
   statusText: {
-    color: '#66756D',
+    color: COLORS.secondary,
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
   },
-  errorState: {
-    paddingTop: 12,
-  },
-  errorText: {
-    color: '#B23B36',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  emptyState: {
+  emptyCard: {
     alignItems: 'center',
+    marginTop: 28,
+    paddingHorizontal: 24,
     paddingVertical: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
   },
   emptyTitle: {
-    marginBottom: 6,
-    color: '#35463D',
-    fontSize: 14,
-    fontWeight: '700',
+    marginBottom: 7,
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  errorCard: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FEF3F2',
+  },
+  errorText: {
+    color: COLORS.danger,
+    fontSize: 12,
   },
   retryButton: {
     alignSelf: 'flex-start',
-    minHeight: 40,
-    justifyContent: 'center',
     marginTop: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#E7F4EC',
   },
   retryText: {
-    color: '#168653',
+    color: COLORS.green,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   note: {
-    marginTop: 14,
-    paddingHorizontal: 4,
-    color: '#66756D',
+    marginTop: 8,
+    color: COLORS.secondary,
     fontSize: 10,
-    lineHeight: 16,
+    lineHeight: 15,
     textAlign: 'center',
   },
 });

@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  AppState,
-  Platform,
-  type EmitterSubscription,
-} from 'react-native';
+import { AppState, Platform, type EmitterSubscription } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { selectUserInfo } from '../../reduxs/reduces/user';
@@ -28,13 +24,9 @@ import {
 } from '../../utils/walkingTrackingNative';
 import {
   createWalkingClientSessionId,
-  filterWalkingLocationPoint,
   stopWalkingTrackingSubscriptions,
 } from '../../utils/walkingTrackingUtils';
-import type {
-  WalkingLocationPoint,
-  WalkingWorkout,
-} from '../../utils/types/walking';
+import type { WalkingWorkout } from '../../utils/types/walking';
 import { createStateSetter } from '../../utils/stateUtils';
 
 type GpsStatus = 'checking' | 'available' | 'denied' | 'unavailable';
@@ -78,18 +70,30 @@ const useWalkingWorkout = () => {
     () => createStateSetter(setState, 'workout'),
     [setState],
   );
-  const setSteps = useMemo(() => createStateSetter(setState, 'steps'), [setState]);
+  const setSteps = useMemo(
+    () => createStateSetter(setState, 'steps'),
+    [setState],
+  );
   const setDistanceMeters = useMemo(
     () => createStateSetter(setState, 'distanceMeters'),
     [setState],
   );
-  const setClock = useMemo(() => createStateSetter(setState, 'clock'), [setState]);
+  const setClock = useMemo(
+    () => createStateSetter(setState, 'clock'),
+    [setState],
+  );
   const setLoading = useMemo(
     () => createStateSetter(setState, 'loading'),
     [setState],
   );
-  const setBusy = useMemo(() => createStateSetter(setState, 'busy'), [setState]);
-  const setError = useMemo(() => createStateSetter(setState, 'error'), [setState]);
+  const setBusy = useMemo(
+    () => createStateSetter(setState, 'busy'),
+    [setState],
+  );
+  const setError = useMemo(
+    () => createStateSetter(setState, 'error'),
+    [setState],
+  );
   const setGpsStatus = useMemo(
     () => createStateSetter(setState, 'gpsStatus'),
     [setState],
@@ -99,13 +103,11 @@ const useWalkingWorkout = () => {
     [setState],
   );
   const refs = useRef<{
-    lastLocation: WalkingLocationPoint | null;
     subscriptions: EmitterSubscription[];
     workout: WalkingWorkout | null;
     busy: boolean;
     latestMetrics: { steps: number; distanceMeters: number };
   }>({
-    lastLocation: null,
     subscriptions: [],
     workout: null,
     busy: false,
@@ -127,10 +129,11 @@ const useWalkingWorkout = () => {
   const attachSensors = useCallback(
     async (
       session: WalkingWorkout,
-      grantedPermissions?: Awaited<ReturnType<typeof requestWalkingPermissions>>,
+      grantedPermissions?: Awaited<
+        ReturnType<typeof requestWalkingPermissions>
+      >,
     ) => {
       stopWalkingTrackingSubscriptions(refs.current.subscriptions);
-      refs.current.lastLocation = null;
       const permissions =
         grantedPermissions ?? (await requestWalkingPermissions());
       if (!permissions.enableSteps) {
@@ -148,17 +151,27 @@ const useWalkingWorkout = () => {
         subscribeWalkingStepUpdates(event => {
           if (Number.isSafeInteger(event.steps) && event.steps >= 0) {
             setSteps(previous => Math.max(previous, event.steps));
+            refs.current.latestMetrics.steps = Math.max(
+              refs.current.latestMetrics.steps,
+              event.steps,
+            );
           }
         }),
         subscribeWalkingLocationUpdates(event => {
-          const filtered = filterWalkingLocationPoint(
-            refs.current.lastLocation,
-            event,
-          );
-          if (!filtered) return;
-          refs.current.lastLocation = filtered.point;
-          if (filtered.addedDistanceMeters > 0) {
-            setDistanceMeters(previous => previous + filtered.addedDistanceMeters);
+          if (
+            !Number.isFinite(event.distanceMeters) ||
+            event.distanceMeters < refs.current.latestMetrics.distanceMeters
+          ) {
+            return;
+          }
+          setDistanceMeters(event.distanceMeters);
+          refs.current.latestMetrics.distanceMeters = event.distanceMeters;
+          if (Number.isSafeInteger(event.steps) && event.steps >= 0) {
+            setSteps(previous => Math.max(previous, event.steps));
+            refs.current.latestMetrics.steps = Math.max(
+              refs.current.latestMetrics.steps,
+              event.steps,
+            );
           }
         }),
         subscribeWalkingTrackingStatus(event => {
@@ -183,16 +196,14 @@ const useWalkingWorkout = () => {
         permissions.enableSteps,
       );
       setSteps(previous => Math.max(previous, session.steps));
-      setDistanceMeters(previous =>
-        Math.max(previous, session.distanceMeters),
-      );
+      setDistanceMeters(previous => Math.max(previous, session.distanceMeters));
       setSensorStatus(result.stepsAvailable ? 'available' : 'unavailable');
       setGpsStatus(
         !permissions.enableGps
           ? 'denied'
           : result.gpsAvailable
-            ? 'available'
-            : 'unavailable',
+          ? 'available'
+          : 'unavailable',
       );
     },
     [setDistanceMeters, setGpsStatus, setSensorStatus, setSteps],
@@ -284,13 +295,7 @@ const useWalkingWorkout = () => {
       refs.current.busy = false;
       setBusy(false);
     }
-  }, [
-    setBusy,
-    setDistanceMeters,
-    setError,
-    setSteps,
-    setWorkout,
-  ]);
+  }, [setBusy, setDistanceMeters, setError, setSteps, setWorkout]);
 
   const loadActiveWorkout = useCallback(async () => {
     setLoading(true);
@@ -335,7 +340,8 @@ const useWalkingWorkout = () => {
           const current = await syncNativeSnapshot(activeWorkout);
           await attachSensors(current);
         } else if (
-          Date.now() - new Date(activeWorkout.lastActiveAt).getTime() > 45_000
+          Date.now() - new Date(activeWorkout.lastActiveAt).getTime() >
+          45_000
         ) {
           await stopNativeWalkingTracking();
           const paused = await pauseWalkingWorkoutRequest(activeWorkout.id);
@@ -366,92 +372,88 @@ const useWalkingWorkout = () => {
     syncNativeSnapshot,
   ]);
 
-  const startWorkout = useCallback(async (weightKg?: number) => {
-    if (refs.current.busy) return;
-    refs.current.busy = true;
-    setBusy(true);
-    setError('');
-    let startedSession: WalkingWorkout | null = null;
-    try {
-      const permissions = await requestWalkingPermissions();
-      if (Platform.OS === 'android' && !permissions.enableGps) {
-        throw new Error(
-          'Để theo dõi khi khóa màn hình trên Android, hãy cấp quyền vị trí rồi thử lại.',
-        );
-      }
-      startedSession = await startWalkingWorkoutRequest(
-        createWalkingClientSessionId(),
-        weightKg,
-      );
-      setWorkout(startedSession);
-      refs.current.workout = startedSession;
-      setSteps(startedSession.steps);
-      setDistanceMeters(startedSession.distanceMeters);
-      await attachSensors(startedSession, permissions);
-    } catch (startError) {
-      stopWalkingTrackingSubscriptions(refs.current.subscriptions);
-      let cleanupError = '';
+  const startWorkout = useCallback(
+    async (weightKg?: number) => {
+      if (refs.current.busy) return;
+      refs.current.busy = true;
+      setBusy(true);
+      setError('');
+      let startedSession: WalkingWorkout | null = null;
       try {
-        await stopNativeWalkingTracking();
-      } catch (stopError) {
-        cleanupError =
-          stopError instanceof Error
-            ? stopError.message
-            : 'Không thể dừng cảm biến.';
-      }
-      if (startedSession) {
+        const permissions = await requestWalkingPermissions();
+        if (Platform.OS === 'android' && !permissions.enableGps) {
+          throw new Error(
+            'Để theo dõi khi khóa màn hình trên Android, hãy cấp quyền vị trí rồi thử lại.',
+          );
+        }
+        startedSession = await startWalkingWorkoutRequest(
+          createWalkingClientSessionId(),
+          weightKg,
+        );
+        setWorkout(startedSession);
+        refs.current.workout = startedSession;
+        setSteps(startedSession.steps);
+        setDistanceMeters(startedSession.distanceMeters);
+        await attachSensors(startedSession, permissions);
+      } catch (startError) {
+        stopWalkingTrackingSubscriptions(refs.current.subscriptions);
+        let cleanupError = '';
         try {
-          await finishWalkingWorkoutRequest(startedSession.id);
-        } catch (finishError) {
-          cleanupError = [
+          await stopNativeWalkingTracking();
+        } catch (stopError) {
+          cleanupError =
+            stopError instanceof Error
+              ? stopError.message
+              : 'Không thể dừng cảm biến.';
+        }
+        if (startedSession) {
+          try {
+            await finishWalkingWorkoutRequest(startedSession.id);
+          } catch (finishError) {
+            cleanupError = [
+              cleanupError,
+              finishError instanceof Error
+                ? `Không thể hủy buổi tập chưa khởi động: ${finishError.message}`
+                : 'Không thể hủy buổi tập chưa khởi động.',
+            ]
+              .filter(Boolean)
+              .join(' ');
+          }
+          try {
+            await clearNativeWalkingSession(startedSession.clientSessionId);
+          } catch (clearError) {
+            cleanupError = [
+              cleanupError,
+              clearError instanceof Error
+                ? `Không thể xóa phiên theo dõi: ${clearError.message}`
+                : 'Không thể xóa phiên theo dõi.',
+            ]
+              .filter(Boolean)
+              .join(' ');
+          }
+        }
+        setWorkout(null);
+        refs.current.workout = null;
+        refs.current.latestMetrics = { steps: 0, distanceMeters: 0 };
+        setSteps(0);
+        setDistanceMeters(0);
+        setError(
+          [
+            startError instanceof Error
+              ? startError.message
+              : 'Không thể bắt đầu buổi đi bộ.',
             cleanupError,
-            finishError instanceof Error
-              ? `Không thể hủy buổi tập chưa khởi động: ${finishError.message}`
-              : 'Không thể hủy buổi tập chưa khởi động.',
           ]
             .filter(Boolean)
-            .join(' ');
-        }
-        try {
-          await clearNativeWalkingSession(startedSession.clientSessionId);
-        } catch (clearError) {
-          cleanupError = [
-            cleanupError,
-            clearError instanceof Error
-              ? `Không thể xóa phiên theo dõi: ${clearError.message}`
-              : 'Không thể xóa phiên theo dõi.',
-          ]
-            .filter(Boolean)
-            .join(' ');
-        }
+            .join(' '),
+        );
+      } finally {
+        refs.current.busy = false;
+        setBusy(false);
       }
-      setWorkout(null);
-      refs.current.workout = null;
-      refs.current.latestMetrics = { steps: 0, distanceMeters: 0 };
-      setSteps(0);
-      setDistanceMeters(0);
-      setError(
-        [
-          startError instanceof Error
-            ? startError.message
-            : 'Không thể bắt đầu buổi đi bộ.',
-          cleanupError,
-        ]
-          .filter(Boolean)
-          .join(' '),
-      );
-    } finally {
-      refs.current.busy = false;
-      setBusy(false);
-    }
-  }, [
-    attachSensors,
-    setBusy,
-    setError,
-    setWorkout,
-    setSteps,
-    setDistanceMeters,
-  ]);
+    },
+    [attachSensors, setBusy, setError, setWorkout, setSteps, setDistanceMeters],
+  );
 
   const pauseWorkout = useCallback(async () => {
     await pauseCurrentWorkout();
@@ -488,11 +490,7 @@ const useWalkingWorkout = () => {
 
   const finishWorkout = useCallback(async () => {
     const current = refs.current.workout;
-    if (
-      !current ||
-      current.status === 'FINISHED' ||
-      refs.current.busy
-    ) {
+    if (!current || current.status === 'FINISHED' || refs.current.busy) {
       return null;
     }
     refs.current.busy = true;
@@ -520,11 +518,7 @@ const useWalkingWorkout = () => {
       setSteps(finalSteps);
       setDistanceMeters(finalDistanceMeters);
       if (current.status === 'IN_PROGRESS') {
-        await updateWalkingWorkout(
-          current.id,
-          finalSteps,
-          finalDistanceMeters,
-        );
+        await updateWalkingWorkout(current.id, finalSteps, finalDistanceMeters);
       }
       const finished = await finishWalkingWorkoutRequest(current.id);
       setWorkout(finished);
@@ -575,11 +569,7 @@ const useWalkingWorkout = () => {
     const clockInterval = setInterval(() => setClock(Date.now()), 1000);
     const progressInterval = setInterval(() => {
       const current = refs.current.workout;
-      if (
-        !current ||
-        current.status !== 'IN_PROGRESS' ||
-        refs.current.busy
-      ) {
+      if (!current || current.status !== 'IN_PROGRESS' || refs.current.busy) {
         return;
       }
       updateWalkingWorkout(
@@ -603,13 +593,7 @@ const useWalkingWorkout = () => {
       clearInterval(clockInterval);
       clearInterval(progressInterval);
     };
-  }, [
-    setClock,
-    setError,
-    setWorkout,
-    workout?.id,
-    workout?.status,
-  ]);
+  }, [setClock, setError, setWorkout, workout?.id, workout?.status]);
 
   useEffect(
     () => () => {
@@ -625,8 +609,8 @@ const useWalkingWorkout = () => {
           ((workout.status === 'PAUSED' && workout.pausedAt
             ? new Date(workout.pausedAt).getTime()
             : workout.status === 'FINISHED' && workout.endedAt
-              ? new Date(workout.endedAt).getTime()
-              : clock) -
+            ? new Date(workout.endedAt).getTime()
+            : clock) -
             new Date(workout.startedAt).getTime() -
             workout.pausedDurationSeconds * 1000) /
             1000,

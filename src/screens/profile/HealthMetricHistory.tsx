@@ -16,7 +16,7 @@ import Svg, {
   Stop,
   Text as SvgText,
 } from 'react-native-svg';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { formatNumberWithOptionalDecimal } from '../../utils/numberUtils';
 import type { HealthProfileHistoryCardProps } from '../../utils/types';
 

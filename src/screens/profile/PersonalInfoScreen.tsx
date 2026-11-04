@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useFocusEffect } from '@react-navigation/native';
 import ScreenHeader from '../component/ScreenHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -356,7 +356,7 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
     }
     Alert.alert(
       'Thu hồi đồng ý dùng gợi ý AI?',
-      'MealCraft sẽ ngừng gửi dữ liệu dinh dưỡng cho Gemini trên thiết bị này. Gợi ý AI đã tải sẽ bị xóa khỏi màn hình.',
+      'HealthAndCook sẽ ngừng gửi dữ liệu dinh dưỡng cho Gemini trên thiết bị này. Gợi ý AI đã tải sẽ bị xóa khỏi màn hình.',
       [
         { text: 'Hủy', style: 'cancel' },
         {
@@ -369,6 +369,24 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
         },
       ],
     );
+  };
+
+  const onHandleOptionPress = (option: any) => {
+    if (option.id === 'BASIC' || option.id === 'PASSWORD') {
+      navigate(ScreenKeys.PERSONAL_INFO, { section: option.id }, true);
+      return;
+    }
+    if (option.id === 'DELETE') {
+      confirmAccountDeletion();
+      return;
+    }
+    if (option.id === 'GEMINI') {
+      revokeGeminiConsent();
+      return;
+    }
+    if (option.id === 'PRIVACY') {
+      navigate(ScreenKeys.PRIVACY_POLICY, { mode: 'view' }, true);
+    }
   };
 
   return (
@@ -415,31 +433,7 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
                     <Pressable
                       key={option.id}
                       accessibilityRole="button"
-                      onPress={() => {
-                        if (option.id === 'BASIC' || option.id === 'PASSWORD') {
-                          navigate(
-                            ScreenKeys.PERSONAL_INFO,
-                            { section: option.id },
-                            true,
-                          );
-                          return;
-                        }
-                        if (option.id === 'DELETE') {
-                          confirmAccountDeletion();
-                          return;
-                        }
-                        if (option.id === 'GEMINI') {
-                          revokeGeminiConsent();
-                          return;
-                        }
-                        if (option.id === 'PRIVACY') {
-                          navigate(
-                            ScreenKeys.PRIVACY_POLICY,
-                            { mode: 'view' },
-                            true,
-                          );
-                        }
-                      }}
+                      onPress={() => onHandleOptionPress(option)}
                       style={styles.optionRow}
                     >
                       <View style={styles.optionCopy}>
@@ -467,7 +461,8 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
             <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
               <Text style={styles.sectionTitle}>Thông tin cơ bản</Text>
               <Text style={styles.description}>
-                Cập nhật ảnh đại diện và tên hiển thị trong tài khoản MealCraft.
+                Cập nhật ảnh đại diện và tên hiển thị trong tài khoản
+                HealthAndCook.
               </Text>
               <Pressable
                 accessibilityRole="button"

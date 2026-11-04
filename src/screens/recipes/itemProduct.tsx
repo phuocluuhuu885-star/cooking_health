@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { AppImage } from '../../abase/component';
 import type { RecipeCardProps } from '../../utils/types';
 
@@ -48,7 +48,7 @@ const ItemProduct = memo(
             />
           ) : (
             <View style={[styles.recipeImage, styles.imagePlaceholder]}>
-              <Text style={styles.placeholderText}>MealCraft</Text>
+              <Text style={styles.placeholderText}>Health&Cook</Text>
             </View>
           )}
           <View style={styles.timeBadge}>

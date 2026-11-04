@@ -69,6 +69,58 @@ export type NutritionItemProps = {
 
 export type MealPeriod = 'LUNCH' | 'DINNER';
 
+export type AiMealChatSuggestion = {
+  mealId: string;
+  name: string;
+  mealPeriod: MealPeriod;
+  nutrition: {
+    calories: number | null;
+    proteinG: number | null;
+    carbsG: number | null;
+    fatG: number | null;
+  };
+};
+
+export type AiMealChatResponse = {
+  success: boolean;
+  message?: string;
+  ErrorMessage?: string;
+  data?: {
+    inScope: boolean;
+    answer: string;
+    suggestions?: AiMealChatSuggestion[];
+  };
+};
+
+export type AiMealScanNutrition = {
+  caloriesKcal: number;
+  proteinG: number;
+  carbohydratesG: number;
+  fatG: number;
+  fiberG: number | null;
+};
+
+export type AiMealScanResult = {
+  recognized: boolean;
+  dishName: string | null;
+  components: Array<{
+    name: string;
+    estimatedAmount: string;
+    estimatedWeightG: number | null;
+    nutrition: AiMealScanNutrition;
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  }>;
+  totalNutrition: AiMealScanNutrition;
+  notes: string[];
+};
+
+export type AiMealScanResponse = {
+  success: boolean;
+  message?: string;
+  ErrorMessage?: string;
+  data?: AiMealScanResult;
+};
+
 export type EstimatedPriceRange = {
   minVnd: number;
   maxVnd: number;
@@ -229,6 +281,7 @@ export type AiMealRecommendationsData = {
   source: 'GEMINI' | 'LOCAL';
   message: string;
   budget?: EstimatedPriceRange;
+  mealBudgets?: Partial<Record<MealPeriod, number>>;
   recommendations: Record<MealPeriod, AiMealRecommendation[]>;
 };
 
@@ -297,23 +350,11 @@ export type MealPlanScreenState = {
   ingredientSummary: Array<{
     name: string;
     amountG: number;
+    mealNames?: string[];
   }>;
   ingredientSummaryVisible: boolean;
   ingredientSummaryLoading: boolean;
   ingredientSummaryError: string;
-};
-
-export type ProfileScreenState = {
-  isHealthProfileVisible: boolean;
-  consumptionPeriod: ConsumptionReportPeriod;
-  reportLoading: boolean;
-  reportError: string;
-  dailyMeals: DailyConsumedMeal[];
-  dailyMealsLoading: boolean;
-  dailyMealsError: string;
-  healthHistory: HealthProfileHistoryPoint[];
-  healthHistoryLoading: boolean;
-  healthHistoryError: string;
 };
 
 export type HealthProfileHistoryPoint = {

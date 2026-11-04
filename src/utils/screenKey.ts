@@ -10,6 +10,8 @@ const ScreenKeys = keyMirror({
   PERSONAL_INFO: null,
   DAILY_CONSUMED_MEALS: null,
   AI_MEAL_RECOMMENDATIONS: null,
+  AI_MEAL_CHAT: null,
+  AI_MEAL_SCAN: null,
   WEEKLY_MEAL_PLAN: null,
   EATING_PROGRESS: null,
   SMART_SHOPPING: null,
@@ -17,6 +19,9 @@ const ScreenKeys = keyMirror({
   FAMILY: null,
   HOUSEHOLD_CHAT: null,
   NOTIFICATIONS: null,
+  HEALTH_DASHBOARD: null,
+  EXPENSES: null,
+  EXPENSE_REPORT: null,
 });
 
 export default ScreenKeys;

@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../components/LinearGradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -98,7 +98,7 @@ const PrivacyPolicyScreen = ({ route }: Props) => {
         <View style={styles.brand}>
           <Text style={styles.brandMark}>MC</Text>
           <View>
-            <Text style={styles.brandName}>MealCraft</Text>
+            <Text style={styles.brandName}>Health&Cook</Text>
             <Text style={styles.brandSubtitle}>
               QUYỀN RIÊNG TƯ & ĐIỀU KHOẢN
             </Text>
@@ -111,7 +111,7 @@ const PrivacyPolicyScreen = ({ route }: Props) => {
             : 'Thông tin trước khi sử dụng'}
         </Text>
         <Text style={styles.intro}>
-          Vui lòng đọc cách MealCraft sử dụng dữ liệu và quyền trên thiết bị.
+          Vui lòng đọc cách Health&Cook sử dụng dữ liệu và quyền trên thiết bị.
           Bạn cần đồng ý với Điều khoản sử dụng và Chính sách quyền riêng tư
           trước khi đăng nhập hoặc tạo tài khoản.
         </Text>
@@ -131,15 +131,15 @@ const PrivacyPolicyScreen = ({ route }: Props) => {
           />
           <PolicySection
             title="4. Chia sẻ và lưu trữ"
-            children="Dữ liệu tài khoản, hồ sơ sức khỏe và lịch sử cân nặng/BMI được lưu trên máy chủ MealCraft để cung cấp dịch vụ và được xóa cùng tài khoản theo quy trình xóa. Thông tin, thực đơn, nội dung chat hoặc hoạt động bạn gửi trong không gian gia đình có thể được thành viên của gia đình đó nhìn thấy. Gợi ý thực đơn gia đình sử dụng mục tiêu và dinh dưỡng đã ghi nhận của thành viên có hồ sơ sức khỏe để tính nội bộ trên máy chủ MealCraft; dữ liệu gia đình không được gửi sang Gemini. Không nhập thông tin sức khỏe nhạy cảm vào nội dung chat nếu bạn không muốn chia sẻ với các thành viên. Ảnh đại diện được lưu trên máy chủ ứng dụng. Không bán dữ liệu sức khỏe cá nhân."
+            children="Dữ liệu tài khoản, hồ sơ sức khỏe và lịch sử cân nặng/BMI được lưu trên máy chủ Health&Cook để cung cấp dịch vụ và được xóa cùng tài khoản theo quy trình xóa. Thông tin, thực đơn, nội dung chat hoặc hoạt động bạn gửi trong không gian gia đình có thể được thành viên của gia đình đó nhìn thấy. Gợi ý thực đơn gia đình sử dụng mục tiêu và dinh dưỡng đã ghi nhận của thành viên có hồ sơ sức khỏe để tính nội bộ trên máy chủ Health&Cook, dữ liệu gia đình không được gửi sang Gemini. Không nhập thông tin sức khỏe nhạy cảm vào nội dung chat nếu bạn không muốn chia sẻ với các thành viên. Ảnh đại diện được lưu trên máy chủ ứng dụng. Không bán dữ liệu sức khỏe cá nhân."
           />
           <PolicySection
             title="5. Gợi ý món ăn bằng AI (tùy chọn)"
-            children="Chỉ khi bạn chủ động yêu cầu gợi ý AI và đồng ý tại thời điểm sử dụng, MealCraft gửi Google Gemini các mục tiêu năng lượng/dinh dưỡng trong ngày, tổng dinh dưỡng đã ghi nhận hôm đó và thông tin các món phù hợp trong thư viện để xếp hạng, giải thích gợi ý. MealCraft không gửi tên, email, mã tài khoản, tuổi, giới tính, chiều cao, cân nặng hoặc BMI cho Gemini. Với hồ sơ dưới 18 tuổi, gợi ý được xử lý nội bộ và không gửi dữ liệu đến Gemini. Dữ liệu dinh dưỡng người trưởng thành gửi đi đã được giảm thiểu thông tin định danh trực tiếp nhưng vẫn có thể được xem là dữ liệu sức khỏe; Google xử lý dữ liệu theo điều khoản và chính sách hiện hành của họ. MealCraft không lưu nội dung yêu cầu AI. Bạn có thể từ chối hoặc thu hồi đồng ý ngay tại mục gợi ý AI; khi đó vẫn có thể xem các món gợi ý thông thường không cá nhân hóa bằng AI. Gợi ý chỉ mang tính tham khảo, không phải tư vấn y tế."
+            children="Chỉ khi bạn chủ động yêu cầu gợi ý AI và đồng ý tại thời điểm sử dụng, Health&Cook gửi Google Gemini các mục tiêu năng lượng/dinh dưỡng trong ngày, tổng dinh dưỡng đã ghi nhận hôm đó và thông tin các món phù hợp trong thư viện để xếp hạng, giải thích gợi ý. Health&Cook không gửi tên, email, mã tài khoản, tuổi, giới tính, chiều cao, cân nặng hoặc BMI cho Gemini. Với hồ sơ dưới 18 tuổi, gợi ý được xử lý nội bộ và không gửi dữ liệu đến Gemini. Dữ liệu dinh dưỡng người trưởng thành gửi đi đã được giảm thiểu thông tin định danh trực tiếp nhưng vẫn có thể được xem là dữ liệu sức khỏe; Google xử lý dữ liệu theo điều khoản và chính sách hiện hành của họ. Health&Cook không lưu nội dung yêu cầu AI. Bạn có thể từ chối hoặc thu hồi đồng ý ngay tại mục gợi ý AI; khi đó vẫn có thể xem các món gợi ý thông thường không cá nhân hóa bằng AI. Gợi ý chỉ mang tính tham khảo, không phải tư vấn y tế."
           />
           <PolicySection
             title="6. Lưu giữ, truy cập và chỉnh sửa dữ liệu"
-            children="Bạn có thể xem và cập nhật tên, ảnh đại diện trong mục Thông tin cá nhân; xem và cập nhật dữ liệu sức khỏe trong Hồ sơ sức khỏe. Bạn có thể xóa tài khoản ngay trong ứng dụng. Với yêu cầu truy cập bản sao dữ liệu hoặc yêu cầu khác, hãy liên hệ đơn vị vận hành qua thông tin hỗ trợ chính thức của MealCraft. Việc lưu giữ dữ liệu tuân theo pháp luật áp dụng."
+            children="Bạn có thể xem và cập nhật tên, ảnh đại diện trong mục Thông tin cá nhân; xem và cập nhật dữ liệu sức khỏe trong Hồ sơ sức khỏe. Bạn có thể xóa tài khoản ngay trong ứng dụng. Với yêu cầu truy cập bản sao dữ liệu hoặc yêu cầu khác, hãy liên hệ đơn vị vận hành qua thông tin hỗ trợ chính thức của Health&Cook. Việc lưu giữ dữ liệu tuân theo pháp luật áp dụng."
           />
           <PolicySection
             title="7. Xóa tài khoản và dữ liệu"

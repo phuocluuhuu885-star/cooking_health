@@ -19,11 +19,14 @@ export const getCurrentMealPeriod = (date = new Date()): MealPeriod => {
   return hour < 12 ? 'LUNCH' : 'DINNER';
 };
 
-export const getMealPeriodSummary = (plan?: HouseholdMealPeriodPlan) => {
+export const getMealPeriodSummary = (
+  plan?: HouseholdMealPeriodPlan,
+  pollsEnabled = true,
+) => {
   if (!plan) return 'Chưa có thông tin';
   if (plan.isCompleted) return 'Bữa ăn đã hoàn thành';
   if (plan.isLocked) return 'Thực đơn đã cố định';
-  if (plan.poll && !plan.poll.closedAt) {
+  if (pollsEnabled && plan.poll && !plan.poll.closedAt) {
     if (plan.poll.options.length === 0) return 'Chưa có món đề xuất';
     const pendingVotes = plan.poll.options.filter(
       option => option.myVote === null,

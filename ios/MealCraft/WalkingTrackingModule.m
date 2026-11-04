@@ -14,8 +14,11 @@ static NSString *const WalkingLastUpdateAtKey = @"walking.lastUpdateAt";
 @property(nonatomic, strong) CLLocationManager *locationManager;
 @property(nonatomic, copy) NSString *sessionId;
 @property(nonatomic, assign) NSInteger previousSteps;
+@property(nonatomic, assign) NSInteger sessionStepBaseline;
+@property(nonatomic, assign) NSInteger lastDistanceSteps;
 @property(nonatomic, assign) CLLocationDistance previousDistanceMeters;
 @property(nonatomic, strong) CLLocation *previousLocation;
+@property(nonatomic, assign) BOOL stepTrackingAvailable;
 @property(nonatomic, assign) BOOL requestedAlwaysAuthorization;
 @end
 
@@ -55,29 +58,40 @@ RCT_REMAP_METHOD(startTracking,
                  resolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject)
 {
+  [self stopSensors];
   self.sessionId = sessionId;
   self.previousSteps = MAX(0, previousSteps.integerValue);
+  self.sessionStepBaseline = self.previousSteps;
+  self.lastDistanceSteps = self.previousSteps;
   self.previousDistanceMeters = MAX(0, previousDistanceMeters.doubleValue);
   self.previousLocation = nil;
+  self.stepTrackingAvailable =
+      enableSteps && [CMPedometer isStepCountingAvailable];
   self.requestedAlwaysAuthorization = NO;
-  [self stopSensors];
   [self persistSnapshotRunning:YES];
 
-  if (enableSteps && [CMPedometer isStepCountingAvailable]) {
+  if (self.stepTrackingAvailable) {
     self.pedometer = [CMPedometer new];
     [self.pedometer startPedometerUpdatesFromDate:[NSDate date]
                                       withHandler:^(CMPedometerData *data, NSError *error) {
       if (error) {
         dispatch_async(dispatch_get_main_queue(), ^{
+          if (![self.sessionId isEqualToString:sessionId]) return;
+          self.stepTrackingAvailable = NO;
+          [self.pedometer stopPedometerUpdates];
+          self.pedometer = nil;
           [self sendEventWithName:@"WalkingTrackingStatus"
                              body:@{ @"kind": @"steps", @"status": @"unavailable" }];
         });
         return;
       }
-      NSInteger sessionSteps = self.previousSteps + data.numberOfSteps.integerValue;
-      self.previousSteps = MAX(self.previousSteps, sessionSteps);
-      [self persistSnapshotRunning:YES];
       dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self.stepTrackingAvailable ||
+            ![self.sessionId isEqualToString:sessionId]) return;
+        NSInteger sessionSteps =
+            self.sessionStepBaseline + data.numberOfSteps.integerValue;
+        self.previousSteps = MAX(self.previousSteps, sessionSteps);
+        [self persistSnapshotRunning:YES];
         [self sendEventWithName:@"WalkingStepUpdate"
                            body:@{ @"steps": @(self.previousSteps) }];
       });
@@ -195,22 +209,32 @@ RCT_REMAP_METHOD(clearSession,
     NSTimeInterval elapsed = [location.timestamp timeIntervalSinceDate:previous.timestamp];
     CLLocationDistance distance = [previous distanceFromLocation:location];
     CLLocationDistance minimumMovement =
-        MAX(1.5, (previous.horizontalAccuracy + location.horizontalAccuracy) * 0.15);
-    if (elapsed > 0 && distance >= minimumMovement && distance / elapsed <= 5.5) {
+        MAX(4.0, (previous.horizontalAccuracy + location.horizontalAccuracy) * 0.35);
+    NSInteger stepsSinceLastMovement = self.previousSteps - self.lastDistanceSteps;
+    BOOL hasConfirmedSteps =
+        !self.stepTrackingAvailable || stepsSinceLastMovement >= 2;
+    if (elapsed > 0 && distance >= minimumMovement && distance / elapsed <= 5.5 &&
+        hasConfirmedSteps) {
       self.previousDistanceMeters += distance;
+      self.lastDistanceSteps = self.previousSteps;
       [self persistSnapshotRunning:YES];
+      self.previousLocation = location;
     } else if (elapsed <= 0 || distance / MAX(elapsed, 0.001) > 5.5) {
       return;
     }
+  } else {
+    self.lastDistanceSteps = self.previousSteps;
+    self.previousLocation = location;
   }
-  self.previousLocation = location;
   [self persistSnapshotRunning:YES];
   [self sendEventWithName:@"WalkingLocationUpdate"
                      body:@{
                        @"latitude": @(location.coordinate.latitude),
                        @"longitude": @(location.coordinate.longitude),
                        @"accuracy": @(location.horizontalAccuracy),
-                       @"timestamp": @([location.timestamp timeIntervalSince1970] * 1000)
+                       @"timestamp": @([location.timestamp timeIntervalSince1970] * 1000),
+                       @"steps": @(self.previousSteps),
+                       @"distanceMeters": @(self.previousDistanceMeters)
                      }];
 }
 
@@ -244,6 +268,7 @@ RCT_REMAP_METHOD(clearSession,
 
 - (void)stopSensors
 {
+  self.stepTrackingAvailable = NO;
   [self.pedometer stopPedometerUpdates];
   self.pedometer = nil;
   [self.locationManager stopUpdatingLocation];

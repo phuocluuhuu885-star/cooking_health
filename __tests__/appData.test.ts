@@ -96,6 +96,7 @@ const report: ConsumptionReportData = {
 const household: Household = {
   id: 'household-1',
   name: 'Gia đình MealCraft',
+  mealVotingEnabled: true,
   currentMemberId: 'user-1',
   currentRole: 'ADMIN',
   members: [],

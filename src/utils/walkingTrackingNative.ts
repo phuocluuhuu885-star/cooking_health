@@ -59,8 +59,7 @@ const getEventEmitter = () => {
   return new NativeEventEmitter(NativeModules.WalkingTracking);
 };
 
-export const checkWalkingSensorSupport = () =>
-  getNativeModule().isSupported();
+export const checkWalkingSensorSupport = () => getNativeModule().isSupported();
 
 export const requestWalkingPermissions = async () => {
   if (Platform.OS !== 'android') {
@@ -114,8 +113,7 @@ export const startNativeWalkingTracking = (
 
 export const getNativeWalkingTrackingSnapshot = () =>
   getNativeModule().getTrackingSnapshot();
-export const stopNativeWalkingTracking = () =>
-  getNativeModule().stopTracking();
+export const stopNativeWalkingTracking = () => getNativeModule().stopTracking();
 
 export const clearNativeWalkingSession = (sessionId: string) =>
   getNativeModule().clearSession(sessionId);

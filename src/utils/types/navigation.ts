@@ -11,6 +11,8 @@ export type RootStackParamList = {
   [ScreenKeys.PERSONAL_INFO]: { section?: 'BASIC' | 'PASSWORD' } | undefined;
   [ScreenKeys.DAILY_CONSUMED_MEALS]: undefined;
   [ScreenKeys.AI_MEAL_RECOMMENDATIONS]: undefined;
+  [ScreenKeys.AI_MEAL_CHAT]: undefined;
+  [ScreenKeys.AI_MEAL_SCAN]: undefined;
   [ScreenKeys.WEEKLY_MEAL_PLAN]: undefined;
   [ScreenKeys.EATING_PROGRESS]: undefined;
   [ScreenKeys.SMART_SHOPPING]: undefined;
@@ -23,6 +25,9 @@ export type RootStackParamList = {
     householdName: string;
   };
   [ScreenKeys.NOTIFICATIONS]: undefined;
+  [ScreenKeys.HEALTH_DASHBOARD]: undefined;
+  [ScreenKeys.EXPENSES]: undefined;
+  [ScreenKeys.EXPENSE_REPORT]: undefined;
 };
 
 export type RecipeDetailScreenProps = StackScreenProps<

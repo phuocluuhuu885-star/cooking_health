@@ -3,7 +3,7 @@ import { memo, useMemo } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Shadow } from 'react-native-shadow-2';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { AppImage } from '../../abase/component';
 import { colors } from '../../abase/constant';
 
@@ -15,14 +15,8 @@ const HomeBottomView = memo((props: IProps) => {
 
   const onTabPress = (tabId: number) => {
     let route = -1;
-    if (tabId === 2) {
-      //qr
-      return;
-    } else if (tabId < 2) {
-      route = tabId;
-    } else {
-      route = tabId - 1;
-    }
+
+    route = tabId;
     console.log(route);
     const event = navigation.emit({
       type: 'tabPress',
@@ -38,24 +32,15 @@ const HomeBottomView = memo((props: IProps) => {
     () =>
       StyleSheet.create({
         container: {
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
+          height: insets.bottom + 66,
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: insets.bottom + 8,
           backgroundColor: 'transparent',
         },
         containerStyle: {
           alignSelf: 'center',
-          paddingBottom: insets.bottom + 8,
           width: width - 32,
-        },
-        overlay: {
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: insets.bottom + 8 + 64,
-          backgroundColor: 'transparent',
         },
       }),
     [insets.bottom, width],
@@ -63,7 +48,6 @@ const HomeBottomView = memo((props: IProps) => {
 
   return (
     <View style={styleView.container}>
-      <View style={styleView.overlay} />
       <View style={styleView.containerStyle}>
         <Shadow
           distance={3} // Độ nhòe của bóng
@@ -91,20 +75,22 @@ const HomeBottomView = memo((props: IProps) => {
                 isSelected={state.index === 1}
                 onPress={onTabPress}
               />
-              {/* <ItemTab
-                                tabId={2}
-                                isSelected={false}
-    onPress={onTabPress} />*/}
               <ItemTab
-                tabId={3}
+                tabId={2}
                 width={width}
                 isSelected={state.index === 2}
                 onPress={onTabPress}
               />
               <ItemTab
-                tabId={4}
+                tabId={3}
                 width={width}
                 isSelected={state.index === 3}
+                onPress={onTabPress}
+              />
+              <ItemTab
+                tabId={4}
+                width={width}
+                isSelected={state.index === 4}
                 onPress={onTabPress}
               />
             </View>
@@ -135,6 +121,11 @@ const ItemTab = memo(
             iconS: require('../../imgs/home/bookS.webp'),
             name: 'Món ăn',
           }
+        : props.tabId === 2
+        ? {
+            icon: require('../../imgs/home/iconS2.webp'),
+            iconS: require('../../imgs/home/iconS2.webp'),
+          }
         : props.tabId === 3
         ? {
             icon: require('../../imgs/home/sCart.webp'),
@@ -154,6 +145,8 @@ const ItemTab = memo(
 
     return (
       <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={itemInfo.name || 'Sức khỏe'}
         onPress={onPress}
         style={[styles.itemContainer, props.isSelected && styles.activeTab]}
       >
@@ -173,7 +166,7 @@ const ItemTab = memo(
         {props.tabId === 2 && (
           <>
             <AppImage
-              source={require('../../imgs/home/homeS.webp')}
+              source={require('../../imgs/home/iconS2.webp')}
               style={styles.icon54}
               resizeMode="contain"
             />
@@ -216,7 +209,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   icon24: { width: 24, height: 24 },
-  icon54: { width: 54, height: 54 },
+  icon54: { width: 65, height: 65 },
   activeTab: {},
 });
 

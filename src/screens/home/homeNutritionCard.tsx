@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import Svg, { Circle } from 'react-native-svg';
 import type { Nutrition } from '../../utils/types';
 import { formatNumberWithOptionalDecimal } from '../../utils/numberUtils';

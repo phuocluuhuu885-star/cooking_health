@@ -24,6 +24,7 @@ export type Household = {
   name: string;
   lunchPollCloseTime?: string;
   dinnerPollCloseTime?: string;
+  mealVotingEnabled: boolean;
   currentMemberId: string;
   currentRole: HouseholdRole;
   members: HouseholdMember[];
@@ -197,6 +198,7 @@ export type HouseholdScreenState = {
   chatUnreadCount: number;
   pollDeadlineVisible: boolean;
   pollDeadlineSaving: boolean;
+  pollVotingSaving: boolean;
   shoppingListVisible: boolean;
   currentTime: Date;
   sendingMealReminder: boolean;

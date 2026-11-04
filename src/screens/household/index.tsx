@@ -15,12 +15,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from '../../components/LinearGradient';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
-import { AppImage } from '../../abase/component';
 import ScreenHeader from '../component/ScreenHeader';
 import { navigate } from '../../utils/navigation';
 import ScreenKeys from '../../utils/screenKey';
@@ -39,14 +38,12 @@ import {
   fetchCurrentHousehold,
   fetchHouseholdMealPlan,
   updateHouseholdMealPollDeadline,
+  updateHouseholdMealVoting,
   voteForHouseholdMeal,
 } from '../../utils/householdApi';
 import { fetchHouseholdChatUnreadCount } from '../../utils/householdChatApi';
 import type {
   MealPeriod,
-  HouseholdMealPoll,
-  HouseholdMealPollOption,
-  HouseholdMealPeriodPlan,
   HouseholdPlannedMeal,
   HouseholdMember,
   HouseholdInvitationResponse,
@@ -62,6 +59,7 @@ import HomeIngredientSummaryModal from '../home/homeIngredientSummaryModal';
 import HouseholdChatButton from './HouseholdChatButton';
 import HouseholdPollScheduleModal from './HouseholdPollScheduleModal';
 import HouseholdShoppingListModal from './HouseholdShoppingListModal';
+import HouseholdSettingsModal from './components/HouseholdSettingsModal';
 import { useSendHouseholdMealReminder } from './HouseholdMealReminderProvider';
 import {
   getMealReminderWindowLabel,
@@ -69,25 +67,19 @@ import {
 } from '../../utils/mealReminderUtils';
 import { createStateSetter } from '../../utils/stateUtils';
 import { formatEstimatedPrice } from '../../utils/priceUtils';
+import ActionButton from './components/ActionButton';
+import HouseholdMealPeriodCard from './components/HouseholdMealPeriodCard';
+import HouseholdMealPollCard from './components/HouseholdMealPollCard';
+import HouseholdMemberRow from './components/HouseholdMemberRow';
+import HouseholdPlannedMealRow from './components/HouseholdPlannedMealRow';
+import { COLORS } from './components/styles';
 import {
-  formatPollDeadline,
+  formatHouseholdDeadlineDateTime,
   getCurrentMealPeriod,
   getFinalizedMeals,
   getHouseholdDateKey,
   getMealPeriodSummary,
 } from '../../utils/householdScreenUtils';
-
-const COLORS = {
-  background: '#F5F7F5',
-  white: '#FFFFFF',
-  text: '#172B23',
-  secondary: '#66756D',
-  green: '#168653',
-  lightGreen: '#E7F4EC',
-  border: '#E5EBE7',
-  danger: '#B42318',
-  lightDanger: '#FEF3F2',
-};
 
 const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
   const route =
@@ -125,6 +117,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
     chatUnreadCount: 0,
     pollDeadlineVisible: false,
     pollDeadlineSaving: false,
+    pollVotingSaving: false,
     shoppingListVisible: false,
     currentTime: new Date(),
     sendingMealReminder: false,
@@ -136,6 +129,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
       error: '',
     },
   });
+  const [householdSettingsVisible, setHouseholdSettingsVisible] = useState(false);
   const {
     membersExpanded,
     selectedMealPeriod,
@@ -143,6 +137,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
     chatUnreadCount,
     pollDeadlineVisible,
     pollDeadlineSaving,
+    pollVotingSaving,
     shoppingListVisible,
     currentTime,
     sendingMealReminder,
@@ -170,6 +165,10 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
   );
   const setPollDeadlineSaving = useMemo(
     () => createStateSetter(setState, 'pollDeadlineSaving'),
+    [setState],
+  );
+  const setPollVotingSaving = useMemo(
+    () => createStateSetter(setState, 'pollVotingSaving'),
     [setState],
   );
   const setShoppingListVisible = useMemo(
@@ -382,7 +381,18 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
   );
 
   const selectedPoll = state.mealPlan?.meals[selectedMealPeriod].poll ?? null;
+  const isVoting = Boolean(
+    household?.mealVotingEnabled && selectedPoll && !selectedPoll.closedAt,
+  );
   const selectedMealPlan = state.mealPlan?.meals[selectedMealPeriod] ?? null;
+  const defaultPollCloseTime =
+    selectedMealPeriod === 'LUNCH'
+      ? household?.lunchPollCloseTime ?? '11:00'
+      : household?.dinnerPollCloseTime ?? '17:00';
+  const displayedPollCloseTime =
+    selectedPoll && !selectedPoll.closedAt
+      ? formatHouseholdDeadlineDateTime(selectedPoll.closesAt).time
+      : defaultPollCloseTime;
   const reminderAllowed = isMealReminderAllowed(
     selectedMealPeriod,
     currentTime,
@@ -431,6 +441,69 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
     return () => clearInterval(timer);
   }, [setCurrentTime]);
   const shoppingListDisabled = Boolean(selectedMealPlan?.isLocked);
+  const handleOpenPollDeadline = useCallback(() => {
+    setPollDeadlineVisible(true);
+  }, [setPollDeadlineVisible]);
+  const handleSetMealVotingEnabled = useCallback(
+    async (enabled: boolean) => {
+      if (!user?.accessToken || !household || pollVotingSaving) {
+        return;
+      }
+      setPollVotingSaving(true);
+      try {
+        const response = await updateHouseholdMealVoting(user, enabled);
+        if (!response.success || !response.data) {
+          Alert.alert(
+            'Không thể cập nhật bình chọn',
+            response.message ||
+              response.ErrorMessage ||
+              'Máy chủ không trả về kết quả cập nhật. Vui lòng thử lại.',
+          );
+          return;
+        }
+        dispatch(
+          cacheCurrentHousehold({
+            userId: user.id,
+            household: {
+              ...household,
+              mealVotingEnabled: response.data.mealVotingEnabled,
+            },
+          }),
+        );
+        dispatch(
+          invalidateCachedHouseholdMealPlan({
+            userId: user.id,
+            householdId: household.id,
+            date: state.date,
+          }),
+        );
+        if (!enabled) {
+          setPollDeadlineVisible(false);
+        }
+        await loadHousehold(true);
+      } catch (error) {
+        console.error('Failed to update household meal voting', error);
+        Alert.alert(
+          'Không thể cập nhật bình chọn',
+          error instanceof Error && error.message
+            ? error.message
+            : 'Không thể kết nối đến máy chủ. Vui lòng thử lại.',
+        );
+      } finally {
+        setPollVotingSaving(false);
+      }
+    },
+    [
+      dispatch,
+      household,
+      loadHousehold,
+      pollVotingSaving,
+      setPollDeadlineVisible,
+      setPollVotingSaving,
+      state.date,
+      user,
+    ],
+  );
   const handleSetPollDeadline = useCallback(
     async (closesAt: string) => {
       if (!user?.accessToken || !household) {
@@ -952,7 +1025,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
         {!embedded ? (
           <ScreenHeader
             title="Gia đình"
-            subtitle="Cùng xem và quản lý thực đơn chung với những người thân."
+            subtitle="Thực đơn chung cho gia đình của bạn."
             style={styles.sharedHeader}
             rightAction={
               household ? (
@@ -985,7 +1058,22 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
               />
-              <Text style={styles.householdName}>{household.name}</Text>
+              <View style={styles.householdHeading}>
+                <Text numberOfLines={1} style={styles.householdName}>
+                  {household.name}
+                </Text>
+                {household.currentRole === 'ADMIN' ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setHouseholdSettingsVisible(true)}
+                    style={styles.householdSettingsButton}
+                  >
+                    <Text style={styles.householdSettingsButtonText}>
+                      Cài đặt
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
               <Text style={styles.memberCount}>
                 {household.members.length} thành viên ·{' '}
                 {household.currentRole === 'ADMIN'
@@ -1102,7 +1190,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                 </Text>
                 <Text style={styles.nutritionNote}>
                   Tổng dinh dưỡng của các món đã lên thực đơn cho bữa trưa và
-                  bữa tối; đây không phải nhật ký món đã ăn.
+                  bữa tối.
                 </Text>
                 {householdNutrition.unavailable > 0 ? (
                   <Text style={styles.nutritionNote}>
@@ -1120,10 +1208,42 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
               />
-              <Text style={styles.sectionTitle}>Thực đơn gia đình hôm nay</Text>
-              <Text style={styles.helper}>
-                Ngày {state.date} · Chọn bữa để xem món và bình chọn
-              </Text>
+              <View style={styles.mealPlanHeading}>
+                <Text style={styles.sectionTitle}>
+                  {isVoting ? 'Bình chọn món' : 'Thực đơn gia đình hôm nay'}
+                </Text>
+                {household.mealVotingEnabled &&
+                (selectedPoll || household.currentRole === 'ADMIN') ? (
+                  <View style={styles.pollCloseTime}>
+                    <Text style={styles.pollCloseTimeText}>
+                      Đóng chọn lúc {displayedPollCloseTime}
+                    </Text>
+                    {household.currentRole === 'ADMIN' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Đổi giờ đóng bình chọn"
+                        accessibilityState={{ disabled: pollDeadlineSaving }}
+                        disabled={pollDeadlineSaving}
+                        onPress={handleOpenPollDeadline}
+                        style={styles.pollCloseTimeEdit}
+                      >
+                        <Text style={styles.pollCloseTimeEditText}>✎</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+              {isVoting && selectedPoll ? (
+                <View style={styles.votingCountRow}>
+                  <Text style={styles.votingCount}>
+                    {selectedPoll.options.length
+                      ? `${selectedPoll.options.length} món`
+                      : 'Chưa đề xuất món'}
+                  </Text>
+                  <Text style={styles.helper}> · Ngày {state.date}</Text>
+                </View>
+              ) : null}
+
               {state.mealPlanLoading ? (
                 <ActivityIndicator color={COLORS.green} />
               ) : state.mealPlanError ? (
@@ -1150,7 +1270,10 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                           accessibilityRole="button"
                           accessibilityLabel={`${
                             period === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'
-                          }, ${getMealPeriodSummary(plan)}`}
+                          }, ${getMealPeriodSummary(
+                            plan,
+                            household.mealVotingEnabled,
+                          )}`}
                           accessibilityState={{ selected }}
                           onPress={() => setSelectedMealPeriod(period)}
                           style={[
@@ -1181,170 +1304,127 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                               selected && styles.mealPeriodTabSummarySelected,
                             ]}
                           >
-                            {getMealPeriodSummary(plan)}
+                            {getMealPeriodSummary(
+                              plan,
+                              household.mealVotingEnabled,
+                            )}
                           </Text>
                         </Pressable>
                       );
                     })}
                   </View>
-                  <HouseholdMealPeriodCard
-                    label={
-                      selectedMealPeriod === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'
-                    }
-                    items={
-                      state.mealPlan?.meals[selectedMealPeriod].items ?? []
-                    }
-                    nutrition={
-                      state.mealPlan?.meals[selectedMealPeriod]
-                        .nutritionSummary ?? null
-                    }
-                    estimatedPrice={
-                      state.mealPlan?.meals[selectedMealPeriod].estimatedPrice
-                    }
-                    unavailableNutritionItems={
-                      state.mealPlan?.meals[selectedMealPeriod]
-                        .unavailableNutritionItems ?? 0
-                    }
-                    renderMeal={
-                      selectedMealPeriod === 'LUNCH'
-                        ? renderLunchMeal
-                        : renderDinnerMeal
-                    }
-                    completed={Boolean(
-                      state.mealPlan?.meals[selectedMealPeriod].isCompleted,
-                    )}
-                    locked={Boolean(
-                      state.mealPlan?.meals[selectedMealPeriod].isLocked,
-                    )}
-                    poll={
-                      state.mealPlan?.meals[selectedMealPeriod].poll ?? null
-                    }
-                    completing={state.completingPeriod === selectedMealPeriod}
-                    onComplete={
-                      selectedMealPeriod === 'LUNCH'
-                        ? handleCompleteLunch
-                        : handleCompleteDinner
-                    }
-                  />
-                  <View style={styles.mealReminder}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        disabled:
-                          !reminderAllowed ||
-                          reminderIsActive ||
-                          Boolean(selectedMealPlan?.isCompleted) ||
-                          sendingMealReminder,
-                      }}
-                      disabled={
-                        !reminderAllowed ||
-                        reminderIsActive ||
-                        Boolean(selectedMealPlan?.isCompleted) ||
-                        sendingMealReminder
+                  {!isVoting ? (
+                    <HouseholdMealPeriodCard
+                      label={
+                        selectedMealPeriod === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'
                       }
-                      onPress={handleSendMealReminder}
-                      style={[
-                        styles.mealReminderButton,
-                        (!reminderAllowed ||
+                      items={
+                        state.mealPlan?.meals[selectedMealPeriod].items ?? []
+                      }
+                      nutrition={
+                        state.mealPlan?.meals[selectedMealPeriod]
+                          .nutritionSummary ?? null
+                      }
+                      estimatedPrice={
+                        state.mealPlan?.meals[selectedMealPeriod].estimatedPrice
+                      }
+                      unavailableNutritionItems={
+                        state.mealPlan?.meals[selectedMealPeriod]
+                          .unavailableNutritionItems ?? 0
+                      }
+                      renderMeal={
+                        selectedMealPeriod === 'LUNCH'
+                          ? renderLunchMeal
+                          : renderDinnerMeal
+                      }
+                      completed={Boolean(
+                        state.mealPlan?.meals[selectedMealPeriod].isCompleted,
+                      )}
+                      locked={Boolean(
+                        state.mealPlan?.meals[selectedMealPeriod].isLocked,
+                      )}
+                      poll={
+                        household.mealVotingEnabled
+                          ? state.mealPlan?.meals[selectedMealPeriod].poll ??
+                            null
+                          : null
+                      }
+                      completing={state.completingPeriod === selectedMealPeriod}
+                      onComplete={
+                        selectedMealPeriod === 'LUNCH'
+                          ? handleCompleteLunch
+                          : handleCompleteDinner
+                      }
+                    />
+                  ) : null}
+                  {isVoting && selectedPoll ? (
+                    <HouseholdMealPollCard
+                      key={`${selectedMealPeriod}:${selectedPoll.closesAt}:open`}
+                      poll={selectedPoll}
+                      mealPeriod={selectedMealPeriod}
+                      votingOptionKey={votingOptionKey}
+                      onVote={handleVote}
+                      onViewIngredients={loadAcceptedIngredients}
+                    />
+                  ) : null}
+                  {reminderAllowed ? (
+                    <View style={styles.mealReminder}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{
+                          disabled:
+                            reminderIsActive ||
+                            Boolean(selectedMealPlan?.isCompleted) ||
+                            sendingMealReminder,
+                        }}
+                        disabled={
                           reminderIsActive ||
                           Boolean(selectedMealPlan?.isCompleted) ||
-                          sendingMealReminder) &&
-                          styles.mealReminderButtonDisabled,
-                      ]}
-                    >
-                      {sendingMealReminder ? (
-                        <ActivityIndicator color={COLORS.white} />
-                      ) : (
-                        <Text style={styles.mealReminderButtonText}>
-                          {reminderIsActive
-                            ? 'Đang chờ xác nhận'
-                            : `Nhắc ăn ${
-                                selectedMealPeriod === 'LUNCH'
-                                  ? 'bữa trưa'
-                                  : 'bữa tối'
-                              }`}
-                        </Text>
-                      )}
-                    </Pressable>
-                    <Text style={styles.mealReminderHint}>
-                      {selectedMealPlan?.isCompleted
-                        ? 'Bữa ăn đã hoàn thành.'
-                        : reminderIsActive
-                        ? 'Lời nhắc sẽ dừng khi có thành viên nhấn Đồng ý.'
-                        : reminderAllowed
-                        ? `Có thể nhắc trong khung giờ ${getMealReminderWindowLabel(
-                            selectedMealPeriod,
-                          )} (giờ Việt Nam).`
-                        : `Chỉ khả dụng trong khung giờ ${getMealReminderWindowLabel(
-                            selectedMealPeriod,
-                          )} (giờ Việt Nam).`}
-                    </Text>
-                  </View>
+                          sendingMealReminder
+                        }
+                        onPress={handleSendMealReminder}
+                        style={[
+                          styles.mealReminderButton,
+                          (reminderIsActive ||
+                            Boolean(selectedMealPlan?.isCompleted) ||
+                            sendingMealReminder) &&
+                            styles.mealReminderButtonDisabled,
+                        ]}
+                      >
+                        {sendingMealReminder ? (
+                          <ActivityIndicator color={COLORS.white} />
+                        ) : (
+                          <Text style={styles.mealReminderButtonText}>
+                            {reminderIsActive
+                              ? 'Đang chờ xác nhận'
+                              : `Nhắc ăn ${
+                                  selectedMealPeriod === 'LUNCH'
+                                    ? 'bữa trưa'
+                                    : 'bữa tối'
+                                }`}
+                          </Text>
+                        )}
+                      </Pressable>
+                      <Text style={styles.mealReminderHint}>
+                        {selectedMealPlan?.isCompleted
+                          ? 'Bữa ăn đã hoàn thành.'
+                          : reminderIsActive
+                          ? 'Lời nhắc sẽ dừng khi có thành viên nhấn Đồng ý.'
+                          : `Có thể nhắc trong khung giờ ${getMealReminderWindowLabel(
+                              selectedMealPeriod,
+                            )} (giờ Việt Nam).`}
+                      </Text>
+                    </View>
+                  ) : null}
                 </>
               )}
             </View>
-            {selectedPoll || household.currentRole === 'ADMIN' ? (
+            {household.mealVotingEnabled &&
+            (selectedPoll || household.currentRole === 'ADMIN') ? (
               <>
-                <View style={styles.pollDeadlineCard}>
-                  <LinearGradient
-                    colors={['#FFFFFF', '#F3FAF5']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <View style={styles.pollDeadlineCopy}>
-                    <Text style={styles.pollDeadlineTitle}>
-                      Giờ đóng bình chọn
-                    </Text>
-                    <Text style={styles.pollDeadlineValue}>
-                      {!selectedPoll
-                        ? `Giờ mặc định: ${
-                            selectedMealPeriod === 'LUNCH'
-                              ? household.lunchPollCloseTime ?? '11:00'
-                              : household.dinnerPollCloseTime ?? '17:00'
-                          }`
-                        : selectedPoll.closedAt
-                        ? `Đã đóng · hạn ${formatPollDeadline(
-                            selectedPoll.closesAt,
-                          )}`
-                        : `Đóng lúc ${formatPollDeadline(
-                            selectedPoll.closesAt,
-                          )}`}
-                    </Text>
-                    <Text style={styles.pollDeadlineHint}>
-                      Áp dụng cho tất cả món trong{' '}
-                      {selectedMealPeriod === 'LUNCH' ? 'bữa trưa' : 'bữa tối'}.
-                      {selectedPoll
-                        ? ` Giờ mặc định các ngày sau: ${
-                            selectedMealPeriod === 'LUNCH'
-                              ? household.lunchPollCloseTime ?? '11:00'
-                              : household.dinnerPollCloseTime ?? '17:00'
-                          }.`
-                        : ' Quản trị viên có thể thiết lập giờ mặc định cho các ngày sau.'}
-                    </Text>
-                  </View>
-                  {household.currentRole === 'ADMIN' ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Chọn ngày và giờ bình chọn, áp dụng giờ mặc định cho những ngày tiếp theo"
-                      disabled={pollDeadlineSaving}
-                      onPress={() => setPollDeadlineVisible(true)}
-                      style={[
-                        styles.pollDeadlineButton,
-                        pollDeadlineSaving && styles.pollDeadlineButtonDisabled,
-                      ]}
-                    >
-                      <Text style={styles.pollDeadlineButtonText}>
-                        {!selectedPoll || selectedPoll.closedAt
-                          ? 'Đặt giờ mặc định'
-                          : 'Đổi thời hạn'}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-                {selectedPoll ? (
+                {selectedPoll?.closedAt ? (
                   <HouseholdMealPollCard
-                    key={`${selectedMealPeriod}:${selectedPoll.closesAt}`}
+                    key={`${selectedMealPeriod}:${selectedPoll.closesAt}:closed`}
                     poll={selectedPoll}
                     mealPeriod={selectedMealPeriod}
                     votingOptionKey={votingOptionKey}
@@ -1466,461 +1546,18 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
         householdName={household?.name ?? 'Gia đình'}
         onClose={() => setShoppingListVisible(false)}
       />
-    </View>
-  );
-};
-
-const HouseholdPlannedMealRow = ({ meal }: { meal: HouseholdPlannedMeal }) => {
-  const handlePress = useCallback(() => {
-    navigate(ScreenKeys.RECIPE_DETAIL, { mealId: meal.meal.id });
-  }, [meal.meal.id]);
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Xem chi tiết món ${meal.meal.name}`}
-      onPress={handlePress}
-      style={styles.mealRow}
-    >
-      {meal.meal.imageUrl ? (
-        <AppImage
-          source={{ uri: meal.meal.imageUrl }}
-          style={styles.mealImage}
-          resizeMode="cover"
+      {household?.currentRole === 'ADMIN' ? (
+        <HouseholdSettingsModal
+          visible={householdSettingsVisible}
+          mealVotingEnabled={household.mealVotingEnabled}
+          saving={pollVotingSaving}
+          onClose={() => setHouseholdSettingsVisible(false)}
+          onVotingChange={handleSetMealVotingEnabled}
         />
-      ) : (
-        <View style={[styles.mealImage, styles.mealImagePlaceholder]}>
-          <Text style={styles.memberInitial}>MC</Text>
-        </View>
-      )}
-      <View style={styles.mealDetails}>
-        <Text numberOfLines={1} style={styles.mealName}>
-          {meal.meal.name}
-        </Text>
-        {meal.meal.description ? (
-          <Text numberOfLines={2} style={styles.mealDescription}>
-            {meal.meal.description}
-          </Text>
-        ) : null}
-        <Text style={styles.mealMeta}>
-          {meal.servings} khẩu phần · Thêm bởi{' '}
-          {meal.addedBy.fullName?.trim() || 'thành viên'}
-        </Text>
-        <Text style={styles.mealPrice}>
-          {formatEstimatedPrice(meal.estimatedPrice)}
-        </Text>
-      </View>
-      <Text style={[styles.mealStatus, meal.isConsumed && styles.mealConsumed]}>
-        {meal.isConsumed ? 'Đã ăn' : 'Chưa ăn'}
-      </Text>
-    </Pressable>
-  );
-};
-
-const HouseholdMealPeriodCard = ({
-  label,
-  items,
-  nutrition,
-  estimatedPrice,
-  unavailableNutritionItems,
-  renderMeal,
-  completed,
-  locked,
-  poll,
-  completing,
-  onComplete,
-}: {
-  label: string;
-  items: HouseholdMealPeriodPlan['items'];
-  nutrition: HouseholdMealPeriodPlan['nutritionSummary'] | null;
-  estimatedPrice?: HouseholdMealPeriodPlan['estimatedPrice'];
-  unavailableNutritionItems: number;
-  renderMeal: (meal: HouseholdPlannedMeal) => React.ReactNode;
-  completed: boolean;
-  locked: boolean;
-  poll: HouseholdMealPoll | null;
-  completing: boolean;
-  onComplete: () => void;
-}) => {
-  const finalizedItems = getFinalizedMeals(items, poll);
-  return (
-    <View style={styles.mealPeriod}>
-      <View style={styles.mealPeriodHeader}>
-        <Text style={styles.mealPeriodTitle}>{label}</Text>
-        {completed ? (
-          <Text style={styles.mealCompletedLabel}>Bạn đã hoàn thành</Text>
-        ) : null}
-      </View>
-      {items.length > 0 ? (
-        <View style={styles.periodNutrition}>
-          <LinearGradient
-            colors={['#FFFFFF', '#EAF6EE']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <Text style={styles.periodNutritionCalories}>
-            {nutrition && nutrition.calories > 0
-              ? `${Math.round(nutrition.calories)} kcal dự kiến`
-              : 'Chưa có dữ liệu calo'}
-          </Text>
-          {nutrition && nutrition.calories > 0 ? (
-            <Text style={styles.periodNutritionMacros}>
-              Đạm {nutrition.proteinG.toFixed(1)} g · Carb{' '}
-              {nutrition.carbsG.toFixed(1)} g · Béo {nutrition.fatG.toFixed(1)}{' '}
-              g
-            </Text>
-          ) : null}
-          <Text style={styles.periodNutritionMacros}>
-            Chi phí ước tính: {formatEstimatedPrice(estimatedPrice)}
-          </Text>
-          {unavailableNutritionItems > 0 ? (
-            <Text style={styles.periodNutritionNote}>
-              {unavailableNutritionItems} món thiếu dữ liệu dinh dưỡng.
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-      {finalizedItems.length > 0 ? (
-        finalizedItems.map(renderMeal)
-      ) : poll?.closedAt && poll.options.length > 0 ? (
-        <Text style={styles.emptyMeals}>
-          Không có món nào được chấp nhận. Hãy đề xuất món khác cho bữa này.
-        </Text>
-      ) : !poll?.options.length ? (
-        <Text style={styles.emptyMeals}>
-          Chưa có món trong bữa này. Hãy chọn món từ mục Công thức để cả nhà
-          cùng bình chọn.
-        </Text>
-      ) : null}
-      {locked && !completed ? (
-        <Text style={styles.lockedMessage}>
-          Thực đơn đã được cố định bởi một thành viên. Bạn vẫn có thể xác nhận
-          phần ăn của mình.
-        </Text>
-      ) : null}
-      {!completed && finalizedItems.length > 0 && poll && !poll.closedAt ? (
-        <Text style={styles.waitingForPoll}>
-          Có thể xác nhận đã ăn sau khi bình chọn đóng lúc{' '}
-          {formatPollDeadline(poll.closesAt)}.
-        </Text>
-      ) : null}
-      {!completed && finalizedItems.length > 0 && (!poll || poll.closedAt) ? (
-        <Pressable
-          accessibilityRole="button"
-          disabled={completing}
-          onPress={onComplete}
-          style={[styles.completeButton, completing && styles.disabledButton]}
-        >
-          {completing ? (
-            <ActivityIndicator color={COLORS.white} />
-          ) : (
-            <Text style={styles.completeButtonText}>
-              Xác nhận đã ăn bữa này
-            </Text>
-          )}
-        </Pressable>
       ) : null}
     </View>
   );
 };
-
-const HouseholdMealPollCard = ({
-  poll,
-  mealPeriod,
-  votingOptionKey,
-  onVote,
-  onViewIngredients,
-}: {
-  poll: HouseholdMealPoll;
-  mealPeriod: MealPeriod;
-  votingOptionKey: string;
-  onVote: (mealPeriod: MealPeriod, mealId: string, agrees: boolean) => void;
-  onViewIngredients: () => void;
-}) => {
-  const [state, setState] = useState({ expanded: true });
-  const { expanded } = state;
-  const setExpanded = useMemo(
-    () => createStateSetter(setState, 'expanded'),
-    [setState],
-  );
-  const acceptedMeals = poll.options.filter(
-    option => option.outcome === 'ACCEPTED',
-  );
-  const pollStatus = poll.closedAt
-    ? `Đã đóng · hạn ${formatPollDeadline(poll.closesAt)}`
-    : `Chốt lúc ${formatPollDeadline(poll.closesAt)}`;
-
-  return (
-    <View style={styles.pollCard}>
-      <LinearGradient
-        colors={['#FFFFFF', '#F3FAF5']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded }}
-        onPress={() => setExpanded(current => !current)}
-        style={styles.pollHeader}
-      >
-        <View style={styles.pollHeaderCopy}>
-          <Text style={styles.pollTitle}>Bình chọn món · {pollStatus}</Text>
-          <Text style={styles.pollHeaderHint}>
-            {poll.options.length
-              ? `${poll.options.length} món · ${
-                  poll.closedAt ? 'Đã có kết quả' : 'Chạm để bình chọn'
-                }`
-              : 'Chưa có món được đề xuất'}
-          </Text>
-        </View>
-        <Text style={styles.pollToggle}>{expanded ? 'Ẩn' : 'Xem'}</Text>
-      </Pressable>
-      {expanded ? (
-        <>
-          <Text style={styles.pollHelper}>
-            Chọn đồng ý hoặc không đồng ý cho từng món. Món được giữ khi số
-            phiếu đồng ý nhiều hơn tổng phiếu không đồng ý và chưa chọn.
-          </Text>
-          {poll.options.length ? (
-            poll.options.map(option => (
-              <HouseholdMealPollOptionRow
-                key={option.id}
-                option={option}
-                mealPeriod={mealPeriod}
-                voting={votingOptionKey === `${mealPeriod}:${option.mealId}`}
-                onVote={onVote}
-              />
-            ))
-          ) : (
-            <Text style={styles.emptyMeals}>Chưa có món nào được đề xuất.</Text>
-          )}
-          {poll.closedAt && acceptedMeals.length > 0 ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={onViewIngredients}
-              style={styles.ingredientSummaryButton}
-            >
-              <Text style={styles.ingredientSummaryButtonText}>
-                Xem nguyên liệu các món được chọn
-              </Text>
-            </Pressable>
-          ) : null}
-        </>
-      ) : null}
-    </View>
-  );
-};
-
-const HouseholdMealPollOptionRow = ({
-  option,
-  mealPeriod,
-  voting,
-  onVote,
-}: {
-  option: HouseholdMealPollOption;
-  mealPeriod: MealPeriod;
-  voting: boolean;
-  onVote: (mealPeriod: MealPeriod, mealId: string, agrees: boolean) => void;
-}) => {
-  const handleAgree = useCallback(() => {
-    onVote(mealPeriod, option.mealId, true);
-  }, [mealPeriod, onVote, option.mealId]);
-  const handleDisagree = useCallback(() => {
-    onVote(mealPeriod, option.mealId, false);
-  }, [mealPeriod, onVote, option.mealId]);
-  const [state, setState] = useState({
-    mealDescription: option.meal.description?.trim() ?? '',
-  });
-  const { mealDescription } = state;
-  const setMealDescription = useMemo(
-    () => createStateSetter(setState, 'mealDescription'),
-    [setState],
-  );
-  useEffect(() => {
-    const existingDescription = option.meal.description?.trim();
-    if (existingDescription) {
-      setMealDescription(existingDescription);
-      return;
-    }
-    let isCurrentRequest = true;
-    syncApi(apiConst.getMealDetail, {
-      id: option.mealId,
-      servings: 1,
-    })
-      .then(response => {
-        if (!isCurrentRequest) {
-          return;
-        }
-        const mealResponse = response as RecipeDetailResponse;
-        setMealDescription(mealResponse?.data?.description?.trim() ?? '');
-      })
-      .catch(() => {
-        if (isCurrentRequest) {
-          setMealDescription('');
-        }
-      });
-    return () => {
-      isCurrentRequest = false;
-    };
-  }, [option.meal.description, option.mealId, setMealDescription]);
-  const resultLabel =
-    option.outcome === 'ACCEPTED'
-      ? 'Được giữ trong thực đơn'
-      : option.outcome === 'REJECTED'
-      ? 'Bị loại khỏi thực đơn'
-      : '';
-
-  return (
-    <View style={styles.pollOption}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Xem cách nấu món ${option.meal.name}`}
-        onPress={() =>
-          navigate(ScreenKeys.RECIPE_DETAIL, { mealId: option.mealId })
-        }
-        style={styles.pollMealDetails}
-      >
-        {option.meal.imageUrl ? (
-          <AppImage
-            source={{ uri: option.meal.imageUrl }}
-            style={styles.pollMealImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.pollMealImage, styles.mealImagePlaceholder]}>
-            <Text style={styles.memberInitial}>MC</Text>
-          </View>
-        )}
-        <View style={styles.pollMealCopy}>
-          <Text numberOfLines={2} style={styles.pollMealName}>
-            {option.meal.name}
-          </Text>
-          <Text numberOfLines={3} style={styles.pollMealDescription}>
-            {mealDescription || 'Chưa có mô tả cho món ăn này.'}
-          </Text>
-          <Text style={styles.recipeLink}>Chạm để xem cách nấu</Text>
-          <Text style={styles.mealPrice}>
-            {formatEstimatedPrice(option.estimatedPrice)}
-          </Text>
-        </View>
-      </Pressable>
-      <Text style={styles.pollCounts}>
-        Đồng ý {option.agrees} · Không đồng ý {option.disagrees} · Chưa chọn{' '}
-        {option.unvoted}
-      </Text>
-      {!option.outcome ? (
-        <Text style={styles.myVote}>
-          {option.myVote === null
-            ? 'Bạn chưa bình chọn món này'
-            : `Bạn đã chọn: ${option.myVote ? 'Đồng ý' : 'Không đồng ý'}`}
-        </Text>
-      ) : null}
-      {resultLabel ? (
-        <Text
-          style={[
-            styles.pollResult,
-            option.outcome === 'ACCEPTED' && styles.pollAccepted,
-          ]}
-        >
-          {resultLabel}
-        </Text>
-      ) : (
-        <View style={styles.voteActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Đồng ý với món ${option.meal.name}`}
-            accessibilityState={{ selected: option.myVote === true }}
-            disabled={voting}
-            onPress={handleAgree}
-            style={[
-              styles.voteButton,
-              option.myVote === true && styles.voteAgreeSelected,
-              voting && styles.disabledButton,
-            ]}
-          >
-            <Text style={styles.voteButtonText}>Đồng ý</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Không đồng ý với món ${option.meal.name}`}
-            accessibilityState={{ selected: option.myVote === false }}
-            disabled={voting}
-            onPress={handleDisagree}
-            style={[
-              styles.voteButton,
-              option.myVote === false && styles.voteDisagreeSelected,
-              voting && styles.disabledButton,
-            ]}
-          >
-            <Text style={styles.voteButtonText}>Không đồng ý</Text>
-          </Pressable>
-          {voting ? <ActivityIndicator color={COLORS.green} /> : null}
-        </View>
-      )}
-    </View>
-  );
-};
-
-const HouseholdMemberRow = ({
-  member,
-  canRemove,
-  onRemove,
-}: {
-  member: HouseholdMember;
-  canRemove: boolean;
-  onRemove: (memberId: string, memberName: string) => void;
-}) => {
-  const handleRemove = useCallback(() => {
-    onRemove(member.userId, member.user.fullName || member.user.email);
-  }, [member, onRemove]);
-
-  return (
-    <View style={styles.memberRow}>
-      <View style={styles.memberAvatar}>
-        <Text style={styles.memberInitial}>
-          {(member.user.fullName || member.user.email)
-            .trim()
-            .charAt(0)
-            .toLocaleUpperCase()}
-        </Text>
-      </View>
-      <View style={styles.memberDetails}>
-        <Text style={styles.memberName}>
-          {member.user.fullName?.trim() || member.user.email}
-        </Text>
-        <Text style={styles.memberRole}>
-          {member.role === 'ADMIN' ? 'Quản trị viên' : 'Thành viên'}
-        </Text>
-      </View>
-      {canRemove ? (
-        <Pressable accessibilityRole="button" onPress={handleRemove}>
-          <Text style={styles.removeText}>Xóa</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-};
-
-const ActionButton = ({
-  label,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  disabled: boolean;
-  onPress: () => void;
-}) => (
-  <Pressable
-    accessibilityRole="button"
-    disabled={disabled}
-    onPress={onPress}
-    style={[styles.primaryButton, disabled && styles.disabledButton]}
-  >
-    <Text style={styles.primaryButtonText}>{label}</Text>
-  </Pressable>
-);
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
@@ -1963,10 +1600,30 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   householdName: {
+    flex: 1,
+    minWidth: 0,
     color: COLORS.text,
     fontSize: 23,
     fontWeight: '800',
     marginTop: 8,
+  },
+  householdHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  householdSettingsButton: {
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 11,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  householdSettingsButtonText: {
+    color: COLORS.green,
+    fontSize: 12,
+    fontWeight: '700',
   },
   memberCount: { color: COLORS.secondary, fontSize: 13, marginTop: 5 },
   shoppingListButton: {
@@ -2050,6 +1707,15 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     overflow: 'hidden',
   },
+  votingCount: {
+    color: COLORS.secondary,
+    fontSize: 12,
+  },
+  votingCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
   mealPeriodTabs: {
     flexDirection: 'row',
     gap: 8,
@@ -2081,6 +1747,34 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   mealPeriodTabSummarySelected: { color: COLORS.text },
+  mealPlanHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 8,
+  },
+  pollCloseTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  pollCloseTimeText: {
+    color: COLORS.secondary,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  pollCloseTimeEdit: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pollCloseTimeEditText: {
+    color: COLORS.green,
+    fontSize: 17,
+    fontWeight: '700',
+  },
   mealReminder: {
     alignItems: 'center',
     marginTop: 14,
@@ -2112,257 +1806,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: 'center',
   },
-  mealPeriod: { marginTop: 8 },
-  pollDeadlineCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    padding: 14,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  pollDeadlineCopy: {
-    flex: 1,
-  },
-  pollDeadlineTitle: {
-    color: COLORS.text,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  pollDeadlineValue: {
-    color: COLORS.green,
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  pollDeadlineHint: {
-    color: COLORS.secondary,
-    fontSize: 10,
-    lineHeight: 14,
-    marginTop: 3,
-  },
-  pollDeadlineButton: {
-    minHeight: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 11,
-    borderRadius: 8,
-    backgroundColor: COLORS.lightGreen,
-  },
-  pollDeadlineButtonDisabled: {
-    opacity: 0.55,
-  },
-  pollDeadlineButtonText: {
-    color: COLORS.green,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  pollCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 16,
-    marginBottom: 14,
-    overflow: 'hidden',
-  },
-  pollHeader: {
-    minHeight: 38,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  pollHeaderCopy: {
-    flex: 1,
-  },
-  pollHeaderHint: {
-    color: COLORS.secondary,
-    fontSize: 10,
-    marginTop: 4,
-  },
-  pollToggle: {
-    color: COLORS.green,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  pollTitle: { color: COLORS.text, fontSize: 13, fontWeight: '800' },
-  pollHelper: {
-    color: COLORS.secondary,
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  pollOption: {
-    paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.border,
-  },
-  pollMealDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 3,
-  },
-  pollMealImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: COLORS.lightGreen,
-  },
-  pollMealCopy: { flex: 1 },
-  pollMealName: { color: COLORS.text, fontSize: 13, fontWeight: '700' },
-  pollMealDescription: {
-    color: COLORS.secondary,
-    fontSize: 10,
-    lineHeight: 14,
-    marginTop: 3,
-  },
-  recipeLink: {
-    color: COLORS.green,
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  pollCounts: { color: COLORS.secondary, fontSize: 11, marginTop: 4 },
-  myVote: {
-    color: COLORS.green,
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 5,
-  },
-  pollResult: {
-    color: COLORS.danger,
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 5,
-  },
-  pollAccepted: { color: COLORS.green },
-  waitingForPoll: {
-    color: COLORS.secondary,
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 8,
-  },
-  voteActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  voteButton: {
-    minHeight: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    backgroundColor: COLORS.border,
-    paddingHorizontal: 10,
-  },
-  voteAgreeSelected: { backgroundColor: '#CDEBD8' },
-  voteDisagreeSelected: { backgroundColor: '#F9DAD7' },
-  voteButtonText: { color: COLORS.text, fontSize: 10, fontWeight: '700' },
-  ingredientSummaryButton: {
-    minHeight: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: COLORS.lightGreen,
-  },
-  ingredientSummaryButtonText: {
-    color: COLORS.green,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  mealPeriodHeader: {
-    minHeight: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  mealPeriodTitle: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 8,
-  },
-  periodNutrition: {
-    padding: 10,
-    marginTop: 8,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  periodNutritionCalories: {
-    color: COLORS.green,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  periodNutritionMacros: {
-    color: COLORS.secondary,
-    fontSize: 11,
-    marginTop: 4,
-  },
-  periodNutritionNote: {
-    color: COLORS.secondary,
-    fontSize: 10,
-    marginTop: 4,
-  },
-  mealRow: {
-    minHeight: 70,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.border,
-  },
-  mealImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: COLORS.lightGreen,
-  },
-  mealImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  mealDetails: { flex: 1 },
-  mealName: { color: COLORS.text, fontSize: 13, fontWeight: '700' },
-  mealDescription: {
-    color: COLORS.secondary,
-    fontSize: 10,
-    lineHeight: 14,
-    marginTop: 3,
-  },
-  mealMeta: { color: COLORS.secondary, fontSize: 10, marginTop: 4 },
-  mealPrice: {
-    color: COLORS.green,
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  mealStatus: { color: COLORS.secondary, fontSize: 10, fontWeight: '600' },
-  mealConsumed: { color: COLORS.green },
-  emptyMeals: { color: COLORS.secondary, fontSize: 12, paddingVertical: 10 },
   mealPlanError: { color: COLORS.danger, fontSize: 12, marginVertical: 8 },
-  mealCompletedLabel: { color: COLORS.green, fontSize: 10, fontWeight: '700' },
-  lockedMessage: {
-    color: COLORS.secondary,
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 6,
-  },
-  completeButton: {
-    minHeight: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    borderRadius: 8,
-    backgroundColor: COLORS.green,
-  },
-  completeButtonText: { color: COLORS.white, fontSize: 11, fontWeight: '800' },
   formCard: {
     borderRadius: 12,
     borderWidth: 1,
@@ -2376,8 +1820,6 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
     fontSize: 12,
     lineHeight: 18,
-    marginTop: 6,
-    marginBottom: 12,
   },
   input: {
     minHeight: 48,
@@ -2388,16 +1830,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     marginBottom: 10,
   },
-  primaryButton: {
-    minHeight: 46,
-    borderRadius: 8,
-    backgroundColor: COLORS.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  primaryButtonText: { color: COLORS.white, fontSize: 14, fontWeight: '800' },
-  disabledButton: { opacity: 0.55 },
   codeBox: {
     borderRadius: 12,
     padding: 14,
@@ -2417,26 +1849,6 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     marginVertical: 4,
   },
-  memberRow: {
-    minHeight: 68,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomColor: COLORS.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.lightGreen,
-  },
-  memberInitial: { color: COLORS.green, fontWeight: '800', fontSize: 16 },
-  memberDetails: { flex: 1, marginHorizontal: 11 },
-  memberName: { color: COLORS.text, fontSize: 14, fontWeight: '700' },
-  memberRole: { color: COLORS.secondary, fontSize: 11, marginTop: 3 },
-  removeText: { color: COLORS.danger, fontSize: 12, fontWeight: '700' },
   leaveButton: {
     minHeight: 46,
     borderRadius: 8,
