@@ -19,7 +19,7 @@ interface ProfileMenuItemProps {
 
 const ProfileMenuItem = memo(
   ({
-    icon,
+    icon: _icon,
     title,
     value,
     onPress,

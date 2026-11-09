@@ -134,6 +134,14 @@ const MealPlanComposerModal = ({
     setMealPeriod('DINNER');
   }, [setMealPeriod]);
 
+  const handleOpenCalendar = useCallback(() => {
+    setCalendarVisible(true);
+  }, [setCalendarVisible]);
+
+  const handleCloseCalendar = useCallback(() => {
+    setCalendarVisible(false);
+  }, [setCalendarVisible]);
+
   const handleRemoveSelection = useCallback(() => {
     onRemoveSelection();
   }, [onRemoveSelection]);
@@ -247,7 +255,7 @@ const MealPlanComposerModal = ({
                   )}. Chạm để chọn ngày`}
                   accessibilityHint="Mở lịch chọn ngày thực đơn"
                   disabled={saving}
-                  onPress={() => setCalendarVisible(true)}
+                  onPress={handleOpenCalendar}
                   style={styles.dateButton}
                 >
                   <Text style={styles.dateButtonText}>
@@ -328,7 +336,7 @@ const MealPlanComposerModal = ({
         animationType="fade"
         transparent
         visible={calendarVisible}
-        onRequestClose={() => setCalendarVisible(false)}
+        onRequestClose={handleCloseCalendar}
       >
         <View style={styles.calendarOverlay}>
           <LinearGradient
@@ -342,7 +350,7 @@ const MealPlanComposerModal = ({
               </View>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => setCalendarVisible(false)}
+                onPress={handleCloseCalendar}
                 style={styles.calendarCloseButton}
               >
                 <Text style={styles.calendarCloseText}>Đóng</Text>

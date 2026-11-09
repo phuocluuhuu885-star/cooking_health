@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -22,6 +22,49 @@ const PERIODS: ConsumptionReportPeriodOption[] = [
   { id: 'WEEK', label: 'Tuần' },
   { id: 'MONTH', label: 'Tháng' },
 ];
+
+const ConsumptionPeriodButton = ({
+  option,
+  selected,
+  onChange,
+}: {
+  option: ConsumptionReportPeriodOption;
+  selected: boolean;
+  onChange: (period: ConsumptionReportPeriodOption['id']) => void;
+}) => {
+  const handlePress = useCallback(() => {
+    onChange(option.id);
+  }, [onChange, option.id]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={handlePress}
+      style={[
+        styles.periodButton,
+        selected && styles.periodButtonSelected,
+      ]}
+    >
+      {selected ? (
+        <LinearGradient
+          colors={['#FFFFFF', '#EAF6EE']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
+      <Text
+        style={[
+          styles.periodButtonText,
+          selected && styles.periodButtonTextSelected,
+        ]}
+      >
+        {option.label}
+      </Text>
+    </Pressable>
+  );
+};
 
 const ConsumptionReport = memo(
   ({
@@ -50,6 +93,63 @@ const ConsumptionReport = memo(
       report && report.days.length > 0
         ? report.totals.calories / (elapsedDays || report.days.length)
         : 0;
+    const hasNoConsumedItems =
+      report?.days.every(day => day.consumedItems === 0) ?? false;
+    const renderPeriod = (option: ConsumptionReportPeriodOption) => {
+      return (
+        <ConsumptionPeriodButton
+          key={option.id}
+          option={option}
+          selected={period === option.id}
+          onChange={onChangePeriod}
+        />
+      );
+    };
+    const renderDay = (
+      day: NonNullable<typeof report>['days'][number],
+      index: number,
+    ) => {
+      const targetRatio = day.nutrition.calories / chartCaloriesTarget;
+      const isOverTarget =
+        hasDailyCaloriesTarget &&
+        day.nutrition.calories > dailyCaloriesTarget;
+      const barHeight =
+        day.nutrition.calories > 0
+          ? Math.max(4, Math.min(targetRatio, 1) * CHART_HEIGHT)
+          : 2;
+
+      return (
+        <View key={day.date} style={styles.barColumn}>
+          <Text style={styles.barValue}>
+            {day.nutrition.calories > 0
+              ? formatNumberWithOptionalDecimal(day.nutrition.calories)
+              : ''}
+          </Text>
+          <View style={styles.barTrack}>
+            <View
+              style={[
+                styles.bar,
+                isOverTarget && styles.barOverTarget,
+                { height: barHeight },
+              ]}
+            />
+          </View>
+          <Text style={styles.barLabel}>
+            {getConsumptionDayLabel(day.date, period, index)}
+          </Text>
+          {hasDailyCaloriesTarget ? (
+            <Text
+              style={[
+                styles.barPercentage,
+                isOverTarget && styles.barPercentageOverTarget,
+              ]}
+            >
+              {Math.round(targetRatio * 100)}%
+            </Text>
+          ) : null}
+        </View>
+      );
+    };
 
     return (
       <LinearGradient
@@ -68,35 +168,7 @@ const ConsumptionReport = memo(
         </View>
 
         <View style={styles.periodSwitch}>
-          {PERIODS.map(option => (
-            <Pressable
-              key={option.id}
-              accessibilityRole="button"
-              accessibilityState={{ selected: period === option.id }}
-              onPress={() => onChangePeriod(option.id)}
-              style={[
-                styles.periodButton,
-                period === option.id && styles.periodButtonSelected,
-              ]}
-            >
-              {period === option.id ? (
-                <LinearGradient
-                  colors={['#FFFFFF', '#EAF6EE']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              ) : null}
-              <Text
-                style={[
-                  styles.periodButtonText,
-                  period === option.id && styles.periodButtonTextSelected,
-                ]}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          ))}
+          {PERIODS.map(renderPeriod)}
         </View>
 
         {!isLoggedIn ? (
@@ -156,53 +228,10 @@ const ConsumptionReport = memo(
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chart}
             >
-              {report.days.map((day, index) => {
-                const targetRatio =
-                  day.nutrition.calories / chartCaloriesTarget;
-                const isOverTarget =
-                  hasDailyCaloriesTarget &&
-                  day.nutrition.calories > dailyCaloriesTarget;
-                const barHeight =
-                  day.nutrition.calories > 0
-                    ? Math.max(4, Math.min(targetRatio, 1) * CHART_HEIGHT)
-                    : 2;
-                return (
-                  <View key={day.date} style={styles.barColumn}>
-                    <Text style={styles.barValue}>
-                      {day.nutrition.calories > 0
-                        ? formatNumberWithOptionalDecimal(
-                            day.nutrition.calories,
-                          )
-                        : ''}
-                    </Text>
-                    <View style={styles.barTrack}>
-                      <View
-                        style={[
-                          styles.bar,
-                          isOverTarget && styles.barOverTarget,
-                          { height: barHeight },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.barLabel}>
-                      {getConsumptionDayLabel(day.date, period, index)}
-                    </Text>
-                    {hasDailyCaloriesTarget ? (
-                      <Text
-                        style={[
-                          styles.barPercentage,
-                          isOverTarget && styles.barPercentageOverTarget,
-                        ]}
-                      >
-                        {Math.round(targetRatio * 100)}%
-                      </Text>
-                    ) : null}
-                  </View>
-                );
-              })}
+              {report.days.map(renderDay)}
             </ScrollView>
 
-            {report.days.every(day => day.consumedItems === 0) ? (
+            {hasNoConsumedItems ? (
               <Text style={styles.message}>
                 Chưa có món nào được đánh dấu đã ăn trong kỳ này. Ghi nhận món
                 đã ăn từ tab Thực phẩm để xem biểu đồ.

@@ -360,6 +360,9 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
   const handleRateMeal = useCallback(() => {
     setReviewModalVisible(true);
   }, [setReviewModalVisible]);
+  const handleCloseReviewModal = useCallback(() => {
+    setReviewModalVisible(false);
+  }, [setReviewModalVisible]);
   const handleReviewSubmitted = useCallback(
     (rating: number) => {
       setReviewSummary(current => {
@@ -609,6 +612,71 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
   }
 
   const nutrition = meal.nutritionSummary;
+  const renderIngredient = (
+    ingredient: (typeof meal.groceryList)[number],
+    index: number,
+  ) => (
+    <View
+      key={ingredient.id}
+      style={[
+        styles.ingredientRow,
+        index < meal.groceryList.length - 1 && styles.ingredientDivider,
+      ]}
+    >
+      <View style={styles.ingredientBullet} />
+      <Text style={styles.ingredientName}>{ingredient.name}</Text>
+      <Text style={styles.ingredientAmount}>
+        {ingredient.formattedAmount ||
+          `${formatNumberWithOptionalDecimal(ingredient.amountG)} g`}
+      </Text>
+    </View>
+  );
+  const renderStep = (
+    step: (typeof orderedSteps)[number],
+    index: number,
+  ) => (
+    <View key={step.id} style={styles.stepRow}>
+      <View style={styles.stepMarkerColumn}>
+        <View style={styles.stepMarker}>
+          <Text style={styles.stepMarkerText}>{step.stepNumber}</Text>
+        </View>
+        {index < orderedSteps.length - 1 ? (
+          <View style={styles.stepConnector} />
+        ) : null}
+      </View>
+      <View style={styles.stepContent}>
+        <Text style={styles.stepTitle}>{step.title}</Text>
+        <Text style={styles.stepInstruction}>{step.instruction}</Text>
+        {step.imageUrl ? (
+          <AppImage
+            source={{ uri: step.imageUrl }}
+            style={styles.stepImage}
+            resizeMode="cover"
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+  const renderReview = (review: MealReview) => (
+    <View key={review.id} style={styles.reviewPreview}>
+      <View style={styles.reviewPreviewHeader}>
+        <Text style={styles.reviewerName}>{review.userName}</Text>
+        <Text
+          accessibilityLabel={`${review.rating} sao`}
+          style={styles.reviewPreviewStars}
+        >
+          {'★'.repeat(Math.max(0, Math.min(5, review.rating)))}
+        </Text>
+      </View>
+      {review.comment ? (
+        <Text numberOfLines={3} style={styles.reviewPreviewComment}>
+          {review.comment}
+        </Text>
+      ) : (
+        <Text style={styles.reviewPreviewNoComment}>Không có bình luận</Text>
+      )}
+    </View>
+  );
 
   return (
     <View style={styles.screen}>
@@ -819,23 +887,7 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
             </Text>
           </View>
           <View style={styles.ingredientsCard}>
-            {meal.groceryList.map((ingredient, index) => (
-              <View
-                key={ingredient.id}
-                style={[
-                  styles.ingredientRow,
-                  index < meal.groceryList.length - 1 &&
-                    styles.ingredientDivider,
-                ]}
-              >
-                <View style={styles.ingredientBullet} />
-                <Text style={styles.ingredientName}>{ingredient.name}</Text>
-                <Text style={styles.ingredientAmount}>
-                  {ingredient.formattedAmount ||
-                    `${formatNumberWithOptionalDecimal(ingredient.amountG)} g`}
-                </Text>
-              </View>
-            ))}
+            {meal.groceryList.map(renderIngredient)}
           </View>
         </LinearGradient>
 
@@ -845,29 +897,7 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
             Làm theo từng bước để món ăn đạt kết quả tốt nhất
           </Text>
           <View style={styles.stepsContainer}>
-            {orderedSteps.map((step, index) => (
-              <View key={step.id} style={styles.stepRow}>
-                <View style={styles.stepMarkerColumn}>
-                  <View style={styles.stepMarker}>
-                    <Text style={styles.stepMarkerText}>{step.stepNumber}</Text>
-                  </View>
-                  {index < orderedSteps.length - 1 ? (
-                    <View style={styles.stepConnector} />
-                  ) : null}
-                </View>
-                <View style={styles.stepContent}>
-                  <Text style={styles.stepTitle}>{step.title}</Text>
-                  <Text style={styles.stepInstruction}>{step.instruction}</Text>
-                  {step.imageUrl ? (
-                    <AppImage
-                      source={{ uri: step.imageUrl }}
-                      style={styles.stepImage}
-                      resizeMode="cover"
-                    />
-                  ) : null}
-                </View>
-              </View>
-            ))}
+            {orderedSteps.map(renderStep)}
           </View>
         </LinearGradient>
 
@@ -886,28 +916,7 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
             </View>
           </View>
           {reviewPreview.length ? (
-            reviewPreview.map(review => (
-              <View key={review.id} style={styles.reviewPreview}>
-                <View style={styles.reviewPreviewHeader}>
-                  <Text style={styles.reviewerName}>{review.userName}</Text>
-                  <Text
-                    accessibilityLabel={`${review.rating} sao`}
-                    style={styles.reviewPreviewStars}
-                  >
-                    {'★'.repeat(Math.max(0, Math.min(5, review.rating)))}
-                  </Text>
-                </View>
-                {review.comment ? (
-                  <Text numberOfLines={3} style={styles.reviewPreviewComment}>
-                    {review.comment}
-                  </Text>
-                ) : (
-                  <Text style={styles.reviewPreviewNoComment}>
-                    Không có bình luận
-                  </Text>
-                )}
-              </View>
-            ))
+            reviewPreview.map(renderReview)
           ) : (
             <Text style={styles.reviewPreviewNoComment}>
               Chưa có đánh giá nào cho món ăn này.
@@ -951,7 +960,7 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
         mealName={meal?.name ?? ''}
         token={user?.accessToken}
         visible={reviewModalVisible}
-        onClose={() => setReviewModalVisible(false)}
+        onClose={handleCloseReviewModal}
         onSubmitted={handleReviewSubmitted}
       />
     </View>

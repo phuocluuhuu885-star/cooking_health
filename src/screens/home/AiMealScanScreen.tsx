@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import {
@@ -19,11 +20,17 @@ import LinearGradient from '../../components/LinearGradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import apiConst from '../../abase/constant/apiConst';
+import { invalidateCachedConsumptionReports } from '../../reduxs/reduces/appData';
+import { useAppDispatch } from '../../reduxs/store';
 import { selectUserInfo } from '../../reduxs/reduces/user';
+import { getVietnamDateKey } from '../../utils/dateUtils';
+import { updateMealScanComponent } from '../../utils/mealScanUtils';
 import type {
+  AddScannedConsumedMealResponse,
   AiMealScanNutrition,
   AiMealScanResponse,
   AiMealScanResult,
+  MealPeriod,
 } from '../../utils/types';
 import { setSyncUser, syncApi } from '../../utils/syncUtils';
 import ScreenHeader from '../component/ScreenHeader';
@@ -106,17 +113,221 @@ const NutritionList = ({ nutrition }: { nutrition: AiMealScanNutrition }) => (
   </View>
 );
 
+const ComponentAmountEditor = ({
+  component,
+  index,
+  disabled,
+  onChangeWeight,
+  onChangeQuantity,
+}: {
+  component: AiMealScanResult['components'][number];
+  index: number;
+  disabled: boolean;
+  onChangeWeight: (index: number, weightG: number) => void;
+  onChangeQuantity: (index: number, quantity: number) => void;
+}) => {
+  const [weightDraft, setWeightDraft] = useState(
+    component.estimatedWeightG === null
+      ? ''
+      : String(Math.round(component.estimatedWeightG)),
+  );
+  const [quantityDraft, setQuantityDraft] = useState(
+    component.estimatedQuantity === null
+      ? ''
+      : String(component.estimatedQuantity),
+  );
+
+  React.useEffect(() => {
+    setWeightDraft(
+      component.estimatedWeightG === null
+        ? ''
+        : String(Math.round(component.estimatedWeightG)),
+    );
+    setQuantityDraft(
+      component.estimatedQuantity === null
+        ? ''
+        : String(component.estimatedQuantity),
+    );
+  }, [component.estimatedQuantity, component.estimatedWeightG]);
+
+  const handleDecreaseWeight = useCallback(() => {
+    if (component.estimatedWeightG === null) return;
+    const weightG = Math.max(10, Math.round(component.estimatedWeightG) - 10);
+    onChangeWeight(index, weightG);
+  }, [component.estimatedWeightG, index, onChangeWeight]);
+  const handleIncreaseWeight = useCallback(() => {
+    if (component.estimatedWeightG === null) return;
+    onChangeWeight(index, Math.round(component.estimatedWeightG) + 10);
+  }, [component.estimatedWeightG, index, onChangeWeight]);
+  const handleSubmitWeight = useCallback(() => {
+    const weightG = Number(weightDraft.replace(',', '.'));
+    if (Number.isFinite(weightG) && weightG >= 10) {
+      onChangeWeight(index, weightG);
+      return;
+    }
+    setWeightDraft(
+      component.estimatedWeightG === null
+        ? ''
+        : String(Math.round(component.estimatedWeightG)),
+    );
+  }, [component.estimatedWeightG, index, onChangeWeight, weightDraft]);
+  const handleDecreaseQuantity = useCallback(() => {
+    if (component.estimatedQuantity === null) return;
+    onChangeQuantity(
+      index,
+      Math.max(1, component.estimatedQuantity - 1),
+    );
+  }, [component.estimatedQuantity, index, onChangeQuantity]);
+  const handleIncreaseQuantity = useCallback(() => {
+    if (component.estimatedQuantity === null) return;
+    onChangeQuantity(index, component.estimatedQuantity + 1);
+  }, [component.estimatedQuantity, index, onChangeQuantity]);
+  const handleSubmitQuantity = useCallback(() => {
+    const quantity = Number(quantityDraft.replace(',', '.'));
+    if (Number.isFinite(quantity) && quantity >= 1) {
+      onChangeQuantity(index, quantity);
+      return;
+    }
+    setQuantityDraft(
+      component.estimatedQuantity === null
+        ? ''
+        : String(component.estimatedQuantity),
+    );
+  }, [component.estimatedQuantity, index, onChangeQuantity, quantityDraft]);
+
+  return (
+    <View style={styles.component}>
+      <View style={styles.componentHeading}>
+        <View style={styles.componentCopy}>
+          <Text style={styles.componentName}>{component.name}</Text>
+          <Text style={styles.componentDescription}>
+            {component.estimatedQuantity !== null
+              ? `${component.estimatedQuantity} ${
+                  component.quantityUnit || 'phần'
+                }`
+              : component.estimatedAmount}
+            {component.estimatedWeightG !== null
+              ? ` · khoảng ${Math.round(component.estimatedWeightG)} g`
+              : ''}
+          </Text>
+        </View>
+        <Text style={styles.confidence}>
+          Độ tin cậy {confidenceLabel[component.confidence]}
+        </Text>
+      </View>
+
+      {component.estimatedQuantity !== null ? (
+        <View style={styles.amountControlRow}>
+          <Text style={styles.amountControlLabel}>Số lượng</Text>
+          <View style={styles.amountControl}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Giảm số lượng ${component.name} một đơn vị`}
+              disabled={
+                disabled ||
+                component.estimatedQuantity <= 1
+              }
+              onPress={handleDecreaseQuantity}
+              style={[
+                styles.amountStepButton,
+                (disabled || component.estimatedQuantity <= 1) &&
+                  styles.amountStepButtonDisabled,
+              ]}
+            >
+              <Text style={styles.amountStepText}>−</Text>
+            </Pressable>
+            <TextInput
+              accessibilityLabel={`Số lượng ${component.name}`}
+              editable={!disabled}
+              keyboardType="decimal-pad"
+              onChangeText={setQuantityDraft}
+              onEndEditing={handleSubmitQuantity}
+              selectTextOnFocus
+              style={styles.amountValueInput}
+              value={quantityDraft}
+            />
+            <Text style={styles.amountUnit}>
+              {component.quantityUnit || 'phần'}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Tăng số lượng ${component.name} một đơn vị`}
+              disabled={disabled}
+              onPress={handleIncreaseQuantity}
+              style={[
+                styles.amountStepButton,
+                disabled && styles.amountStepButtonDisabled,
+              ]}
+            >
+              <Text style={styles.amountStepText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      {component.estimatedWeightG !== null ? (
+        <View style={styles.amountControlRow}>
+          <Text style={styles.amountControlLabel}>Khối lượng</Text>
+          <View style={styles.amountControl}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Giảm khối lượng ${component.name} 10 gram`}
+              disabled={disabled || component.estimatedWeightG <= 10}
+              onPress={handleDecreaseWeight}
+              style={[
+                styles.amountStepButton,
+                (disabled || component.estimatedWeightG <= 10) &&
+                  styles.amountStepButtonDisabled,
+              ]}
+            >
+              <Text style={styles.amountStepText}>−</Text>
+            </Pressable>
+            <TextInput
+              accessibilityLabel={`Khối lượng ${component.name} tính bằng gram`}
+              editable={!disabled}
+              keyboardType="number-pad"
+              onChangeText={setWeightDraft}
+              onEndEditing={handleSubmitWeight}
+              selectTextOnFocus
+              style={styles.amountValueInput}
+              value={weightDraft}
+            />
+            <Text style={styles.amountUnit}>g</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Tăng khối lượng ${component.name} 10 gram`}
+              disabled={disabled}
+              onPress={handleIncreaseWeight}
+              style={[
+                styles.amountStepButton,
+                disabled && styles.amountStepButtonDisabled,
+              ]}
+            >
+              <Text style={styles.amountStepText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      <NutritionList nutrition={component.nutrition} />
+    </View>
+  );
+};
+
 const AiMealScanScreen = () => {
   const insets = useSafeAreaInsets();
+  const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(
     null,
   );
   const [result, setResult] = useState<AiMealScanResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [savingConsumed, setSavingConsumed] = useState(false);
+  const [consumedEntrySaved, setConsumedEntrySaved] = useState(false);
   const [error, setError] = useState('');
 
-  const chooseImage = async (source: 'camera' | 'library') => {
+  const chooseImage = useCallback(async (source: 'camera' | 'library') => {
     setError('');
     const pickerOptions = {
       mediaType: 'photo' as const,
@@ -167,9 +378,10 @@ const AiMealScanScreen = () => {
       mimeType: detectedType,
     });
     setResult(null);
-  };
+    setConsumedEntrySaved(false);
+  }, []);
 
-  const onConfirmScanAI = async () => {
+  const onConfirmScanAI = useCallback(async () => {
     if (!selectedImage || loading) return;
     if (!user?.id || !user.accessToken) {
       setError('Đăng nhập để phân tích món ăn bằng AI.');
@@ -194,13 +406,121 @@ const AiMealScanScreen = () => {
         );
       }
       setResult(response.data);
+      setConsumedEntrySaved(false);
     } catch (requestError) {
       setError(getNutritionError(requestError));
     } finally {
       setLoading(false);
     }
-  };
-  const analyzeImage = () => {
+  }, [loading, selectedImage, user]);
+
+  const handleChooseCamera = useCallback(() => chooseImage('camera'), [
+    chooseImage,
+  ]);
+  const handleChooseLibrary = useCallback(() => chooseImage('library'), [
+    chooseImage,
+  ]);
+
+  const openImageSourceOptions = useCallback(() => {
+    if (loading || savingConsumed) return;
+    Alert.alert('Thêm ảnh món ăn', 'Chọn cách thêm ảnh:', [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Chụp ảnh', onPress: handleChooseCamera },
+      { text: 'Chọn ảnh từ thư viện', onPress: handleChooseLibrary },
+    ]);
+  }, [handleChooseCamera, handleChooseLibrary, loading, savingConsumed]);
+
+  const saveScannedMealAsConsumed = useCallback(async (mealPeriod: MealPeriod) => {
+    if (
+      !result?.recognized ||
+      !result.dishName ||
+      !user?.id ||
+      !user.accessToken
+    ) {
+      Alert.alert(
+        'Không thể lưu món',
+        'Đăng nhập để lưu món đã ăn vào nhật ký dinh dưỡng.',
+      );
+      return;
+    }
+
+    setSavingConsumed(true);
+    setError('');
+    setSyncUser(user);
+    try {
+      const response = (await syncApi(apiConst.addScannedConsumedMeal, {
+        mealPeriod,
+        scanResult: result,
+      })) as AddScannedConsumedMealResponse;
+      if (!response?.success) {
+        throw new Error(
+          response?.message ||
+            response?.ErrorMessage ||
+            'Không thể lưu món đã ăn.',
+        );
+      }
+      setConsumedEntrySaved(true);
+      dispatch(invalidateCachedConsumptionReports({ userId: user.id }));
+      Alert.alert(
+        'Đã lưu món ăn',
+        `${result.dishName} đã được thêm vào nhật ký bữa ${
+          mealPeriod === 'LUNCH' ? 'trưa' : 'tối'
+        } ngày ${getVietnamDateKey()}. Dinh dưỡng dựa trên số lượng và khối lượng đã chỉnh sửa (nếu có).`,
+      );
+    } catch (saveError) {
+      Alert.alert('Không thể lưu món', getNutritionError(saveError));
+    } finally {
+      setSavingConsumed(false);
+    }
+  }, [dispatch, result, user]);
+
+  const handleSaveLunch = useCallback(
+    () => saveScannedMealAsConsumed('LUNCH'),
+    [saveScannedMealAsConsumed],
+  );
+  const handleSaveDinner = useCallback(
+    () => saveScannedMealAsConsumed('DINNER'),
+    [saveScannedMealAsConsumed],
+  );
+  const handleChangeComponentWeight = useCallback(
+    (index: number, weightG: number) => {
+      setResult(current =>
+        current ? updateMealScanComponent(current, index, { weightG }) : current,
+      );
+    },
+    [],
+  );
+  const handleChangeComponentQuantity = useCallback(
+    (index: number, quantity: number) => {
+      setResult(current =>
+        current
+          ? updateMealScanComponent(current, index, { quantity })
+          : current,
+      );
+    },
+    [],
+  );
+
+  const handleMarkAsEaten = useCallback(() => {
+    if (savingConsumed || consumedEntrySaved) return;
+    Alert.alert(
+      'Ghi nhận món đã ăn',
+      'Chọn bữa để lưu món và dinh dưỡng ước tính vào nhật ký cá nhân.',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Bữa trưa',
+          onPress: handleSaveLunch,
+        },
+        {
+          text: 'Bữa tối',
+          onPress: handleSaveDinner,
+        },
+      ],
+    );
+  }, [consumedEntrySaved, handleSaveDinner, handleSaveLunch, savingConsumed]);
+
+  const analyzeImage = useCallback(() => {
     Alert.alert(
       'Đồng ý phân tích ảnh?',
       'Ảnh món ăn sẽ được gửi đến Google Gemini để nhận diện và ước tính thành phần, khẩu phần cùng dinh dưỡng. Ảnh không được lưu vào nhật ký HealthAndCook. Kết quả chỉ mang tính tham khảo và có thể không chính xác.',
@@ -212,7 +532,43 @@ const AiMealScanScreen = () => {
         },
       ],
     );
-  };
+  }, [onConfirmScanAI]);
+
+  const getAnalyzeButtonStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.analyzeButton,
+      (!selectedImage || loading) && styles.disabledButton,
+      pressed && styles.pressed,
+    ],
+    [loading, selectedImage],
+  );
+
+  const renderComponent = useCallback(
+    (component: AiMealScanResult['components'][number], index: number) => (
+      <ComponentAmountEditor
+        key={`${component.name}-${index}`}
+        component={component}
+        index={index}
+        disabled={savingConsumed || consumedEntrySaved}
+        onChangeWeight={handleChangeComponentWeight}
+        onChangeQuantity={handleChangeComponentQuantity}
+      />
+    ),
+    [
+      consumedEntrySaved,
+      handleChangeComponentQuantity,
+      handleChangeComponentWeight,
+      savingConsumed,
+    ],
+  );
+
+  function renderNote(note: string, index: number) {
+    return (
+      <Text key={`${note}-${index}`} style={styles.note}>
+        • {note}
+      </Text>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -237,55 +593,36 @@ const AiMealScanScreen = () => {
           </Text>
         </View>
 
-        {selectedImage ? (
-          <Image
-            accessibilityLabel="Ảnh món ăn đã chọn"
-            source={{ uri: selectedImage.uri }}
-            style={styles.preview}
-          />
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <Text style={styles.placeholderIcon}>＋</Text>
-            <Text style={styles.placeholderText}>
-              Chụp món ăn hoặc chọn ảnh từ thư viện
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
-            disabled={loading}
-            onPress={() => chooseImage('camera')}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={styles.secondaryButtonText}>Chụp ảnh</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={loading}
-            onPress={() => chooseImage('library')}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={styles.secondaryButtonText}>Chọn ảnh</Text>
-          </Pressable>
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            selectedImage ? 'Đổi ảnh món ăn' : 'Chụp hoặc chọn ảnh món ăn'
+          }
+          disabled={loading || savingConsumed}
+          onPress={openImageSourceOptions}
+          style={selectedImage ? styles.preview : styles.imagePlaceholder}
+        >
+          {selectedImage ? (
+            <Image
+              accessibilityLabel="Ảnh món ăn đã chọn"
+              source={{ uri: selectedImage.uri }}
+              style={styles.previewImage}
+            />
+          ) : (
+            <>
+              <Text style={styles.placeholderIcon}>＋</Text>
+              <Text style={styles.placeholderText}>
+                Chạm để chụp ảnh hoặc chọn từ thư viện
+              </Text>
+            </>
+          )}
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"
           disabled={!selectedImage || loading}
           onPress={analyzeImage}
-          style={({ pressed }) => [
-            styles.analyzeButton,
-            (!selectedImage || loading) && styles.disabledButton,
-            pressed && styles.pressed,
-          ]}
+          style={getAnalyzeButtonStyle}
         >
           {loading ? (
             <ActivityIndicator color={COLORS.white} />
@@ -326,46 +663,45 @@ const AiMealScanScreen = () => {
                     <Text style={styles.sectionTitle}>
                       Thành phần nhìn thấy
                     </Text>
-                    {result.components.map((component, index) => (
-                      <View
-                        key={`${component.name}-${index}`}
-                        style={styles.component}
-                      >
-                        <View style={styles.componentHeading}>
-                          <View style={styles.componentCopy}>
-                            <Text style={styles.componentName}>
-                              {component.name}
-                            </Text>
-                            <Text style={styles.componentDescription}>
-                              {component.estimatedAmount}
-                              {component.estimatedWeightG !== null
-                                ? ` · khoảng ${Math.round(
-                                    component.estimatedWeightG,
-                                  )} g`
-                                : ''}
-                            </Text>
-                          </View>
-                          <Text style={styles.confidence}>
-                            Độ tin cậy {confidenceLabel[component.confidence]}
-                          </Text>
-                        </View>
-                        <NutritionList nutrition={component.nutrition} />
-                      </View>
-                    ))}
+                    <Text style={styles.adjustmentHint}>
+                      Chỉnh số lượng hoặc khối lượng; dinh dưỡng sẽ cập nhật
+                      ngay theo tỷ lệ ước tính.
+                    </Text>
+                    {result.components.map(renderComponent)}
                   </View>
                 ) : null}
               </>
             )}
 
-            {result.notes.map((note, index) => (
-              <Text key={`${note}-${index}`} style={styles.note}>
-                • {note}
-              </Text>
-            ))}
+            {result.notes.map(renderNote)}
             <Text style={styles.disclaimer}>
               Giá trị dinh dưỡng do AI ước tính từ ảnh, không phải dữ liệu cân
               đo hoặc phân tích phòng thí nghiệm.
             </Text>
+            {result.recognized && result.dishName ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  consumedEntrySaved
+                    ? 'Món ăn đã được lưu vào nhật ký'
+                    : 'Ghi nhận món đã ăn'
+                }
+                disabled={savingConsumed || consumedEntrySaved}
+                onPress={handleMarkAsEaten}
+                style={[
+                  styles.consumedButton,
+                  (savingConsumed || consumedEntrySaved) && styles.disabledButton,
+                ]}
+              >
+                {savingConsumed ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={styles.consumedButtonText}>
+                    {consumedEntrySaved ? 'Đã lưu vào nhật ký' : 'Đã ăn'}
+                  </Text>
+                )}
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
       </ScrollView>
@@ -408,9 +744,11 @@ const styles = StyleSheet.create({
   preview: {
     width: '100%',
     height: 245,
+    overflow: 'hidden',
     borderRadius: 14,
     backgroundColor: COLORS.border,
   },
+  previewImage: { width: '100%', height: '100%' },
   imagePlaceholder: {
     height: 210,
     alignItems: 'center',
@@ -429,18 +767,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
   },
-  actions: { flexDirection: 'row', gap: 10 },
-  secondaryButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 13,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 11,
-    backgroundColor: COLORS.white,
-  },
-  secondaryButtonText: { color: COLORS.text, fontSize: 13, fontWeight: '700' },
   analyzeButton: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -485,6 +811,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
+  adjustmentHint: {
+    marginTop: -2,
+    marginBottom: 8,
+    color: COLORS.secondary,
+    fontSize: 11,
+    lineHeight: 16,
+  },
   nutritionList: { gap: 7 },
   nutritionRow: {
     flexDirection: 'row',
@@ -502,6 +835,58 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+  },
+  amountControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 8,
+  },
+  amountControlLabel: {
+    color: COLORS.secondary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  amountControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  amountStepButton: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: COLORS.lightGreen,
+  },
+  amountStepButtonDisabled: {
+    opacity: 0.4,
+  },
+  amountStepText: {
+    color: COLORS.green,
+    fontSize: 18,
+    lineHeight: 21,
+    fontWeight: '700',
+  },
+  amountValueInput: {
+    minWidth: 48,
+    height: 34,
+    paddingHorizontal: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    color: COLORS.text,
+    backgroundColor: COLORS.white,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  amountUnit: {
+    maxWidth: 54,
+    color: COLORS.secondary,
+    fontSize: 10,
   },
   componentHeading: {
     flexDirection: 'row',
@@ -525,4 +910,12 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     textAlign: 'center',
   },
+  consumedButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: COLORS.green,
+  },
+  consumedButtonText: { color: COLORS.white, fontSize: 14, fontWeight: '800' },
 });

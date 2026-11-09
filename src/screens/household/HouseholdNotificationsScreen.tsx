@@ -198,6 +198,18 @@ const HouseholdNotificationsScreen = () => {
     user?.accessToken,
   ]);
 
+  const renderNotification = useCallback(
+    (notification: HouseholdNotification) => (
+      <HouseholdNotificationCard
+        key={notification.id}
+        notification={notification}
+        saving={saving}
+        onOpen={openNotification}
+      />
+    ),
+    [openNotification, saving],
+  );
+
   return (
     <View style={styles.screen}>
       <ScreenHeader
@@ -263,59 +275,7 @@ const HouseholdNotificationsScreen = () => {
               </Text>
             </View>
           ) : (
-            notifications.map(notification => (
-              <Pressable
-                key={notification.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected: !notification.readAt }}
-                disabled={saving}
-                onPress={() => openNotification(notification)}
-                style={({ pressed }) => [
-                  styles.notificationCard,
-                  !notification.readAt && styles.unreadCard,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <LinearGradient
-                  colors={
-                    notification.readAt
-                      ? ['#FFFFFF', '#F3FAF5']
-                      : ['#FFFFFF', '#EAF6EE']
-                  }
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <View style={styles.notificationTop}>
-                  <View
-                    style={[
-                      styles.notificationMarker,
-                      !notification.readAt && styles.unreadMarker,
-                    ]}
-                  >
-                    <Text style={styles.notificationMarkerText}>
-                      {notification.type === 'POLL_CLOSED' ? '✓' : '•'}
-                    </Text>
-                  </View>
-                  <View style={styles.notificationCopy}>
-                    <View style={styles.titleRow}>
-                      <Text style={styles.notificationTitle}>
-                        {notification.title}
-                      </Text>
-                      {!notification.readAt ? (
-                        <View style={styles.unreadDot} />
-                      ) : null}
-                    </View>
-                    <Text style={styles.notificationBody}>
-                      {notification.body}
-                    </Text>
-                    <Text style={styles.timestamp}>
-                      {formatHouseholdNotificationDate(notification.createdAt)}
-                    </Text>
-                  </View>
-                </View>
-              </Pressable>
-            ))
+            notifications.map(renderNotification)
           )}
         </ScrollView>
       )}
@@ -324,6 +284,74 @@ const HouseholdNotificationsScreen = () => {
 };
 
 export default HouseholdNotificationsScreen;
+
+type NotificationCardProps = {
+  notification: HouseholdNotification;
+  saving: boolean;
+  onOpen: (notification: HouseholdNotification) => void;
+};
+
+const HouseholdNotificationCard = ({
+  notification,
+  saving,
+  onOpen,
+}: NotificationCardProps) => {
+  const handlePress = useCallback(
+    () => onOpen(notification),
+    [notification, onOpen],
+  );
+  const getCardStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.notificationCard,
+      !notification.readAt && styles.unreadCard,
+      pressed && styles.pressed,
+    ],
+    [notification.readAt],
+  );
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: !notification.readAt }}
+      disabled={saving}
+      onPress={handlePress}
+      style={getCardStyle}
+    >
+      <LinearGradient
+        colors={
+          notification.readAt
+            ? ['#FFFFFF', '#F3FAF5']
+            : ['#FFFFFF', '#EAF6EE']
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.notificationTop}>
+        <View
+          style={[
+            styles.notificationMarker,
+            !notification.readAt && styles.unreadMarker,
+          ]}
+        >
+          <Text style={styles.notificationMarkerText}>
+            {notification.type === 'POLL_CLOSED' ? '✓' : '•'}
+          </Text>
+        </View>
+        <View style={styles.notificationCopy}>
+          <View style={styles.titleRow}>
+            <Text style={styles.notificationTitle}>{notification.title}</Text>
+            {!notification.readAt ? <View style={styles.unreadDot} /> : null}
+          </View>
+          <Text style={styles.notificationBody}>{notification.body}</Text>
+          <Text style={styles.timestamp}>
+            {formatHouseholdNotificationDate(notification.createdAt)}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+};
 
 const styles = StyleSheet.create({
   screen: {

@@ -203,6 +203,12 @@ const AiMealRecommendationsScreen = () => {
       recommendations: null,
       loading: false,
     }));
+    const userId = user.id;
+    function handleConsent() {
+      saveAiRecommendationConsent(userId, true);
+      loadRecommendations();
+    }
+
     Alert.alert(
       'Đồng ý dùng gợi ý AI?',
       'Nếu tiếp tục, Health&Cook sẽ gửi mục tiêu kcal và dinh dưỡng, tổng món đã ăn hôm nay cùng thông tin các món phù hợp đến Google Gemini để xếp hạng. Không gửi tên, email, mã tài khoản, tuổi, giới tính, chiều cao, cân nặng hoặc BMI. Bạn có thể từ chối và vẫn xem gợi ý món thông thường.',
@@ -210,10 +216,7 @@ const AiMealRecommendationsScreen = () => {
         { text: 'Để sau', style: 'cancel' },
         {
           text: 'Đồng ý và tiếp tục',
-          onPress: () => {
-            saveAiRecommendationConsent(user.id, true);
-            loadRecommendations();
-          },
+          onPress: handleConsent,
         },
       ],
     );
@@ -376,6 +379,77 @@ const AiMealRecommendationsScreen = () => {
     [addRecommendationsToPlan, state.recommendations],
   );
 
+  function renderPeriod(period: MealPeriod, index: number) {
+    const recommendations =
+      state.recommendations?.recommendations[period] ?? [];
+
+    function renderRecommendation(recommendation: AiMealRecommendation) {
+      return (
+        <HomeRecipeCard
+          key={recommendation.meal.id}
+          meal={recommendation.meal}
+          onPress={openRecipe}
+          onAdd={addMealHandlers.get(`${period}:${recommendation.meal.id}`)}
+          adding={addingKey === `${period}:${recommendation.meal.id}`}
+          disableAdd={state.loading || addingKey !== null}
+          recommendationReason={recommendation.recommendationReason}
+          recommendedServings={recommendation.recommendedServings}
+          estimatedPrice={recommendation.estimatedPrice}
+        />
+      );
+    }
+
+    return (
+      <View key={period} style={index > 0 && styles.periodSection}>
+        <Text style={styles.periodTitle}>
+          {period === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'}
+        </Text>
+        {state.recommendations?.mealBudgets?.[period] ? (
+          <Text style={styles.budgetHint}>
+            Gợi ý ưu tiên trong ngân sách{' '}
+            {Math.round(
+              state.recommendations.mealBudgets[period]!,
+            ).toLocaleString('vi-VN')}
+            đ cho cả bữa
+          </Text>
+        ) : null}
+        {recommendations.length ? (
+          recommendations.map(renderRecommendation)
+        ) : (
+          <Text style={styles.emptyText}>
+            {state.recommendations?.consumedPeriods.includes(period)
+              ? 'Đã ghi nhận bữa này.'
+              : state.recommendations?.mealBudgets?.[period]
+              ? `Chưa có món phù hợp với dinh dưỡng và ngân sách ${Math.round(
+                  state.recommendations.mealBudgets[period]!,
+                ).toLocaleString('vi-VN')}đ.`
+              : 'Chưa có món trong thư viện phù hợp với lượng dinh dưỡng còn lại.'}
+          </Text>
+        )}
+        {recommendations.length ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Thêm tất cả món vào ${
+              period === 'LUNCH' ? 'bữa trưa' : 'bữa tối'
+            }`}
+            disabled={state.loading || addingKey !== null}
+            onPress={period === 'LUNCH' ? addAllLunch : addAllDinner}
+            style={[
+              styles.addAllButton,
+              (state.loading || addingKey !== null) && styles.disabled,
+            ]}
+          >
+            {addingKey === period ? (
+              <ActivityIndicator color={COLORS.white} size="small" />
+            ) : (
+              <Text style={styles.addAllButtonText}>Thêm tất cả</Text>
+            )}
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <ScreenHeader
@@ -445,80 +519,7 @@ const AiMealRecommendationsScreen = () => {
                 vào phần còn lại.
               </Text>
             ) : null}
-            {PERIODS.map((period, index) => {
-              const recommendations =
-                state.recommendations?.recommendations[period] ?? [];
-              return (
-                <View key={period} style={index > 0 && styles.periodSection}>
-                  <Text style={styles.periodTitle}>
-                    {period === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'}
-                  </Text>
-                  {state.recommendations?.mealBudgets?.[period] ? (
-                    <Text style={styles.budgetHint}>
-                      Gợi ý ưu tiên trong ngân sách{' '}
-                      {Math.round(
-                        state.recommendations.mealBudgets[period]!,
-                      ).toLocaleString('vi-VN')}
-                      đ cho cả bữa
-                    </Text>
-                  ) : null}
-                  {recommendations.length ? (
-                    recommendations.map(recommendation => (
-                      <HomeRecipeCard
-                        key={recommendation.meal.id}
-                        meal={recommendation.meal}
-                        onPress={openRecipe}
-                        onAdd={addMealHandlers.get(
-                          `${period}:${recommendation.meal.id}`,
-                        )}
-                        adding={
-                          addingKey === `${period}:${recommendation.meal.id}`
-                        }
-                        disableAdd={state.loading || addingKey !== null}
-                        recommendationReason={
-                          recommendation.recommendationReason
-                        }
-                        recommendedServings={recommendation.recommendedServings}
-                        estimatedPrice={recommendation.estimatedPrice}
-                      />
-                    ))
-                  ) : (
-                    <Text style={styles.emptyText}>
-                      {state.recommendations?.consumedPeriods.includes(period)
-                        ? 'Đã ghi nhận bữa này.'
-                        : state.recommendations?.mealBudgets?.[period]
-                        ? `Chưa có món phù hợp với dinh dưỡng và ngân sách ${Math.round(
-                            state.recommendations.mealBudgets[period]!,
-                          ).toLocaleString('vi-VN')}đ.`
-                        : 'Chưa có món trong thư viện phù hợp với lượng dinh dưỡng còn lại.'}
-                    </Text>
-                  )}
-                  {recommendations.length ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Thêm tất cả món vào ${
-                        period === 'LUNCH' ? 'bữa trưa' : 'bữa tối'
-                      }`}
-                      disabled={state.loading || addingKey !== null}
-                      onPress={period === 'LUNCH' ? addAllLunch : addAllDinner}
-                      style={[
-                        styles.addAllButton,
-                        (state.loading || addingKey !== null) &&
-                          styles.disabled,
-                      ]}
-                    >
-                      {addingKey === period ? (
-                        <ActivityIndicator color={COLORS.white} size="small" />
-                      ) : (
-                        <Text style={styles.addAllButtonText}>
-                          Thêm tất cả
-                        </Text>
-                      )}
-                    </Pressable>
-                  ) : null}
-                </View>
-              );
-            })}
+            {PERIODS.map(renderPeriod)}
           </LinearGradient>
         ) : (
           <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>

@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { goBack } from "../utils/navigation";
@@ -18,14 +18,15 @@ type IProps = {
 const ToolBar = memo((props: IProps) => {
     const insets = useSafeAreaInsets();
     const hasRightButtonText = props.buttonRightText ? true : false;
+    const { onBackPress: onBackPressProp, onRightPress: onRightPressProp } = props;
 
-    const onBackPress = () => {
-        props.onBackPress ? props.onBackPress() : goBack();
-    }
+    const onBackPress = useCallback(() => {
+        onBackPressProp ? onBackPressProp() : goBack();
+    }, [onBackPressProp]);
 
-    const onRightPress = () => {
-        props.onRightPress && props.onRightPress()
-    }
+    const onRightPress = useCallback(() => {
+        onRightPressProp && onRightPressProp()
+    }, [onRightPressProp]);
 
     return (
         <View style={{ elevation: 10, zIndex: 10 }} >

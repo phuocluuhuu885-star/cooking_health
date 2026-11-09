@@ -10,6 +10,7 @@ import type {
   IncomeCategory,
   IncomeMonthData,
   MealBudget,
+  MealPeriod,
 } from './types';
 import { setSyncUser, syncApi } from './syncUtils';
 
@@ -21,6 +22,66 @@ type ExpenseInput = {
   category: ExpenseCategory;
   note: string | null;
   mealId: string | null;
+};
+
+export const createMealExpense = async (
+  user: UserInfo,
+  scope: ExpenseScope,
+  data: {
+    date: string;
+    mealPeriod: MealPeriod;
+    mealId: string;
+    mealName: string;
+    amountVnd: number;
+  },
+): Promise<ExpenseResponse<Expense>> => {
+  const periodLabel = data.mealPeriod === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối';
+  return createExpense(user, {
+    scope,
+    title: `${periodLabel}: ${data.mealName}`,
+    amountVnd: data.amountVnd,
+    expenseDate: data.date,
+    category: 'FOOD',
+    note: null,
+    mealId: data.mealId,
+  });
+};
+
+export const createMealExpenses = async (
+  user: UserInfo,
+  scope: ExpenseScope,
+  data: {
+    date: string;
+    mealPeriod: MealPeriod;
+    expenses: Array<{
+      mealId: string;
+      mealName: string;
+      amountVnd: number;
+    }>;
+  },
+) => {
+  const failures: Array<{ mealName: string; message: string }> = [];
+  for (const expense of data.expenses) {
+    try {
+      const response = await createMealExpense(user, scope, {
+        ...data,
+        ...expense,
+      });
+      if (!response.success) {
+        failures.push({
+          mealName: expense.mealName,
+          message: response.message || 'Không thể lưu khoản chi.',
+        });
+      }
+    } catch (error) {
+      failures.push({
+        mealName: expense.mealName,
+        message:
+          error instanceof Error ? error.message : 'Vui lòng thử lại sau.',
+      });
+    }
+  }
+  return failures;
 };
 
 export type IncomeInput = {

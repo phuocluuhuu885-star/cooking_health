@@ -18,7 +18,6 @@ import type {
   ExpenseCategory,
   ExpenseMonthData,
   ExpenseScope,
-  IncomeCategory,
   IncomeMonthData,
 } from '../../utils/types';
 import { fetchExpenses, fetchIncomes } from '../../utils/expenseApi';
@@ -182,6 +181,48 @@ const ExpenseReportScreen = () => {
     },
     [month],
   );
+  const handlePersonalScope = useCallback(() => {
+    setScope('PERSONAL');
+  }, []);
+  const handleHouseholdScope = useCallback(() => {
+    setScope('HOUSEHOLD');
+  }, []);
+  const handlePreviousMonth = useCallback(() => {
+    moveMonth(-1);
+  }, [moveMonth]);
+  const handleNextMonth = useCallback(() => {
+    moveMonth(1);
+  }, [moveMonth]);
+  const renderSegment = (segment: (typeof segments)[number]) => (
+    <Path
+      key={segment.id}
+      d={getSlicePath(segment.startAngle, segment.endAngle, 88, 95)}
+      fill={segment.color}
+      stroke={COLORS.white}
+      strokeWidth={2}
+    />
+  );
+  const renderCategoryLegend = (category: (typeof categoryTotals)[number]) => {
+    const percentage =
+      totalExpenses > 0 ? (category.amount / totalExpenses) * 100 : 0;
+    return (
+      <View key={category.id} style={styles.legendRow}>
+        <View style={styles.legendLabel}>
+          <View
+            style={[
+              styles.legendDot,
+              { backgroundColor: category.color },
+            ]}
+          />
+          <Text style={styles.legendText}>{category.label}</Text>
+        </View>
+        <Text style={styles.legendAmount}>{formatMoney(category.amount)}</Text>
+        <Text style={styles.legendPercent}>
+          {percentage.toFixed(1).replace(/\.0$/, '')}%
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.screen}>
@@ -197,13 +238,13 @@ const ExpenseReportScreen = () => {
           <ScopeButton
             label="Cá nhân"
             selected={scope === 'PERSONAL'}
-            onPress={() => setScope('PERSONAL')}
+            onPress={handlePersonalScope}
           />
           {household ? (
             <ScopeButton
               label={`Hộ ${household.name}`}
               selected={scope === 'HOUSEHOLD'}
-              onPress={() => setScope('HOUSEHOLD')}
+              onPress={handleHouseholdScope}
             />
           ) : null}
         </View>
@@ -212,7 +253,7 @@ const ExpenseReportScreen = () => {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Tháng trước"
-            onPress={() => moveMonth(-1)}
+            onPress={handlePreviousMonth}
             style={styles.monthArrow}
           >
             <Text style={styles.monthArrowText}>‹</Text>
@@ -221,7 +262,7 @@ const ExpenseReportScreen = () => {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Tháng sau"
-            onPress={() => moveMonth(1)}
+            onPress={handleNextMonth}
             style={styles.monthArrow}
           >
             <Text style={styles.monthArrowText}>›</Text>
@@ -279,20 +320,7 @@ const ExpenseReportScreen = () => {
                           fill={segments[0].color}
                         />
                       ) : (
-                        segments.map(segment => (
-                          <Path
-                            key={segment.id}
-                            d={getSlicePath(
-                              segment.startAngle,
-                              segment.endAngle,
-                              88,
-                              95,
-                            )}
-                            fill={segment.color}
-                            stroke={COLORS.white}
-                            strokeWidth={2}
-                          />
-                        ))
+                        segments.map(renderSegment)
                       )}
                       <Circle cx={95} cy={95} r={53} fill={COLORS.white} />
                     </Svg>
@@ -304,33 +332,7 @@ const ExpenseReportScreen = () => {
                     </View>
                   </View>
                   <View style={styles.legend}>
-                    {categoryTotals.map(category => {
-                      const percentage =
-                        totalExpenses > 0
-                          ? (category.amount / totalExpenses) * 100
-                          : 0;
-                      return (
-                        <View key={category.id} style={styles.legendRow}>
-                          <View style={styles.legendLabel}>
-                            <View
-                              style={[
-                                styles.legendDot,
-                                { backgroundColor: category.color },
-                              ]}
-                            />
-                            <Text style={styles.legendText}>
-                              {category.label}
-                            </Text>
-                          </View>
-                          <Text style={styles.legendAmount}>
-                            {formatMoney(category.amount)}
-                          </Text>
-                          <Text style={styles.legendPercent}>
-                            {percentage.toFixed(1).replace(/\.0$/, '')}%
-                          </Text>
-                        </View>
-                      );
-                    })}
+                    {categoryTotals.map(renderCategoryLegend)}
                   </View>
                 </>
               ) : (

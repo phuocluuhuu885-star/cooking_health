@@ -20,6 +20,7 @@ import { useAppDispatch } from '../reduxs/store';
 import { setUserInfo } from '../reduxs/reduces/user';
 import InputComponent from '../abase/component/InputBox';
 import LoginTabs from './component/LoginTab';
+import { queuePremiumWelcome } from '../utils/premiumWelcome';
 
 const LogoSection = memo(() => {
   const insets = useSafeAreaInsets();
@@ -189,6 +190,7 @@ const Login = () => {
         password: state.loginPassword,
       });
       if (res?.success && res.data?.user) {
+        queuePremiumWelcome(res.data.user.id);
         setState(prev => ({
           ...prev,
           loginEmail: '',

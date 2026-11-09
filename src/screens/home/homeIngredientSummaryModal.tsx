@@ -16,6 +16,70 @@ import {
 } from '../../utils/numberUtils';
 import { localStorage } from '../../utils/storage';
 
+const HomeIngredientSummaryRow = ({
+  ingredient,
+  index,
+  checked,
+  canCheckIngredients,
+  onToggle,
+}: {
+  ingredient: HomeIngredientSummaryModalProps['ingredients'][number];
+  index: number;
+  checked: boolean;
+  canCheckIngredients: boolean;
+  onToggle: (name: string) => void;
+}) => {
+  const handleToggleIngredient = useCallback(() => {
+    onToggle(ingredient.name);
+  }, [ingredient.name, onToggle]);
+  const getIngredientStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.item,
+      checked && styles.itemChecked,
+      pressed && canCheckIngredients && styles.pressed,
+    ],
+    [canCheckIngredients, checked],
+  );
+
+  return (
+    <Pressable
+      accessibilityRole={canCheckIngredients ? 'checkbox' : undefined}
+      accessibilityLabel={`${ingredient.name}, ${formatLocalizedWeight(ingredient.amountG)}${
+        checked ? ', đã có hoặc đã mua' : ''
+      }`}
+      accessibilityState={
+        canCheckIngredients ? { checked: Boolean(checked) } : undefined
+      }
+      disabled={!canCheckIngredients}
+      onPress={handleToggleIngredient}
+      style={getIngredientStyle}
+    >
+      {canCheckIngredients ? (
+        <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+          {checked ? <Text style={styles.checkmark}>✓</Text> : null}
+        </View>
+      ) : (
+        <View style={styles.ingredientMarker}>
+          <Text style={styles.ingredientMarkerText}>{index + 1}</Text>
+        </View>
+      )}
+      <View style={styles.itemCopy}>
+        <Text style={[styles.itemName, checked && styles.itemNameChecked]}>
+          {ingredient.name}
+        </Text>
+        {ingredient.mealNames?.length ? (
+          <Text style={styles.mealNames} numberOfLines={2}>
+            Dùng cho: {ingredient.mealNames.join(', ')}
+          </Text>
+        ) : null}
+      </View>
+      <Text style={[styles.amount, checked && styles.itemNameChecked]}>
+        {formatLocalizedWeight(ingredient.amountG)}
+      </Text>
+    </Pressable>
+  );
+};
+
 const HomeIngredientSummaryModal = memo(
   (props: HomeIngredientSummaryModalProps) => {
     const insets = useSafeAreaInsets();
@@ -84,6 +148,22 @@ const HomeIngredientSummaryModal = memo(
       ingredient => checked[ingredient.name],
     ).length;
 
+    function renderIngredient(
+      ingredient: (typeof ingredients)[number],
+      index: number,
+    ) {
+      return (
+        <HomeIngredientSummaryRow
+          key={ingredient.name}
+          ingredient={ingredient}
+          index={index}
+          checked={Boolean(checked[ingredient.name])}
+          canCheckIngredients={canCheckIngredients}
+          onToggle={toggleIngredient}
+        />
+      );
+    }
+
     return (
       <Modal
         visible={visible}
@@ -148,71 +228,7 @@ const HomeIngredientSummaryModal = memo(
                   </Pressable>
                 </View>
               ) : ingredients.length > 0 ? (
-                ingredients.map((ingredient, index) => (
-                  <Pressable
-                    key={ingredient.name}
-                    accessibilityRole={
-                      canCheckIngredients ? 'checkbox' : undefined
-                    }
-                    accessibilityLabel={`${ingredient.name}, ${formatLocalizedWeight(ingredient.amountG)}${
-                      checked[ingredient.name] ? ', đã có hoặc đã mua' : ''
-                    }`}
-                    accessibilityState={
-                      canCheckIngredients
-                        ? { checked: Boolean(checked[ingredient.name]) }
-                        : undefined
-                    }
-                    disabled={!canCheckIngredients}
-                    onPress={() => toggleIngredient(ingredient.name)}
-                    style={({ pressed }) => [
-                      styles.item,
-                      checked[ingredient.name] && styles.itemChecked,
-                      pressed && canCheckIngredients && styles.pressed,
-                    ]}
-                  >
-                    {canCheckIngredients ? (
-                      <View
-                        style={[
-                          styles.checkbox,
-                          checked[ingredient.name] && styles.checkboxChecked,
-                        ]}
-                      >
-                        {checked[ingredient.name] ? (
-                          <Text style={styles.checkmark}>✓</Text>
-                        ) : null}
-                      </View>
-                    ) : (
-                      <View style={styles.ingredientMarker}>
-                        <Text style={styles.ingredientMarkerText}>
-                          {index + 1}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={styles.itemCopy}>
-                      <Text
-                        style={[
-                          styles.itemName,
-                          checked[ingredient.name] && styles.itemNameChecked,
-                        ]}
-                      >
-                        {ingredient.name}
-                      </Text>
-                      {ingredient.mealNames?.length ? (
-                        <Text style={styles.mealNames} numberOfLines={2}>
-                          Dùng cho: {ingredient.mealNames.join(', ')}
-                        </Text>
-                      ) : null}
-                    </View>
-                    <Text
-                      style={[
-                        styles.amount,
-                        checked[ingredient.name] && styles.itemNameChecked,
-                      ]}
-                    >
-                      {formatLocalizedWeight(ingredient.amountG)}
-                    </Text>
-                  </Pressable>
-                ))
+                ingredients.map(renderIngredient)
               ) : (
                 <View style={styles.emptyCard}>
                   <Text style={styles.emptyTitle}>Chưa có nguyên liệu</Text>

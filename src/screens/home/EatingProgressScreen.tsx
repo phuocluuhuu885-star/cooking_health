@@ -32,6 +32,38 @@ const PERIOD_OPTIONS: Array<{
   { id: 'MONTH', label: 'Tháng này' },
 ];
 
+const PeriodOptionButton = ({
+  option,
+  selected,
+  onSelect,
+}: {
+  option: (typeof PERIOD_OPTIONS)[number];
+  selected: boolean;
+  onSelect: (period: ConsumptionReportPeriod) => void;
+}) => {
+  const handleSelect = useCallback(() => {
+    onSelect(option.id);
+  }, [onSelect, option.id]);
+
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected }}
+      onPress={handleSelect}
+      style={[styles.periodButton, selected && styles.periodButtonSelected]}
+    >
+      <Text
+        style={[
+          styles.periodButtonText,
+          selected && styles.periodButtonTextSelected,
+        ]}
+      >
+        {option.label}
+      </Text>
+    </Pressable>
+  );
+};
+
 const formatDate = (date: string, includeYear = false) =>
   new Date(`${date}T00:00:00.000Z`).toLocaleDateString('vi-VN', {
     day: 'numeric',
@@ -142,6 +174,76 @@ const EatingProgressScreen = () => {
 
   const dateRange =
     report && `${formatDate(report.startDate)} – ${formatDate(report.endDate)}`;
+  const macroItems = [
+    ['Đạm', 'proteinG', COLORS.protein],
+    ['Tinh bột', 'carbsG', COLORS.carbs],
+    ['Chất béo', 'fatG', COLORS.fat],
+  ] as const;
+
+  function renderPeriodOption(option: (typeof PERIOD_OPTIONS)[number]) {
+    return (
+      <PeriodOptionButton
+        key={option.id}
+        option={option}
+        selected={period === option.id}
+        onSelect={handlePeriodChange}
+      />
+    );
+  }
+
+  function renderDay(day: ConsumptionReportData['days'][number]) {
+    const hasIntake = day.consumedItems > 0;
+    const hasCalories = day.nutrition.calories > 0;
+    const barWidth = hasCalories
+      ? Math.max(
+          3,
+          Math.min((day.nutrition.calories / summary.maxCalories) * 100, 100),
+        )
+      : 0;
+
+    return (
+      <View key={day.date} style={styles.dayRow}>
+        <Text style={styles.dayLabel}>
+          {period === 'WEEK'
+            ? formatWeekday(day.date)
+            : formatDate(day.date)}
+        </Text>
+        <View style={styles.barTrack}>
+          {hasCalories ? (
+            <View style={[styles.barFill, { width: `${barWidth}%` }]} />
+          ) : null}
+        </View>
+        <Text
+          style={[
+            styles.dayCalories,
+            !hasCalories && styles.dayCaloriesEmpty,
+          ]}
+        >
+          {hasCalories
+            ? formatLocalizedNumber(day.nutrition.calories)
+            : hasIntake
+            ? 'Thiếu số liệu'
+            : 'Chưa ghi nhận'}
+        </Text>
+      </View>
+    );
+  }
+
+  function renderMacro(
+    item: (typeof macroItems)[number],
+  ) {
+    const [label, key, color] = item;
+
+    return (
+      <View key={key} style={styles.macro}>
+        <View style={[styles.macroDot, { backgroundColor: color }]} />
+        <Text style={styles.macroLabel}>{label}</Text>
+        <Text style={styles.macroValue}>
+          {formatLocalizedNumber(report!.totals[key])} g
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -164,30 +266,7 @@ const EatingProgressScreen = () => {
         </Text>
 
         <View style={styles.periodPicker} accessibilityRole="tablist">
-          {PERIOD_OPTIONS.map(option => {
-            const selected = period === option.id;
-            return (
-              <Pressable
-                key={option.id}
-                accessibilityRole="tab"
-                accessibilityState={{ selected }}
-                onPress={() => handlePeriodChange(option.id)}
-                style={[
-                  styles.periodButton,
-                  selected && styles.periodButtonSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.periodButtonText,
-                    selected && styles.periodButtonTextSelected,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {PERIOD_OPTIONS.map(renderPeriodOption)}
         </View>
 
         {loading ? (
@@ -332,47 +411,7 @@ const EatingProgressScreen = () => {
                   <Text style={styles.legendText}>kcal</Text>
                 </View>
               </View>
-              {report.days.map(day => {
-                const hasIntake = day.consumedItems > 0;
-                const hasCalories = day.nutrition.calories > 0;
-                const barWidth = hasCalories
-                  ? Math.max(
-                      3,
-                      Math.min(
-                        (day.nutrition.calories / summary.maxCalories) * 100,
-                        100,
-                      ),
-                    )
-                  : 0;
-                return (
-                  <View key={day.date} style={styles.dayRow}>
-                    <Text style={styles.dayLabel}>
-                      {period === 'WEEK'
-                        ? formatWeekday(day.date)
-                        : formatDate(day.date)}
-                    </Text>
-                    <View style={styles.barTrack}>
-                      {hasCalories ? (
-                        <View
-                          style={[styles.barFill, { width: `${barWidth}%` }]}
-                        />
-                      ) : null}
-                    </View>
-                    <Text
-                      style={[
-                        styles.dayCalories,
-                        !hasCalories && styles.dayCaloriesEmpty,
-                      ]}
-                    >
-                      {hasCalories
-                        ? formatLocalizedNumber(day.nutrition.calories)
-                        : hasIntake
-                        ? 'Thiếu số liệu'
-                        : 'Chưa ghi nhận'}
-                    </Text>
-                  </View>
-                );
-              })}
+              {report.days.map(renderDay)}
               {calorieTarget > 0 ? (
                 <Text style={styles.chartNote}>
                   Thanh so sánh các ngày trong kỳ; mục tiêu cá nhân được xem ở
@@ -388,23 +427,7 @@ const EatingProgressScreen = () => {
                 phải lượng mỗi ngày.
               </Text>
               <View style={styles.macros}>
-                {(
-                  [
-                    ['Đạm', 'proteinG', COLORS.protein],
-                    ['Tinh bột', 'carbsG', COLORS.carbs],
-                    ['Chất béo', 'fatG', COLORS.fat],
-                  ] as const
-                ).map(([label, key, color]) => (
-                  <View key={key} style={styles.macro}>
-                    <View
-                      style={[styles.macroDot, { backgroundColor: color }]}
-                    />
-                    <Text style={styles.macroLabel}>{label}</Text>
-                    <Text style={styles.macroValue}>
-                      {formatLocalizedNumber(report.totals[key])} g
-                    </Text>
-                  </View>
-                ))}
+                {macroItems.map(renderMacro)}
               </View>
             </LinearGradient>
 

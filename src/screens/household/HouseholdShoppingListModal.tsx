@@ -34,6 +34,10 @@ type Props = {
   onClose: () => void;
 };
 
+function isPurchasedItem(item: HouseholdShoppingItem) {
+  return Boolean(item.purchasedAt);
+}
+
 const HouseholdShoppingListModal = ({
   visible,
   token,
@@ -175,7 +179,23 @@ const HouseholdShoppingListModal = ({
     ],
   );
 
-  const purchasedCount = items.filter(item => item.purchasedAt).length;
+  const handleRetryLoad = useCallback(() => {
+    setLoading(true);
+    loadList();
+  }, [loadList, setLoading]);
+  const renderShoppingItem = useCallback(
+    (item: HouseholdShoppingItem) => (
+      <HouseholdShoppingItemRow
+        key={item.ingredientKey}
+        item={item}
+        disabled={disabled}
+        savingKey={savingKey}
+        onToggle={togglePurchased}
+      />
+    ),
+    [disabled, savingKey, togglePurchased],
+  );
+  const purchasedCount = items.filter(isPurchasedItem).length;
   const dateLabel = new Date(`${date}T00:00:00.000Z`).toLocaleDateString(
     'vi-VN',
     { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' },
@@ -230,10 +250,7 @@ const HouseholdShoppingListModal = ({
             <Text style={styles.errorText}>{error}</Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => {
-                setLoading(true);
-                loadList();
-              }}
+              onPress={handleRetryLoad}
               style={styles.retryButton}
             >
               <Text style={styles.retryText}>Thử lại</Text>
@@ -269,64 +286,7 @@ const HouseholdShoppingListModal = ({
                 </Text>
               </View>
             ) : (
-              items.map(item => {
-                const purchased = Boolean(item.purchasedAt);
-                return (
-                  <Pressable
-                    key={item.ingredientKey}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{
-                      checked: purchased,
-                      disabled: disabled || savingKey !== null,
-                    }}
-                    disabled={disabled || savingKey !== null}
-                    onPress={() => togglePurchased(item)}
-                    style={({ pressed }) => [
-                      styles.item,
-                      purchased && styles.itemPurchased,
-                      disabled && styles.disabledItem,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.checkbox,
-                        purchased && styles.checkboxChecked,
-                      ]}
-                    >
-                      {savingKey === item.ingredientKey ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={purchased ? COLORS.white : COLORS.green}
-                        />
-                      ) : purchased ? (
-                        <Text style={styles.checkmark}>✓</Text>
-                      ) : null}
-                    </View>
-                    <View style={styles.itemCopy}>
-                      <Text
-                        style={[
-                          styles.itemName,
-                          purchased && styles.itemNamePurchased,
-                        ]}
-                      >
-                        {item.name}
-                      </Text>
-                      <Text style={styles.mealNames} numberOfLines={2}>
-                        Dùng cho: {item.mealNames.join(', ')}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.amount,
-                        purchased && styles.itemNamePurchased,
-                      ]}
-                    >
-                      {formatHouseholdShoppingAmount(item.amountG)}
-                    </Text>
-                  </Pressable>
-                );
-              })
+              items.map(renderShoppingItem)
             )}
             <Text style={styles.note}>
               Nguyên liệu trùng tên được gộp và định lượng theo khẩu phần trong
@@ -340,6 +300,85 @@ const HouseholdShoppingListModal = ({
 };
 
 export default HouseholdShoppingListModal;
+
+type ShoppingItemRowProps = {
+  item: HouseholdShoppingItem;
+  disabled: boolean;
+  savingKey: string | null;
+  onToggle: (item: HouseholdShoppingItem) => void;
+};
+
+const HouseholdShoppingItemRow = ({
+  item,
+  disabled,
+  savingKey,
+  onToggle,
+}: ShoppingItemRowProps) => {
+  const purchased = Boolean(item.purchasedAt);
+  const handleToggle = useCallback(
+    () => onToggle(item),
+    [item, onToggle],
+  );
+  const getItemStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.item,
+      purchased && styles.itemPurchased,
+      disabled && styles.disabledItem,
+      pressed && styles.pressed,
+    ],
+    [disabled, purchased],
+  );
+
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{
+        checked: purchased,
+        disabled: disabled || savingKey !== null,
+      }}
+      disabled={disabled || savingKey !== null}
+      onPress={handleToggle}
+      style={getItemStyle}
+    >
+      <View
+        style={[
+          styles.checkbox,
+          purchased && styles.checkboxChecked,
+        ]}
+      >
+        {savingKey === item.ingredientKey ? (
+          <ActivityIndicator
+            size="small"
+            color={purchased ? COLORS.white : COLORS.green}
+          />
+        ) : purchased ? (
+          <Text style={styles.checkmark}>✓</Text>
+        ) : null}
+      </View>
+      <View style={styles.itemCopy}>
+        <Text
+          style={[
+            styles.itemName,
+            purchased && styles.itemNamePurchased,
+          ]}
+        >
+          {item.name}
+        </Text>
+        <Text style={styles.mealNames} numberOfLines={2}>
+          Dùng cho: {item.mealNames.join(', ')}
+        </Text>
+      </View>
+      <Text
+        style={[
+          styles.amount,
+          purchased && styles.itemNamePurchased,
+        ]}
+      >
+        {formatHouseholdShoppingAmount(item.amountG)}
+      </Text>
+    </Pressable>
+  );
+};
 
 const COLORS = {
   background: '#F5F7F5',

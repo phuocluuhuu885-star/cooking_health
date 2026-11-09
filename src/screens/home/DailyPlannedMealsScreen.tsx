@@ -45,6 +45,56 @@ const formatDate = (date: string) =>
     timeZone: 'UTC',
   });
 
+type DailyPlannedMeal = NonNullable<MealPlanResponse['data']>['meals']['LUNCH']['items'][number];
+
+const PlannedMealRow = ({
+  item,
+  onPress,
+}: {
+  item: DailyPlannedMeal;
+  onPress: (mealId: string) => void;
+}) => {
+  const handlePress = useCallback(() => {
+    onPress(item.meal.id);
+  }, [item.meal.id, onPress]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Xem món ${item.meal.name}`}
+      onPress={handlePress}
+      style={styles.mealRow}
+    >
+      {item.meal.imageUrl ? (
+        <AppImage
+          source={{ uri: item.meal.imageUrl }}
+          style={styles.mealImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[styles.mealImage, styles.imageFallback]}>
+          <Text style={styles.fallbackText}>HealthAndCook</Text>
+        </View>
+      )}
+      <View style={styles.mealCopy}>
+        <Text numberOfLines={2} style={styles.mealName}>
+          {item.meal.name}
+        </Text>
+        <Text style={styles.mealMeta}>
+          {formatNumberWithOptionalDecimal(item.servings)} khẩu phần
+          {item.nutritionSummary?.total
+            ? ` · ${Math.round(item.nutritionSummary.total.calories)} kcal`
+            : ''}
+        </Text>
+        {item.isConsumed ? (
+          <Text style={styles.consumed}>Đã ghi nhận</Text>
+        ) : null}
+      </View>
+      <Text style={styles.chevron}>›</Text>
+    </Pressable>
+  );
+};
+
 const DailyPlannedMealsScreen = ({ route }: Props) => {
   const { date } = route.params;
   const insets = useSafeAreaInsets();
@@ -104,6 +154,36 @@ const DailyPlannedMealsScreen = ({ route }: Props) => {
     }, [loadMeals]),
   );
 
+  const openMeal = useCallback((mealId: string) => {
+    navigate(ScreenKeys.RECIPE_DETAIL, { mealId });
+  }, []);
+
+  function renderPeriod(period: Period) {
+    const meals = state.data?.meals[period.key].items ?? [];
+
+    function renderMeal(item: (typeof meals)[number]) {
+      return <PlannedMealRow key={item.id} item={item} onPress={openMeal} />;
+    }
+
+    return (
+      <LinearGradient
+        key={period.key}
+        colors={['#FFFFFF', '#F3FAF5']}
+        style={styles.card}
+      >
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>{period.title}</Text>
+          <Text style={styles.count}>{meals.length} món</Text>
+        </View>
+        {meals.length ? (
+          meals.map(renderMeal)
+        ) : (
+          <Text style={styles.empty}>Chưa có món nào được lên lịch.</Text>
+        )}
+      </LinearGradient>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <ScreenHeader
@@ -132,70 +212,7 @@ const DailyPlannedMealsScreen = ({ route }: Props) => {
             </Pressable>
           </LinearGradient>
         ) : (
-          PERIODS.map(period => {
-            const meals = state.data?.meals[period.key].items ?? [];
-            return (
-              <LinearGradient
-                key={period.key}
-                colors={['#FFFFFF', '#F3FAF5']}
-                style={styles.card}
-              >
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>{period.title}</Text>
-                  <Text style={styles.count}>{meals.length} món</Text>
-                </View>
-                {meals.length ? (
-                  meals.map(item => (
-                    <Pressable
-                      key={item.id}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Xem món ${item.meal.name}`}
-                      onPress={() =>
-                        navigate(ScreenKeys.RECIPE_DETAIL, {
-                          mealId: item.meal.id,
-                        })
-                      }
-                      style={styles.mealRow}
-                    >
-                      {item.meal.imageUrl ? (
-                        <AppImage
-                          source={{ uri: item.meal.imageUrl }}
-                          style={styles.mealImage}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View style={[styles.mealImage, styles.imageFallback]}>
-                          <Text style={styles.fallbackText}>HealthAndCook</Text>
-                        </View>
-                      )}
-                      <View style={styles.mealCopy}>
-                        <Text numberOfLines={2} style={styles.mealName}>
-                          {item.meal.name}
-                        </Text>
-                        <Text style={styles.mealMeta}>
-                          {formatNumberWithOptionalDecimal(item.servings)} khẩu
-                          phần
-                          {item.nutritionSummary?.total
-                            ? ` · ${Math.round(
-                                item.nutritionSummary.total.calories,
-                              )} kcal`
-                            : ''}
-                        </Text>
-                        {item.isConsumed ? (
-                          <Text style={styles.consumed}>Đã ghi nhận</Text>
-                        ) : null}
-                      </View>
-                      <Text style={styles.chevron}>›</Text>
-                    </Pressable>
-                  ))
-                ) : (
-                  <Text style={styles.empty}>
-                    Chưa có món nào được lên lịch.
-                  </Text>
-                )}
-              </LinearGradient>
-            );
-          })
+          PERIODS.map(renderPeriod)
         )}
       </ScrollView>
     </View>

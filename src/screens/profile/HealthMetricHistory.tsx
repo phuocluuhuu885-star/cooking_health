@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,7 +16,6 @@ import Svg, {
   Stop,
   Text as SvgText,
 } from 'react-native-svg';
-import LinearGradient from '../../components/LinearGradient';
 import { formatNumberWithOptionalDecimal } from '../../utils/numberUtils';
 import type { HealthProfileHistoryCardProps } from '../../utils/types';
 
@@ -27,6 +26,47 @@ const PLOT_TOP = 18;
 const PLOT_BOTTOM = 132;
 const LEFT_INSET = 48;
 const RIGHT_INSET = 14;
+const METRIC_OPTIONS = [
+  ['weightKg', 'Cân nặng'],
+  ['bmi', 'BMI'],
+] as const satisfies readonly (readonly [Metric, string])[];
+
+const MetricSwitchButton = ({
+  metric,
+  label,
+  selected,
+  onSelect,
+}: {
+  metric: Metric;
+  label: string;
+  selected: boolean;
+  onSelect: (metric: Metric) => void;
+}) => {
+  const handlePress = useCallback(() => {
+    onSelect(metric);
+  }, [metric, onSelect]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={handlePress}
+      style={[
+        styles.metricButton,
+        selected && styles.metricButtonSelected,
+      ]}
+    >
+      <Text
+        style={[
+          styles.metricButtonText,
+          selected && styles.metricButtonTextSelected,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+};
 
 const formatDate = (date: string) =>
   new Intl.DateTimeFormat('vi-VN', {
@@ -90,14 +130,57 @@ const HealthMetricHistory = memo(
         ? currentPoint[metric] - firstPoint[metric]
         : undefined;
     const unit = metric === 'weightKg' ? 'kg' : '';
+    const renderMetricOption = ([value, label]: (typeof METRIC_OPTIONS)[number]) => (
+      <MetricSwitchButton
+        key={value}
+        metric={value}
+        label={label}
+        selected={metric === value}
+        onSelect={setMetric}
+      />
+    );
+    const renderYAxisTick = (index: number) => {
+      const y = PLOT_TOP + (index * (PLOT_BOTTOM - PLOT_TOP)) / 2;
+      return (
+        <React.Fragment key={index}>
+          <Line
+            x1={LEFT_INSET}
+            y1={y}
+            x2={chartWidth - RIGHT_INSET}
+            y2={y}
+            stroke="#E5EBE7"
+            strokeWidth={1}
+            strokeDasharray="4 5"
+          />
+          <SvgText
+            x={LEFT_INSET - 8}
+            y={y + 3.5}
+            textAnchor="end"
+            fill={COLORS.secondary}
+            fontSize={10}
+          >
+            {formatNumberWithOptionalDecimal(yAxisTicks[index])}
+          </SvgText>
+        </React.Fragment>
+      );
+    };
+    const renderChartPoint = (
+      point: (typeof points)[number],
+      index: number,
+    ) => (
+      <Circle
+        key={`${point.measuredAt}-${index}`}
+        cx={point.x}
+        cy={point.y}
+        r={4}
+        fill={COLORS.white}
+        stroke={COLORS.green}
+        strokeWidth={2.5}
+      />
+    );
 
     return (
-      <LinearGradient
-        colors={['#FFFFFF', '#F3FAF5']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.card}
-      >
+      <View style={styles.card}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={styles.title}>Theo dõi cân nặng & BMI</Text>
@@ -108,32 +191,7 @@ const HealthMetricHistory = memo(
         </View>
 
         <View style={styles.metricSwitch}>
-          {(
-            [
-              ['weightKg', 'Cân nặng'],
-              ['bmi', 'BMI'],
-            ] as const
-          ).map(([value, label]) => (
-            <Pressable
-              key={value}
-              accessibilityRole="button"
-              accessibilityState={{ selected: metric === value }}
-              onPress={() => setMetric(value)}
-              style={[
-                styles.metricButton,
-                metric === value && styles.metricButtonSelected,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.metricButtonText,
-                  metric === value && styles.metricButtonTextSelected,
-                ]}
-              >
-                {label}
-              </Text>
-            </Pressable>
-          ))}
+          {METRIC_OPTIONS.map(renderMetricOption)}
         </View>
 
         {loading ? (
@@ -187,31 +245,7 @@ const HealthMetricHistory = memo(
                   <Stop offset="1" stopColor="#168653" stopOpacity="0.03" />
                 </SvgLinearGradient>
               </Defs>
-              {[0, 1, 2].map(index => {
-                const y = PLOT_TOP + (index * (PLOT_BOTTOM - PLOT_TOP)) / 2;
-                return (
-                  <React.Fragment key={index}>
-                    <Line
-                      x1={LEFT_INSET}
-                      y1={y}
-                      x2={chartWidth - RIGHT_INSET}
-                      y2={y}
-                      stroke="#E5EBE7"
-                      strokeWidth={1}
-                      strokeDasharray="4 5"
-                    />
-                    <SvgText
-                      x={LEFT_INSET - 8}
-                      y={y + 3.5}
-                      textAnchor="end"
-                      fill={COLORS.secondary}
-                      fontSize={10}
-                    >
-                      {formatNumberWithOptionalDecimal(yAxisTicks[index])}
-                    </SvgText>
-                  </React.Fragment>
-                );
-              })}
+              {[0, 1, 2].map(renderYAxisTick)}
               <Path d={areaPath} fill="url(#metricArea)" />
               {points.length > 1 ? (
                 <Path
@@ -223,17 +257,7 @@ const HealthMetricHistory = memo(
                   strokeLinejoin="round"
                 />
               ) : null}
-              {points.map((point, index) => (
-                <Circle
-                  key={`${point.measuredAt}-${index}`}
-                  cx={point.x}
-                  cy={point.y}
-                  r={4}
-                  fill={COLORS.white}
-                  stroke={COLORS.green}
-                  strokeWidth={2.5}
-                />
-              ))}
+              {points.map(renderChartPoint)}
             </Svg>
 
             <View style={styles.dateLabels}>
@@ -253,7 +277,7 @@ const HealthMetricHistory = memo(
             </Text>
           </>
         )}
-      </LinearGradient>
+      </View>
     );
   },
 );
@@ -272,27 +296,27 @@ const COLORS = {
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
-    marginTop: 16,
-    borderRadius: 16,
+    padding: 15,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
   },
   header: { flexDirection: 'row', alignItems: 'center' },
   headerCopy: { flex: 1 },
   title: { color: COLORS.text, fontSize: 16, fontWeight: '800' },
   subtitle: {
-    marginTop: 4,
+    marginTop: 3,
     color: COLORS.secondary,
     fontSize: 11,
-    lineHeight: 16,
+    lineHeight: 15,
   },
   metricSwitch: {
     flexDirection: 'row',
     padding: 3,
-    marginTop: 14,
-    borderRadius: 11,
-    backgroundColor: '#EFF3F0',
+    marginTop: 12,
+    borderRadius: 8,
+    backgroundColor: '#F2F5F3',
   },
   metricButton: {
     flex: 1,

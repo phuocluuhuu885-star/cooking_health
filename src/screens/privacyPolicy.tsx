@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BackHandler,
   Pressable,
@@ -38,6 +38,8 @@ const PolicySection = ({
   </View>
 );
 
+const blockHardwareBack = () => true;
+
 const PrivacyPolicyScreen = ({ route }: Props) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -56,7 +58,7 @@ const PrivacyPolicyScreen = ({ route }: Props) => {
     if (viewOnly) return undefined;
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
-      () => true,
+      blockHardwareBack,
     );
     return () => subscription.remove();
   }, [viewOnly]);
@@ -66,11 +68,15 @@ const PrivacyPolicyScreen = ({ route }: Props) => {
     [insets.bottom],
   );
 
-  const continueToApp = () => {
+  const continueToApp = useCallback(() => {
     if (!accepted) return;
     savePrivacyPolicyConsent();
     resetTo(ScreenKeys.HOMESCREEN);
-  };
+  }, [accepted]);
+
+  const handleToggleConsent = useCallback(() => {
+    setAccepted(value => !value);
+  }, []);
 
   if (alreadyAccepted) {
     return <View style={styles.screen} />;
@@ -169,7 +175,7 @@ const PrivacyPolicyScreen = ({ route }: Props) => {
           <Pressable
             accessibilityRole="checkbox"
             accessibilityState={{ checked: accepted }}
-            onPress={() => setAccepted(value => !value)}
+            onPress={handleToggleConsent}
             style={styles.consentRow}
           >
             <View style={[styles.checkbox, accepted && styles.checkboxChecked]}>

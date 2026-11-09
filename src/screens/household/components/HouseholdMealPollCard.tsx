@@ -14,6 +14,14 @@ type Props = {
   onViewIngredients: () => void;
 };
 
+function isAcceptedOption(option: HouseholdMealPoll['options'][number]) {
+  return option.outcome === 'ACCEPTED';
+}
+
+function isProposedOption(option: HouseholdMealPoll['options'][number]) {
+  return option.outcome !== 'ACCEPTED';
+}
+
 const HouseholdMealPollCard = ({
   poll,
   mealPeriod,
@@ -28,24 +36,26 @@ const HouseholdMealPollCard = ({
     [setState],
   );
   const proposedOptions = poll.closedAt
-    ? poll.options.filter(option => option.outcome !== 'ACCEPTED')
+    ? poll.options.filter(isProposedOption)
     : poll.options;
-  const acceptedMeals = poll.options.filter(
-    option => option.outcome === 'ACCEPTED',
-  );
+  const acceptedMeals = poll.options.filter(isAcceptedOption);
   const toggleExpanded = useCallback(() => {
     setExpanded(current => !current);
   }, [setExpanded]);
-  const optionRows = proposedOptions.map(option => (
-    <HouseholdMealPollOptionRow
-      key={option.id}
-      option={option}
-      mealPeriod={mealPeriod}
-      voting={votingOptionKey === `${mealPeriod}:${option.mealId}`}
-      pollClosed={Boolean(poll.closedAt)}
-      onVote={onVote}
-    />
-  ));
+  function renderOption(option: (typeof proposedOptions)[number]) {
+    return (
+      <HouseholdMealPollOptionRow
+        key={option.id}
+        option={option}
+        mealPeriod={mealPeriod}
+        voting={votingOptionKey === `${mealPeriod}:${option.mealId}`}
+        pollClosed={Boolean(poll.closedAt)}
+        onVote={onVote}
+      />
+    );
+  }
+
+  const optionRows = proposedOptions.map(renderOption);
 
   if (!poll.closedAt) {
     return (

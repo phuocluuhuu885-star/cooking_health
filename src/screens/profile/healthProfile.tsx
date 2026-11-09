@@ -42,6 +42,40 @@ type Option<T extends string> = {
   description?: string;
 };
 
+const OptionRow = <T extends string>({
+  option,
+  selectedValue,
+  onSelect,
+}: {
+  option: Option<T>;
+  selectedValue: T | null;
+  onSelect: (value: T) => void;
+}) => {
+  const isSelected = selectedValue === option.value;
+  const handleSelect = useCallback(() => {
+    onSelect(option.value);
+  }, [onSelect, option.value]);
+
+  return (
+    <TouchableOpacity
+      key={option.value}
+      activeOpacity={0.8}
+      style={[styles.option, isSelected && styles.optionSelected]}
+      onPress={handleSelect}
+    >
+      <View style={styles.optionContent}>
+        <Text style={styles.optionTitle}>{option.title}</Text>
+        {option.description ? (
+          <Text style={styles.optionDescription}>{option.description}</Text>
+        ) : null}
+      </View>
+      <View style={[styles.radio, isSelected && styles.radioSelected]}>
+        {isSelected ? <View style={styles.radioInner} /> : null}
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 type FormState = {
   age: string;
   heightCm: string;
@@ -318,40 +352,20 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
     }
   }, [dispatch, onClose, onUpdated, setIsLoading, state, validate]);
 
-  const renderOption = useCallback(
-    <T extends string>(
-      option: Option<T>,
-      selectedValue: T | null,
-      onSelect: (value: T) => void,
-    ) => {
-      const isSelected = selectedValue === option.value;
-
-      return (
-        <TouchableOpacity
-          key={option.value}
-          activeOpacity={0.8}
-          style={[styles.option, isSelected && styles.optionSelected]}
-          onPress={() => onSelect(option.value)}
-        >
-          <View style={styles.optionContent}>
-            <Text style={styles.optionTitle}>{option.title}</Text>
-
-            {option.description ? (
-              <Text style={styles.optionDescription}>{option.description}</Text>
-            ) : null}
-          </View>
-
-          <View style={[styles.radio, isSelected && styles.radioSelected]}>
-            {isSelected ? <View style={styles.radioInner} /> : null}
-          </View>
-        </TouchableOpacity>
-      );
-    },
-    [],
-  );
+  const renderGenderOption = (option: Option<Gender>) =>
+    <OptionRow option={option} selectedValue={state.gender} onSelect={onSelectGender} />;
+  const renderActivityOption = (option: Option<ActivityLevel>) =>
+    <OptionRow option={option} selectedValue={state.activityLevel} onSelect={onSelectActivityLevel} />;
+  const renderGoalOption = (option: Option<Goal>) =>
+    <OptionRow option={option} selectedValue={state.goal} onSelect={onSelectGoal} />;
 
   return (
-    <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
         <KeyboardAvoidingView
           style={styles.keyboardContainer}
@@ -372,6 +386,9 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
+            <View style={styles.dragHandleArea}>
+              <View style={styles.dragHandle} />
+            </View>
             <View style={styles.modalHeader}>
               <View style={styles.headerIcon}>
                 <Text style={styles.headerIconText}>🥗</Text>
@@ -387,6 +404,8 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
               </View>
 
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Đóng cập nhật thông tin cá nhân"
                 hitSlop={10}
                 disabled={isLoading}
                 style={styles.closeButton}
@@ -462,9 +481,7 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
                 <Text style={styles.sectionTitle}>Giới tính</Text>
 
                 <View style={styles.optionContainer}>
-                  {GENDER_OPTIONS.map(option =>
-                    renderOption(option, state.gender, onSelectGender),
-                  )}
+                  {GENDER_OPTIONS.map(renderGenderOption)}
                 </View>
 
                 {!!state.errorMsg.gender && (
@@ -482,13 +499,7 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
                 <Text style={styles.sectionTitle}>Mức độ vận động</Text>
 
                 <View style={styles.optionContainer}>
-                  {ACTIVITY_OPTIONS.map(option =>
-                    renderOption(
-                      option,
-                      state.activityLevel,
-                      onSelectActivityLevel,
-                    ),
-                  )}
+                  {ACTIVITY_OPTIONS.map(renderActivityOption)}
                 </View>
 
                 {!!state.errorMsg.activityLevel && (
@@ -508,9 +519,7 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
                 <Text style={styles.sectionTitle}>Mục tiêu của bạn</Text>
 
                 <View style={styles.optionContainer}>
-                  {GOAL_OPTIONS.map(option =>
-                    renderOption(option, state.goal, onSelectGoal),
-                  )}
+                  {GOAL_OPTIONS.map(renderGoalOption)}
                 </View>
 
                 {!!state.errorMsg.goal && (
@@ -556,25 +565,37 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: colors.BaseWhite,
   },
 
   keyboardContainer: {
     width: '100%',
-    maxHeight: '92%',
+    maxHeight: '100%',
   },
 
   modal: {
     overflow: 'hidden',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    flex: 1,
+  },
+
+  dragHandleArea: {
+    alignItems: 'center',
+    paddingTop: 9,
+    paddingBottom: 2,
+  },
+
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.Gray.g300,
   },
 
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 18,
-    paddingTop: 18,
+    paddingTop: 10,
     paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: colors.Gray.g200,
@@ -643,7 +664,7 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
     padding: 16,
     borderWidth: 1,

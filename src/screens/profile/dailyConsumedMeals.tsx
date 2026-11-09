@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import LinearGradient from '../../components/LinearGradient';
+import { Image } from 'react-native';
 import type {
   DailyConsumedMeal,
   DailyConsumedMealsCardProps,
@@ -22,8 +22,10 @@ const DailyConsumedMealRow = memo(
     onPress: (mealId: string) => void;
   }) => {
     const handlePress = useCallback(() => {
+      if (item.source === 'SCANNED') return;
       onPress(item.mealId);
-    }, [item.mealId, onPress]);
+    }, [item.mealId, item.source, onPress]);
+    const isScannedMeal = item.source === 'SCANNED';
     const consumedTime = new Date(item.consumedAt).toLocaleTimeString('vi-VN', {
       hour: '2-digit',
       minute: '2-digit',
@@ -32,27 +34,47 @@ const DailyConsumedMealRow = memo(
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Xem món đã ăn ${item.name}`}
+        accessibilityLabel={
+          isScannedMeal
+            ? `Món đã quét ${item.name}`
+            : `Xem món đã ăn ${item.name}`
+        }
+        disabled={isScannedMeal}
         onPress={handlePress}
         style={styles.item}
       >
+        {item.imageUrl?.trim() ? (
+          <Image
+            source={{ uri: item.imageUrl.trim() }}
+            style={styles.mealImage}
+            resizeMode="cover"
+          />
+        ) : null}
         <View style={styles.itemCopy}>
           <Text numberOfLines={2} style={styles.itemName}>
             {item.name}
           </Text>
-          <Text style={styles.itemMeta}>
-            {item.mealPeriod === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'} ·{' '}
-            {item.servings} khẩu phần · {consumedTime}
-            {item.source === 'HOUSEHOLD' ? ' · Gia đình' : ''}
+          <View style={styles.itemMetaRow}>
+            <Text style={styles.periodBadge}>
+              {item.mealPeriod === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'}
+            </Text>
+            <Text style={styles.itemMeta}>
+              {item.servings} khẩu phần · {consumedTime}
+            </Text>
+          </View>
+          <Text style={styles.calories}>
+            {item.nutrition
+              ? `${formatNumberWithOptionalDecimal(
+                  item.nutrition.calories,
+                )} kcal`
+              : 'Chưa có dinh dưỡng'}
           </Text>
+          {item.source === 'HOUSEHOLD' || isScannedMeal ? (
+            <Text style={styles.sourceLabel}>
+              {item.source === 'HOUSEHOLD' ? 'Gia đình' : 'Quét AI'}
+            </Text>
+          ) : null}
         </View>
-        <Text style={styles.calories}>
-          {item.nutrition
-            ? `${formatNumberWithOptionalDecimal(
-                item.nutrition.calories,
-              )} kcal`
-            : 'Chưa có dinh dưỡng'}
-        </Text>
       </Pressable>
     );
   },
@@ -63,51 +85,38 @@ const DailyConsumedMeals = ({
   loading,
   error,
   onRetry,
-  onAddMeal,
   onPressMeal,
-}: DailyConsumedMealsCardProps & { onPressMeal: (mealId: string) => void }) => (
-  <LinearGradient
-    colors={['#FFFFFF', '#F3FAF5']}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-    style={styles.card}
-  >
-    <View style={styles.header}>
-      <Text style={styles.title}>Thực phẩm đã tiêu thụ hôm nay</Text>
-      <View style={styles.headerActions}>
+}: DailyConsumedMealsCardProps & { onPressMeal: (mealId: string) => void }) => {
+  const renderMeal = (item: DailyConsumedMeal) => (
+    <DailyConsumedMealRow key={item.id} item={item} onPress={onPressMeal} />
+  );
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Món đã ăn trong ngày</Text>
         {loading ? <ActivityIndicator color={COLORS.green} size="small" /> : null}
-        {onAddMeal ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={onAddMeal}
-            style={styles.addButton}
-          >
-            <Text style={styles.addButtonText}>+ Thêm món</Text>
+      </View>
+      <Text style={styles.subtitle}>Các món được ghi nhận trong ngày đã chọn</Text>
+      {error ? (
+        <View style={styles.messageBox}>
+          <Text style={styles.message}>{error}</Text>
+          <Pressable accessibilityRole="button" onPress={onRetry}>
+            <Text style={styles.retry}>Thử tải lại</Text>
           </Pressable>
-        ) : null}
-      </View>
+        </View>
+      ) : loading && items.length === 0 ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={COLORS.green} />
+        </View>
+      ) : items.length === 0 ? (
+        <Text style={styles.message}>Ngày này chưa có món nào được ghi nhận.</Text>
+      ) : (
+        items.map(renderMeal)
+      )}
     </View>
-    <Text style={styles.subtitle}>Danh sách theo ngày UTC hiện tại</Text>
-    {error ? (
-      <View style={styles.messageBox}>
-        <Text style={styles.message}>{error}</Text>
-        <Pressable accessibilityRole="button" onPress={onRetry}>
-          <Text style={styles.retry}>Thử tải lại</Text>
-        </Pressable>
-      </View>
-    ) : loading && items.length === 0 ? (
-      <View style={styles.loading}>
-        <ActivityIndicator color={COLORS.green} />
-      </View>
-    ) : items.length === 0 ? (
-      <Text style={styles.message}>Hôm nay chưa có món nào được ghi nhận.</Text>
-    ) : (
-      items.map(item => (
-        <DailyConsumedMealRow key={item.id} item={item} onPress={onPressMeal} />
-      ))
-    )}
-  </LinearGradient>
-);
+  );
+};
 
 export default memo(DailyConsumedMeals);
 
@@ -122,39 +131,64 @@ const COLORS = {
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
-    marginTop: 14,
-    borderRadius: 12,
+    padding: 14,
+    marginTop: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  addButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: '#E7F4EC',
-  },
-  addButtonText: { color: COLORS.green, fontSize: 12, fontWeight: '800' },
   title: { color: COLORS.text, fontSize: 16, fontWeight: '800' },
   subtitle: { color: COLORS.secondary, fontSize: 12, marginTop: 4 },
   item: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.border,
+    alignItems: 'flex-start',
+    gap: 11,
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#F7FAF8',
+    borderWidth: 1,
+    borderColor: '#EEF2EF',
   },
-  itemCopy: { flex: 1 },
-  itemName: { color: COLORS.text, fontSize: 14, fontWeight: '700' },
-  itemMeta: { color: COLORS.secondary, fontSize: 12, marginTop: 4 },
-  calories: { color: COLORS.green, fontSize: 12, fontWeight: '800' },
+  mealImage: {
+    width: 76,
+    height: 76,
+    borderRadius: 8,
+    backgroundColor: '#E7F4EC',
+  },
+  itemCopy: { flex: 1, minWidth: 0 },
+  itemName: { color: COLORS.text, fontSize: 14, fontWeight: '700', flexShrink: 1 },
+  itemMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginTop: 7,
+  },
+  itemMeta: { color: COLORS.secondary, fontSize: 11 },
+  periodBadge: {
+    overflow: 'hidden',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    color: COLORS.green,
+    backgroundColor: '#E7F4EC',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  sourceLabel: { marginTop: 6, color: COLORS.secondary, fontSize: 10 },
+  calories: {
+    marginTop: 7,
+    color: COLORS.green,
+    fontSize: 11,
+    fontWeight: '800',
+  },
   loading: { minHeight: 64, justifyContent: 'center' },
   messageBox: { marginTop: 10 },
   message: {

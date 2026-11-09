@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useId, useMemo } from 'react';
 import {
   ColorValue,
   StyleProp,
@@ -47,6 +47,17 @@ const LinearGradient = ({
     borderBottomRightRadius: flattenedStyle.borderBottomRightRadius,
     overflow: 'hidden',
   };
+  const gradientStops = useMemo(
+    () =>
+      colors.map((color, index) => (
+        <Stop
+          key={index}
+          offset={locations?.[index] ?? index / Math.max(colors.length - 1, 1)}
+          stopColor={color}
+        />
+      )),
+    [colors, locations],
+  );
 
   return (
     <View {...viewProps} style={style}>
@@ -61,15 +72,7 @@ const LinearGradient = ({
               y1={`${start.y * 100}%`}
               y2={`${end.y * 100}%`}
             >
-              {colors.map((color, index) => (
-                <Stop
-                  key={index}
-                  offset={
-                    locations?.[index] ?? index / Math.max(colors.length - 1, 1)
-                  }
-                  stopColor={color}
-                />
-              ))}
+              {gradientStops}
             </SvgLinearGradient>
           </Defs>
           <Rect fill={`url(#${gradientId})`} height="100%" width="100%" />

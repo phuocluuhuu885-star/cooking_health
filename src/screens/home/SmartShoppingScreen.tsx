@@ -27,6 +27,7 @@ import type {
   RecipeDetailMeal,
   RecipeDetailResponse,
 } from '../../utils/types';
+import TestBannerAd from '../component/TestBannerAd';
 
 type PlannedMealRef = {
   id: string;
@@ -60,6 +61,70 @@ const formatWeekday = (date: string) =>
     timeZone: 'UTC',
   });
 const getDayOfMonth = (date: string) => date.slice(8, 10);
+
+const ShoppingDateButton = ({
+  date,
+  selected,
+  onSelect,
+}: {
+  date: string;
+  selected: boolean;
+  onSelect: (date: string) => void;
+}) => {
+  const handleSelect = useCallback(() => {
+    onSelect(date);
+  }, [date, onSelect]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${formatWeekday(date)} ${getDayOfMonth(date)}`}
+      accessibilityState={{ selected }}
+      onPress={handleSelect}
+      style={[styles.dateButton, selected && styles.dateButtonSelected]}
+    >
+      <Text style={[styles.dateWeekday, selected && styles.dateTextSelected]}>
+        {formatWeekday(date)}
+      </Text>
+      <Text style={[styles.dateNumber, selected && styles.dateTextSelected]}>
+        {getDayOfMonth(date)}
+      </Text>
+    </Pressable>
+  );
+};
+
+const ShoppingIngredientRow = ({
+  ingredient,
+  checked,
+  onToggle,
+}: {
+  ingredient: HomeAggregatedIngredient;
+  checked: boolean;
+  onToggle: (name: string) => void;
+}) => {
+  const handleToggle = useCallback(() => {
+    onToggle(ingredient.name);
+  }, [ingredient.name, onToggle]);
+
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      onPress={handleToggle}
+      style={styles.ingredientRow}
+    >
+      <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+        {checked ? <Text style={styles.checkmark}>✓</Text> : null}
+      </View>
+      <Text
+        style={[styles.ingredientName, checked && styles.ingredientDone]}
+      >
+        {ingredient.name}
+      </Text>
+      <Text style={styles.amount}>{formatAmount(ingredient.amountG)}</Text>
+    </Pressable>
+  );
+};
 
 const SmartShoppingScreen = () => {
   const insets = useSafeAreaInsets();
@@ -215,6 +280,38 @@ const SmartShoppingScreen = () => {
   );
   const checkedCount = Object.values(state.checked).filter(Boolean).length;
 
+  const openDailyMeals = useCallback(() => {
+    navigate(ScreenKeys.DAILY_PLANNED_MEALS, { date: selectedDate });
+  }, [selectedDate]);
+  const retryLoadIngredients = useCallback(() => {
+    loadIngredients(selectedDate);
+  }, [loadIngredients, selectedDate]);
+  const openWeeklyMealPlan = useCallback(() => {
+    navigate(ScreenKeys.WEEKLY_MEAL_PLAN);
+  }, []);
+
+  function renderDate(date: string) {
+    return (
+      <ShoppingDateButton
+        key={date}
+        date={date}
+        selected={date === selectedDate}
+        onSelect={setSelectedDate}
+      />
+    );
+  }
+
+  function renderIngredient(ingredient: HomeAggregatedIngredient) {
+    return (
+      <ShoppingIngredientRow
+        key={ingredient.name}
+        ingredient={ingredient}
+        checked={Boolean(state.checked[ingredient.name])}
+        onToggle={toggleIngredient}
+      />
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <ScreenHeader eyebrow="HEALTH AI COACH" title="Đi chợ thông minh" />
@@ -230,47 +327,11 @@ const SmartShoppingScreen = () => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.dateList}
         >
-          {dates.map(date => {
-            const selected = date === selectedDate;
-            return (
-              <Pressable
-                key={date}
-                accessibilityRole="button"
-                accessibilityLabel={`${formatWeekday(date)} ${getDayOfMonth(
-                  date,
-                )}`}
-                accessibilityState={{ selected }}
-                onPress={() => setSelectedDate(date)}
-                style={[
-                  styles.dateButton,
-                  selected && styles.dateButtonSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.dateWeekday,
-                    selected && styles.dateTextSelected,
-                  ]}
-                >
-                  {formatWeekday(date)}
-                </Text>
-                <Text
-                  style={[
-                    styles.dateNumber,
-                    selected && styles.dateTextSelected,
-                  ]}
-                >
-                  {getDayOfMonth(date)}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {dates.map(renderDate)}
         </ScrollView>
         <Pressable
           accessibilityRole="button"
-          onPress={() =>
-            navigate(ScreenKeys.DAILY_PLANNED_MEALS, { date: selectedDate })
-          }
+          onPress={openDailyMeals}
           style={styles.mealListButton}
         >
           <Text style={styles.mealListButtonText}>
@@ -290,7 +351,7 @@ const SmartShoppingScreen = () => {
           <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
             <Text style={styles.error}>{state.error}</Text>
             <Pressable
-              onPress={() => loadIngredients(selectedDate)}
+              onPress={retryLoadIngredients}
               style={styles.retryButton}
             >
               <Text style={styles.retryText}>Thử lại</Text>
@@ -304,7 +365,7 @@ const SmartShoppingScreen = () => {
             </Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => navigate(ScreenKeys.WEEKLY_MEAL_PLAN)}
+              onPress={openWeeklyMealPlan}
               style={styles.primaryButton}
             >
               <Text style={styles.primaryButtonText}>Lên thực đơn 7 ngày</Text>
@@ -332,41 +393,11 @@ const SmartShoppingScreen = () => {
                   {checkedCount}/{state.ingredients.length}
                 </Text>
               </View>
-              {state.ingredients.map(ingredient => {
-                const checked = Boolean(state.checked[ingredient.name]);
-                return (
-                  <Pressable
-                    key={ingredient.name}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked }}
-                    onPress={() => toggleIngredient(ingredient.name)}
-                    style={styles.ingredientRow}
-                  >
-                    <View
-                      style={[
-                        styles.checkbox,
-                        checked && styles.checkboxChecked,
-                      ]}
-                    >
-                      {checked ? <Text style={styles.checkmark}>✓</Text> : null}
-                    </View>
-                    <Text
-                      style={[
-                        styles.ingredientName,
-                        checked && styles.ingredientDone,
-                      ]}
-                    >
-                      {ingredient.name}
-                    </Text>
-                    <Text style={styles.amount}>
-                      {formatAmount(ingredient.amountG)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {state.ingredients.map(renderIngredient)}
             </LinearGradient>
           </>
         )}
+        <TestBannerAd />
       </ScrollView>
     </View>
   );

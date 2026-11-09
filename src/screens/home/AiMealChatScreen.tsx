@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import LinearGradient from '../../components/LinearGradient';
+import { AppImage } from '../../abase/component';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import apiConst from '../../abase/constant/apiConst';
@@ -23,6 +24,7 @@ import { invalidateCachedMealPlan } from '../../reduxs/reduces/appData';
 import { useAppDispatch } from '../../reduxs/store';
 import { setSyncUser, syncApi } from '../../utils/syncUtils';
 import type {
+  AiMealChatHistoryEntry,
   AiMealChatResponse,
   AiMealChatSuggestion,
   MealPeriod,
@@ -62,8 +64,92 @@ const QUICK_QUESTIONS = [
   'Bữa tối còn món nào trong thực đơn?',
 ];
 
+const QuickQuestion = ({
+  question,
+  disabled,
+  onPress,
+}: {
+  question: string;
+  disabled: boolean;
+  onPress: (question: string) => void;
+}) => {
+  const handlePress = useCallback(() => {
+    onPress(question);
+  }, [onPress, question]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={handlePress}
+      style={styles.quickQuestion}
+    >
+      <Text style={styles.quickQuestionText}>{question}</Text>
+      <Text style={styles.quickArrow}>›</Text>
+    </Pressable>
+  );
+};
+
 const formatNutrition = (value: number | null, unit: string) =>
   value === null ? `Chưa có ${unit}` : `${Math.round(value * 10) / 10} ${unit}`;
+
+type SuggestionCardProps = {
+  suggestion: AiMealChatSuggestion;
+  adding: boolean;
+  disabled: boolean;
+  onAdd: (suggestion: AiMealChatSuggestion) => void;
+};
+
+const SuggestionCard = ({
+  suggestion,
+  adding,
+  disabled,
+  onAdd,
+}: SuggestionCardProps) => {
+  const handleAdd = useCallback(() => {
+    onAdd(suggestion);
+  }, [onAdd, suggestion]);
+
+  return (
+    <View style={styles.suggestionCard}>
+      {suggestion.imageUrl ? (
+        <AppImage
+          source={{ uri: suggestion.imageUrl }}
+          style={styles.suggestionImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[styles.suggestionImage, styles.suggestionImagePlaceholder]}>
+          <Text style={styles.suggestionImagePlaceholderText}>🍽</Text>
+        </View>
+      )}
+      <View style={styles.suggestionDetails}>
+        <Text numberOfLines={2} style={styles.suggestionName}>
+          {suggestion.name}
+        </Text>
+        <Text style={styles.suggestionNutrition}>
+          {formatNutrition(suggestion.nutrition.calories, 'kcal')} · Đạm{' '}
+          {formatNutrition(suggestion.nutrition.proteinG, 'g')} · Carb{' '}
+          {formatNutrition(suggestion.nutrition.carbsG, 'g')} · Béo{' '}
+          {formatNutrition(suggestion.nutrition.fatG, 'g')} / khẩu phần
+        </Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Thêm ${suggestion.name} vào thực đơn`}
+        disabled={disabled}
+        onPress={handleAdd}
+        style={[styles.addSuggestionButton, disabled && styles.disabledButton]}
+      >
+        {adding ? (
+          <ActivityIndicator color={COLORS.white} size="small" />
+        ) : (
+          <Text style={styles.addSuggestionButtonText}>+</Text>
+        )}
+      </Pressable>
+    </View>
+  );
+};
 
 const AiMealChatScreen = () => {
   const insets = useSafeAreaInsets();
@@ -125,9 +211,21 @@ const AiMealChatScreen = () => {
         { id: nextMessageId.current++, role: 'user', text: message },
       ]);
       try {
+        const conversationHistory: AiMealChatHistoryEntry[] = messages
+          .filter(item => item.id !== 0)
+          .slice(-8)
+          .map(item => ({
+            role: item.role,
+            text: item.text,
+            suggestions: item.suggestions?.map(suggestion => ({
+              mealId: suggestion.mealId,
+              mealPeriod: suggestion.mealPeriod,
+            })),
+          }));
         const response = (await syncApi(apiConst.postAiMealChatMessage, {
           message,
           consent,
+          conversationHistory,
         })) as AiMealChatResponse;
         if (!response?.success || !response.data?.answer) {
           throw new Error(
@@ -151,7 +249,7 @@ const AiMealChatScreen = () => {
         setSending(false);
       }
     },
-    [sending, user],
+    [messages, sending, user],
   );
 
   const handleSendQuestion = useCallback(
@@ -171,13 +269,15 @@ const AiMealChatScreen = () => {
           { text: 'Để sau', style: 'cancel' },
           {
             text: 'Đồng ý và tiếp tục',
-            onPress: () => {
-              if (user?.id) saveAiChatConsent(user.id, true);
-              sendMessage(message, true);
-            },
+            onPress: handleConsent,
           },
         ],
       );
+
+      function handleConsent() {
+        if (user?.id) saveAiChatConsent(user.id, true);
+        sendMessage(message, true);
+      }
     },
     [sendMessage, sending, user],
   );
@@ -232,6 +332,14 @@ const AiMealChatScreen = () => {
 
   const chooseMealPeriod = useCallback(
     (suggestion: AiMealChatSuggestion) => {
+      function handleAddToLunch() {
+        return addSuggestionToMealPlan(suggestion, 'LUNCH');
+      }
+
+      function handleAddToDinner() {
+        return addSuggestionToMealPlan(suggestion, 'DINNER');
+      }
+
       Alert.alert(
         'Chọn bữa muốn thêm',
         `Thêm ${suggestion.name} vào thực đơn hôm nay:`,
@@ -239,17 +347,80 @@ const AiMealChatScreen = () => {
           { text: 'Hủy', style: 'cancel' },
           {
             text: 'Bữa trưa',
-            onPress: () => addSuggestionToMealPlan(suggestion, 'LUNCH'),
+            onPress: handleAddToLunch,
           },
           {
             text: 'Bữa tối',
-            onPress: () => addSuggestionToMealPlan(suggestion, 'DINNER'),
+            onPress: handleAddToDinner,
           },
         ],
       );
     },
     [addSuggestionToMealPlan],
   );
+  const renderSuggestion = useCallback(
+    (suggestion: AiMealChatSuggestion) => (
+      <SuggestionCard
+        key={suggestion.mealId}
+        suggestion={suggestion}
+        adding={addingMealId === suggestion.mealId}
+        disabled={addingMealId !== null}
+        onAdd={chooseMealPeriod}
+      />
+    ),
+    [addingMealId, chooseMealPeriod],
+  );
+
+  const handleContentSizeChange = useCallback(() => {
+    scrollRef.current?.scrollToEnd({ animated: true });
+  }, []);
+
+  function renderMessage(item: Message) {
+    return (
+      <View
+        key={item.id}
+        style={[
+          styles.messageRow,
+          item.role === 'user' && styles.userMessageRow,
+        ]}
+      >
+        <LinearGradient
+          colors={
+            item.role === 'user'
+              ? ['#168653', '#117246']
+              : ['#FFFFFF', '#F3FAF5']
+          }
+          style={[
+            styles.messageBubble,
+            item.role === 'user'
+              ? styles.userMessageBubble
+              : styles.assistantMessageBubble,
+          ]}
+        >
+          <Text
+            style={[
+              styles.messageText,
+              item.role === 'user' && styles.userMessageText,
+            ]}
+          >
+            {item.text}
+          </Text>
+          {item.suggestions?.map(renderSuggestion)}
+        </LinearGradient>
+      </View>
+    );
+  }
+
+  function renderQuickQuestion(question: string) {
+    return (
+      <QuickQuestion
+        key={question}
+        question={question}
+        disabled={sending}
+        onPress={sendQuickQuestion}
+      />
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -262,73 +433,10 @@ const AiMealChatScreen = () => {
           ref={scrollRef}
           contentContainerStyle={styles.messages}
           keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() =>
-            scrollRef.current?.scrollToEnd({ animated: true })
-          }
+          onContentSizeChange={handleContentSizeChange}
           showsVerticalScrollIndicator={false}
         >
-          {messages.map(item => (
-            <View
-              key={item.id}
-              style={[
-                styles.messageRow,
-                item.role === 'user' && styles.userMessageRow,
-              ]}
-            >
-              <LinearGradient
-                colors={
-                  item.role === 'user'
-                    ? ['#168653', '#117246']
-                    : ['#FFFFFF', '#F3FAF5']
-                }
-                style={[
-                  styles.messageBubble,
-                  item.role === 'user'
-                    ? styles.userMessageBubble
-                    : styles.assistantMessageBubble,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.messageText,
-                    item.role === 'user' && styles.userMessageText,
-                  ]}
-                >
-                  {item.text}
-                </Text>
-                {item.suggestions?.map(suggestion => (
-                  <View key={suggestion.mealId} style={styles.suggestionCard}>
-                    <Text style={styles.suggestionName}>{suggestion.name}</Text>
-                    <Text style={styles.suggestionNutrition}>
-                      {formatNutrition(suggestion.nutrition.calories, 'kcal')} ·{' '}
-                      Đạm {formatNutrition(suggestion.nutrition.proteinG, 'g')}{' '}
-                      · Carb {formatNutrition(suggestion.nutrition.carbsG, 'g')}{' '}
-                      · Béo {formatNutrition(suggestion.nutrition.fatG, 'g')} /
-                      khẩu phần
-                    </Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Thêm ${suggestion.name} vào thực đơn`}
-                      disabled={addingMealId !== null}
-                      onPress={() => chooseMealPeriod(suggestion)}
-                      style={[
-                        styles.addSuggestionButton,
-                        addingMealId !== null && styles.disabledButton,
-                      ]}
-                    >
-                      {addingMealId === suggestion.mealId ? (
-                        <ActivityIndicator color={COLORS.white} size="small" />
-                      ) : (
-                        <Text style={styles.addSuggestionButtonText}>
-                          Thêm vào thực đơn hôm nay
-                        </Text>
-                      )}
-                    </Pressable>
-                  </View>
-                ))}
-              </LinearGradient>
-            </View>
-          ))}
+          {messages.map(renderMessage)}
           {sending ? (
             <View style={styles.thinking}>
               <ActivityIndicator color={COLORS.green} size="small" />
@@ -340,18 +448,7 @@ const AiMealChatScreen = () => {
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {messages.length === 1 ? (
             <View style={styles.quickQuestions}>
-              {QUICK_QUESTIONS.map(question => (
-                <Pressable
-                  key={question}
-                  accessibilityRole="button"
-                  disabled={sending}
-                  onPress={() => sendQuickQuestion(question)}
-                  style={styles.quickQuestion}
-                >
-                  <Text style={styles.quickQuestionText}>{question}</Text>
-                  <Text style={styles.quickArrow}>›</Text>
-                </Pressable>
-              ))}
+              {QUICK_QUESTIONS.map(renderQuickQuestion)}
             </View>
           ) : null}
         </ScrollView>
@@ -436,32 +533,48 @@ const styles = StyleSheet.create({
   messageText: { color: COLORS.text, fontSize: 13, lineHeight: 19 },
   userMessageText: { color: COLORS.white },
   suggestionCard: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     marginTop: 10,
-    padding: 10,
-    borderRadius: 8,
+    padding: 9,
+    paddingRight: 48,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.white,
   },
-  suggestionName: { color: COLORS.text, fontSize: 13, fontWeight: '800' },
+  suggestionImage: {
+    width: 68,
+    height: 68,
+    borderRadius: 8,
+    backgroundColor: COLORS.lightGreen,
+  },
+  suggestionImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  suggestionImagePlaceholderText: { fontSize: 24 },
+  suggestionDetails: { flex: 1, gap: 4 },
+  suggestionName: { color: COLORS.text, fontSize: 12, fontWeight: '800' },
   suggestionNutrition: {
-    marginTop: 4,
     color: COLORS.secondary,
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 9,
+    lineHeight: 13,
   },
   addSuggestionButton: {
-    minHeight: 36,
-    marginTop: 9,
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
     borderRadius: 8,
     backgroundColor: COLORS.green,
   },
   addSuggestionButtonText: {
     color: COLORS.white,
-    fontSize: 11,
+    fontSize: 23,
+    lineHeight: 26,
     fontWeight: '800',
   },
   disabledButton: { opacity: 0.6 },

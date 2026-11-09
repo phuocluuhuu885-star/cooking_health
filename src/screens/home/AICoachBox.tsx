@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import LinearGradient from '../../components/LinearGradient';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
@@ -102,6 +102,32 @@ const AICoachBox = ({
     onMealScan,
   ];
 
+  const getFeatureStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.feature,
+      pressed && styles.featurePressed,
+    ],
+    [],
+  );
+
+  function renderFeature(feature: (typeof FEATURES)[number], index: number) {
+    return (
+      <Pressable
+        key={feature.title}
+        accessibilityRole="button"
+        accessibilityLabel={`${feature.title}. ${feature.subtitle}`}
+        onPress={actions[index]}
+        style={getFeatureStyle}
+      >
+        <FeatureIcon kind={feature.icon} />
+        <Text style={styles.featureTitle}>{feature.title}</Text>
+        <Text numberOfLines={2} style={styles.featureSubtitle}>
+          {feature.subtitle}
+        </Text>
+      </Pressable>
+    );
+  }
+
   return (
     <LinearGradient
       colors={['#FFFFFF', '#F3FAF5']}
@@ -124,24 +150,7 @@ const AICoachBox = ({
 
       <Text style={styles.prompt}>Hôm nay bạn cần hỗ trợ gì?</Text>
       <View style={styles.grid}>
-        {FEATURES.map((feature, index) => (
-          <Pressable
-            key={feature.title}
-            accessibilityRole="button"
-            accessibilityLabel={`${feature.title}. ${feature.subtitle}`}
-            onPress={actions[index]}
-            style={({ pressed }) => [
-              styles.feature,
-              pressed && styles.featurePressed,
-            ]}
-          >
-            <FeatureIcon kind={feature.icon} />
-            <Text style={styles.featureTitle}>{feature.title}</Text>
-            <Text numberOfLines={2} style={styles.featureSubtitle}>
-              {feature.subtitle}
-            </Text>
-          </Pressable>
-        ))}
+        {FEATURES.map(renderFeature)}
       </View>
       <Text style={styles.disclaimer}>
         Gợi ý dựa trên dữ liệu dinh dưỡng và món ăn có trong Health&Cook chỉ mang

@@ -17,6 +17,7 @@ type API = {
   updateMealConsumption: ApiType;
   getDailyConsumedMeals: ApiType;
   addConsumedMeal: ApiType;
+  addScannedConsumedMeal: ApiType;
   getConsumptionReport: ApiType;
   getAiMealRecommendations: ApiType;
   postAiMealChatMessage: ApiType;
@@ -127,6 +128,10 @@ const apiConst: API = {
   addConsumedMeal: {
     method: 'post',
     url: 'api/meal-plan/consumed',
+  },
+  addScannedConsumedMeal: {
+    method: 'post',
+    url: 'api/meal-plan/scanned-consumed',
   },
   getConsumptionReport: {
     method: 'get',

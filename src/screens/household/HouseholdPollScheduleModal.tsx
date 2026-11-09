@@ -1,4 +1,10 @@
-import React, { memo, useEffect, useMemo, useState } from 'react';
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -93,12 +99,17 @@ const HouseholdPollScheduleModal = ({
     },
   };
 
-  const handleSelectDate = (day: DateData) => {
+  const handleSelectDate = useCallback((day: DateData) => {
     setSelectedDate(day.dateString);
     setError('');
-  };
+  }, [setError, setSelectedDate]);
 
-  const handleConfirm = () => {
+  const handleChangeTime = useCallback((value: string) => {
+    setSelectedTime(value.replace(/[^\d:]/g, '').slice(0, 5));
+    setError('');
+  }, [setError, setSelectedTime]);
+
+  const handleConfirm = useCallback(() => {
     if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(selectedTime)) {
       setError('Nhập giờ theo định dạng HH:mm, ví dụ 18:30.');
       return;
@@ -112,7 +123,7 @@ const HouseholdPollScheduleModal = ({
       return;
     }
     onConfirm(closesAtValue.toISOString());
-  };
+  }, [onConfirm, selectedDate, selectedTime, setError]);
 
   return (
     <Modal
@@ -184,10 +195,7 @@ const HouseholdPollScheduleModal = ({
               accessibilityLabel={`Giờ kết thúc bình chọn ${mealLabel}`}
               keyboardType="numbers-and-punctuation"
               maxLength={5}
-              onChangeText={value => {
-                setSelectedTime(value.replace(/[^\d:]/g, '').slice(0, 5));
-                setError('');
-              }}
+              onChangeText={handleChangeTime}
               placeholder="HH:mm"
               placeholderTextColor={COLORS.secondary}
               style={styles.timeInput}

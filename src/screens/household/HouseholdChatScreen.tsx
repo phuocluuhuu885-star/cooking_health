@@ -36,6 +36,7 @@ import {
   type ChatSocket,
 } from '../../utils/householdChatSocket';
 import { createStateSetter } from '../../utils/stateUtils';
+import { notifyIfTokenAuthenticationFailure } from '../../utils/authSession';
 import {
   formatHouseholdChatTime,
   mergeHouseholdMessages,
@@ -50,6 +51,11 @@ type Props = StackScreenProps<
 
 const PAGE_SIZE = 30;
 const MAX_MESSAGE_LENGTH = 2000;
+
+function getMessageKey(item: HouseholdChatMessage) {
+  return item.id;
+}
+
 const HouseholdChatScreen = ({ route }: Props) => {
   const insets = useSafeAreaInsets();
   const user = useSelector(selectUserInfo);
@@ -220,6 +226,11 @@ const HouseholdChatScreen = ({ route }: Props) => {
             return;
           }
           if (!response.success) {
+            if (notifyIfTokenAuthenticationFailure(response, token)) {
+              setError('');
+              socket.disconnect();
+              return;
+            }
             setError(response.message);
             socket.disconnect();
             return;
@@ -231,6 +242,10 @@ const HouseholdChatScreen = ({ route }: Props) => {
       socket.on('disconnect', () => setConnected(false));
       socket.on('connect_error', connectError => {
         setConnected(false);
+        if (notifyIfTokenAuthenticationFailure(connectError, token)) {
+          setError('');
+          return;
+        }
         setError(connectError.message || 'Không thể kết nối phòng chat.');
       });
       socket.on('chat:message', message => {
@@ -332,6 +347,10 @@ const HouseholdChatScreen = ({ route }: Props) => {
           return;
         }
         if (!response.success) {
+          if (notifyIfTokenAuthenticationFailure(response, user?.accessToken)) {
+            setError('');
+            return;
+          }
           setError(response.message);
           return;
         }
@@ -341,7 +360,14 @@ const HouseholdChatScreen = ({ route }: Props) => {
         setDraft('');
         setError('');
       });
-  }, [draft, setDraft, setError, setMessages, setSending]);
+  }, [
+    draft,
+    setDraft,
+    setError,
+    setMessages,
+    setSending,
+    user?.accessToken,
+  ]);
 
   const renderMessage = useCallback(
     ({ item, index }: { item: HouseholdChatMessage; index: number }) => {
@@ -440,7 +466,7 @@ const HouseholdChatScreen = ({ route }: Props) => {
         <FlatList
           data={messages}
           inverted
-          keyExtractor={item => item.id}
+          keyExtractor={getMessageKey}
           renderItem={renderMessage}
           contentContainerStyle={styles.messagesContent}
           keyboardShouldPersistTaps="handled"

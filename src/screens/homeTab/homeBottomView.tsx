@@ -1,8 +1,7 @@
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaFrame } from 'react-native-safe-area-context';
-import { Shadow } from 'react-native-shadow-2';
 import LinearGradient from '../../components/LinearGradient';
 import { AppImage } from '../../abase/component';
 import { colors } from '../../abase/constant';
@@ -13,11 +12,8 @@ const HomeBottomView = memo((props: IProps) => {
   const { insets, state, navigation } = props;
   const { width } = useSafeAreaFrame();
 
-  const onTabPress = (tabId: number) => {
-    let route = -1;
-
-    route = tabId;
-    console.log(route);
+  const onTabPress = useCallback((tabId: number) => {
+    const route = tabId;
     const event = navigation.emit({
       type: 'tabPress',
       target: state.routes[route].key,
@@ -26,7 +22,7 @@ const HomeBottomView = memo((props: IProps) => {
     if (!event.defaultPrevented) {
       navigation.navigate(state.routes[route].name, state.routes[route].params);
     }
-  };
+  }, [navigation, state.routes]);
 
   const styleView = useMemo(
     () =>
@@ -49,53 +45,46 @@ const HomeBottomView = memo((props: IProps) => {
   return (
     <View style={styleView.container}>
       <View style={styleView.containerStyle}>
-        <Shadow
-          distance={3} // Độ nhòe của bóng
-          startColor={'#00000014'} // Màu bóng từ Figma
-          offset={[0, 1]} // x=0, y=1
-          stretch={true} // Để bóng ôm sát theo chiều rộng view
-          containerStyle={styles.shadowContainer}
-        >
+        <View style={styles.menuWrapper}>
           <LinearGradient
             colors={['#FFFFFF', '#F0F9F4']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.menuWrapper}
-          >
-            <View style={styles.content}>
-              <ItemTab
-                tabId={0}
-                width={width}
-                isSelected={state.index === 0}
-                onPress={onTabPress}
-              />
-              <ItemTab
-                tabId={1}
-                width={width}
-                isSelected={state.index === 1}
-                onPress={onTabPress}
-              />
-              <ItemTab
-                tabId={2}
-                width={width}
-                isSelected={state.index === 2}
-                onPress={onTabPress}
-              />
-              <ItemTab
-                tabId={3}
-                width={width}
-                isSelected={state.index === 3}
-                onPress={onTabPress}
-              />
-              <ItemTab
-                tabId={4}
-                width={width}
-                isSelected={state.index === 4}
-                onPress={onTabPress}
-              />
-            </View>
-          </LinearGradient>
-        </Shadow>
+            style={styles.menuBackground}
+          />
+          <View style={styles.content}>
+            <ItemTab
+              tabId={0}
+              width={width}
+              isSelected={state.index === 0}
+              onPress={onTabPress}
+            />
+            <ItemTab
+              tabId={1}
+              width={width}
+              isSelected={state.index === 1}
+              onPress={onTabPress}
+            />
+            <ItemTab
+              tabId={2}
+              width={width}
+              isSelected={state.index === 2}
+              onPress={onTabPress}
+            />
+            <ItemTab
+              tabId={3}
+              width={width}
+              isSelected={state.index === 3}
+              onPress={onTabPress}
+            />
+            <ItemTab
+              tabId={4}
+              width={width}
+              isSelected={state.index === 4}
+              onPress={onTabPress}
+            />
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -108,25 +97,26 @@ const ItemTab = memo(
     width: number;
     onPress: (tabId: number) => void;
   }) => {
+    const { onPress: onTabPress, tabId } = props;
     const itemInfo = useMemo(() => {
-      return props.tabId === 0
+      return tabId === 0
         ? {
             icon: require('../../imgs/home/home.webp'),
             iconS: require('../../imgs/home/homeS.webp'),
             name: 'Trang chủ',
           }
-        : props.tabId === 1
+        : tabId === 1
         ? {
             icon: require('../../imgs/home/book.webp'),
             iconS: require('../../imgs/home/bookS.webp'),
             name: 'Món ăn',
           }
-        : props.tabId === 2
+        : tabId === 2
         ? {
             icon: require('../../imgs/home/iconS2.webp'),
             iconS: require('../../imgs/home/iconS2.webp'),
           }
-        : props.tabId === 3
+        : tabId === 3
         ? {
             icon: require('../../imgs/home/sCart.webp'),
             iconS: require('../../imgs/home/cart.webp'),
@@ -137,11 +127,11 @@ const ItemTab = memo(
             iconS: require('../../imgs/home/profileS.webp'),
             name: 'Cá nhân',
           };
-    }, [props.tabId]);
+    }, [tabId]);
 
-    const onPress = () => {
-      props.onPress(props.tabId);
-    };
+    const onPress = useCallback(() => {
+      onTabPress(tabId);
+    }, [onTabPress, tabId]);
 
     return (
       <TouchableOpacity
@@ -164,13 +154,21 @@ const ItemTab = memo(
           </>
         )}
         {props.tabId === 2 && (
-          <>
+          <View
+            style={[
+              styles.healthIconWrapper,
+              props.isSelected && styles.healthIconWrapperActive,
+            ]}
+          >
             <AppImage
               source={require('../../imgs/home/iconS2.webp')}
-              style={styles.icon54}
+              style={[
+                styles.healthIcon,
+                props.isSelected && styles.healthIconActive,
+              ]}
               resizeMode="contain"
             />
-          </>
+          </View>
         )}
       </TouchableOpacity>
     );
@@ -178,13 +176,18 @@ const ItemTab = memo(
 );
 
 const styles = StyleSheet.create({
-  shadowContainer: {
-    width: '100%',
-  },
   menuWrapper: {
-    borderRadius: 12,
-    overflow: 'hidden', // Để BlurView không tràn ra ngoài bo góc
+    position: 'relative',
+    overflow: 'visible',
     height: 58,
+  },
+  menuBackground: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 12,
   },
   content: {
     flexDirection: 'row',
@@ -209,7 +212,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   icon24: { width: 24, height: 24 },
-  icon54: { width: 65, height: 65 },
+  healthIconWrapper: {
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  healthIconWrapperActive: {
+    width: 78,
+    height: 78,
+    shadowColor: '#183B29',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  healthIcon: { width: 58, height: 58 },
+  healthIconActive: { width: 76, height: 76 },
   activeTab: {},
 });
 

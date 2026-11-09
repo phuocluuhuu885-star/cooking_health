@@ -266,6 +266,12 @@ const WeeklyMealPlanScreen = () => {
     const adultConsentRequired =
       planMode === 'PERSONAL' && (user.healthProfile?.age ?? 0) >= 18;
     if (adultConsentRequired && !hasAiRecommendationConsent(user.id)) {
+      const userId = user.id;
+      function handleConsent() {
+        saveAiRecommendationConsent(userId, true);
+        generatePlan();
+      }
+
       Alert.alert(
         'Đồng ý dùng gợi ý AI?',
         'Để tạo kế hoạch, HealthAndCook gửi mục tiêu kcal/macro, dinh dưỡng đã ghi nhận theo ngày và thông tin món trong thư viện đến Google Gemini. Không gửi tên, email, mã tài khoản, tuổi, giới tính, chiều cao, cân nặng hoặc BMI. Bạn có thể từ chối và vẫn dùng gợi ý dinh dưỡng xử lý nội bộ.',
@@ -273,10 +279,7 @@ const WeeklyMealPlanScreen = () => {
           { text: 'Để sau', style: 'cancel' },
           {
             text: 'Đồng ý và tạo',
-            onPress: () => {
-              saveAiRecommendationConsent(user.id, true);
-              generatePlan();
-            },
+            onPress: handleConsent,
           },
         ],
       );
@@ -816,6 +819,22 @@ const WeeklyMealPlanScreen = () => {
     [renderMealOption, selectedDay, state.selectedMeals],
   );
 
+  function hasSavedMealBudget(period: MealPeriod) {
+    return state.mealBudgets[period] !== undefined;
+  }
+
+  function formatSavedMealBudget(period: MealPeriod) {
+    return `${period === 'LUNCH' ? 'trưa' : 'tối'} ${Math.round(
+      state.mealBudgets[period]!,
+    ).toLocaleString('vi-VN')}đ`;
+  }
+
+  const savedMealBudgetHint = Object.keys(state.mealBudgets).length
+    ? `Ngân sách tổng đã lưu: ${PERIODS.filter(hasSavedMealBudget)
+        .map(formatSavedMealBudget)
+        .join(' · ')}. Gợi ý được ưu tiên theo giới hạn này.`
+    : 'Có thể đặt ngân sách tổng cho từng bữa trong mục Quản lý chi tiêu.';
+
   return (
     <View style={styles.screen}>
       <ScreenHeader
@@ -891,16 +910,7 @@ const WeeklyMealPlanScreen = () => {
           </View>
         ) : null}
         <Text style={styles.savedMealBudgetHint}>
-          {Object.keys(state.mealBudgets).length
-            ? `Ngân sách tổng đã lưu: ${PERIODS.filter(period => state.mealBudgets[period] !== undefined)
-                .map(
-                  period =>
-                    `${period === 'LUNCH' ? 'trưa' : 'tối'} ${Math.round(
-                      state.mealBudgets[period]!,
-                    ).toLocaleString('vi-VN')}đ`,
-                )
-                .join(' · ')}. Gợi ý được ưu tiên theo giới hạn này.`
-            : 'Có thể đặt ngân sách tổng cho từng bữa trong mục Quản lý chi tiêu.'}
+          {savedMealBudgetHint}
         </Text>
         {planMode === 'FAMILY' && !household ? (
           <LinearGradient

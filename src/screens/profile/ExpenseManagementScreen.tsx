@@ -194,6 +194,222 @@ const emptyIncomeForm = (): IncomeForm => ({
   note: '',
 });
 
+const CategoryChip = <T extends ExpenseCategory | IncomeCategory>({
+  id,
+  label,
+  icon,
+  selected,
+  onSelect,
+}: {
+  id: T;
+  label: string;
+  icon: string;
+  selected: boolean;
+  onSelect: (id: T) => void;
+}) => {
+  const handlePress = useCallback(() => {
+    onSelect(id);
+  }, [id, onSelect]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={handlePress}
+      style={[styles.categoryChip, selected && styles.categoryChipSelected]}
+    >
+      <Text style={styles.categoryIcon}>{icon}</Text>
+      <Text
+        style={[styles.categoryText, selected && styles.categoryTextSelected]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+};
+
+const IncomeTransactionRow = ({
+  item,
+  onEdit,
+  onRemove,
+}: {
+  item: Income;
+  onEdit: (item: Income) => void;
+  onRemove: (item: Income) => void;
+}) => {
+  const handleEdit = useCallback(() => onEdit(item), [item, onEdit]);
+  const handleRemove = useCallback(() => onRemove(item), [item, onRemove]);
+  const category = INCOME_CATEGORIES.find(
+    incomeCategory => incomeCategory.id === item.category,
+  );
+
+  return (
+    <View style={styles.expenseCard}>
+      <View style={styles.expenseMeta}>
+        <View style={styles.tagWrap}>
+          <Text style={styles.tagIcon}>{category?.icon ?? '💵'}</Text>
+          <Text style={styles.tagText}>{category?.label ?? 'Khác'}</Text>
+        </View>
+        <Text style={styles.expenseDate}>{item.incomeDate}</Text>
+      </View>
+      <View style={styles.expenseTitleRow}>
+        <Text style={styles.expenseTitle}>{item.title}</Text>
+        {item.note ? (
+          <Text style={styles.expenseNote} numberOfLines={1}>
+            {item.note}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.expenseAmountWrap}>
+        <Text style={styles.incomeAmount}>{formatMoney(item.amountVnd)}</Text>
+        <View style={styles.rowActions}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleEdit}
+            style={styles.rowIconButton}
+            hitSlop={8}
+          >
+            <Svg width={17} height={17} viewBox="0 0 24 24">
+              <Path
+                d="m14 5 5 5M4 20l4.5-1 10.2-10.2a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z"
+                fill="none"
+                stroke={COLORS.green}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+              />
+            </Svg>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleRemove}
+            style={styles.rowIconButton}
+            hitSlop={8}
+          >
+            <Svg width={17} height={17} viewBox="0 0 24 24">
+              <Path
+                d="M4 7h16M10 11v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3"
+                fill="none"
+                stroke={COLORS.danger}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+              />
+            </Svg>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const MealPickerOption = ({
+  meal,
+  onSelect,
+}: {
+  meal: BackendMeal;
+  onSelect: (meal: BackendMeal) => void;
+}) => {
+  const handlePress = useCallback(() => onSelect(meal), [meal, onSelect]);
+  const category =
+    meal.category === 'LUNCH'
+      ? 'Bữa trưa'
+      : meal.category === 'DINNER'
+        ? 'Bữa tối'
+        : meal.category === 'BREAKFAST'
+          ? 'Bữa sáng'
+          : 'Ăn nhẹ';
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={handlePress}
+      style={styles.mealOption}
+    >
+      <Text style={styles.mealOptionName}>{meal.name}</Text>
+      <Text style={styles.mealOptionCategory}>{category}</Text>
+    </Pressable>
+  );
+};
+
+const ExpenseTransactionRow = ({
+  item,
+  onEdit,
+  onRemove,
+}: {
+  item: Expense;
+  onEdit: (item: Expense) => void;
+  onRemove: (item: Expense) => void;
+}) => {
+  const handleEdit = useCallback(() => onEdit(item), [item, onEdit]);
+  const handleRemove = useCallback(() => onRemove(item), [item, onRemove]);
+
+  return (
+    <View style={styles.expenseRow}>
+      <View style={styles.expenseIcon}>
+        <Text style={styles.expenseIconText}>
+          {item.source === 'MEAL' ? '🍽' : '₫'}
+        </Text>
+      </View>
+      <View style={styles.expenseCopy}>
+        <Text style={styles.expenseTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={styles.expenseMeta}>
+          {categoryLabel(item.category)} · {item.expenseDate}
+          {item.source === 'MEAL' ? ' · Món trong app' : ''}
+        </Text>
+        {item.note ? (
+          <Text style={styles.expenseNote} numberOfLines={1}>
+            {item.note}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.expenseAmountWrap}>
+        <Text style={styles.expenseAmount}>{formatMoney(item.amountVnd)}</Text>
+        <View style={styles.rowActions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Sửa ${item.title}`}
+            onPress={handleEdit}
+            style={styles.rowIconButton}
+            hitSlop={8}
+          >
+            <Svg width={17} height={17} viewBox="0 0 24 24">
+              <Path
+                d="m14 5 5 5M4 20l4.5-1 10.2-10.2a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z"
+                fill="none"
+                stroke={COLORS.green}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+              />
+            </Svg>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Xóa ${item.title}`}
+            onPress={handleRemove}
+            style={styles.rowIconButton}
+            hitSlop={8}
+          >
+            <Svg width={17} height={17} viewBox="0 0 24 24">
+              <Path
+                d="M4 7h16M10 11v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3"
+                fill="none"
+                stroke={COLORS.danger}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+              />
+            </Svg>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+};
+
 const ExpenseManagementScreen = () => {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
@@ -702,6 +918,130 @@ const ExpenseManagementScreen = () => {
     setEditingIncomeId(null);
     setIncomeForm(emptyIncomeForm());
   }, []);
+  const handlePersonalScope = useCallback(() => {
+    changeScope('PERSONAL');
+  }, [changeScope]);
+  const handleHouseholdScope = useCallback(() => {
+    changeScope('HOUSEHOLD');
+  }, [changeScope]);
+  const handleExpenseTitleChange = useCallback(
+    (title: string) => {
+      setForm(previous => ({ ...previous, title }));
+    },
+    [setForm],
+  );
+  const handleExpenseAmountChange = useCallback(
+    (amount: string) => {
+      setForm(previous => ({
+        ...previous,
+        amount: amount.replace(/[^\d]/g, ''),
+      }));
+    },
+    [setForm],
+  );
+  const handleExpenseNoteChange = useCallback(
+    (note: string) => {
+      setForm(previous => ({ ...previous, note }));
+    },
+    [setForm],
+  );
+  const handleIncomeTitleChange = useCallback(
+    (title: string) => {
+      setIncomeForm(previous => ({ ...previous, title }));
+    },
+    [setIncomeForm],
+  );
+  const handleIncomeAmountChange = useCallback(
+    (amount: string) => {
+      setIncomeForm(previous => ({
+        ...previous,
+        amount: amount.replace(/[^\d]/g, ''),
+      }));
+    },
+    [setIncomeForm],
+  );
+  const handleIncomeDateChange = useCallback(
+    (date: string) => {
+      setIncomeForm(previous => ({ ...previous, date: date.slice(0, 10) }));
+    },
+    [setIncomeForm],
+  );
+  const handleIncomeNoteChange = useCallback(
+    (note: string) => {
+      setIncomeForm(previous => ({ ...previous, note }));
+    },
+    [setIncomeForm],
+  );
+  const handleToggleDatePicker = useCallback(() => {
+    setDatePickerVisible(value => !value);
+  }, []);
+  const handleToggleMealPicker = useCallback(() => {
+    setMealPickerVisible(value => !value);
+  }, []);
+  const handleClearSelectedMeal = useCallback(() => {
+    setForm(previous => ({ ...previous, mealId: null }));
+  }, []);
+  const selectExpenseCategory = useCallback((category: ExpenseCategory) => {
+    setForm(previous => ({
+      ...previous,
+      category,
+      ...(category === 'FOOD' ? {} : { mealId: null }),
+    }));
+    if (category !== 'FOOD') {
+      setMealPickerVisible(false);
+      setMealSearch('');
+    }
+  }, []);
+  const selectIncomeCategory = useCallback((category: IncomeCategory) => {
+    setIncomeForm(previous => ({ ...previous, category }));
+  }, []);
+  const selectedMealName =
+    meals.find(meal => meal.id === form.mealId)?.name ?? form.title;
+  const renderIncomeItem = (item: Income) => (
+    <IncomeTransactionRow
+      key={item.id}
+      item={item}
+      onEdit={editIncome}
+      onRemove={removeIncome}
+    />
+  );
+  const renderExpenseCategory = (category: (typeof CATEGORIES)[number]) => (
+    <CategoryChip
+      key={category.id}
+      id={category.id}
+      label={category.label}
+      icon={category.icon}
+      selected={form.category === category.id}
+      onSelect={selectExpenseCategory}
+    />
+  );
+  const renderMealOption = (meal: BackendMeal) => (
+    <MealPickerOption
+      key={meal.id}
+      meal={meal}
+      onSelect={selectMeal}
+    />
+  );
+  const renderIncomeCategory = (
+    category: (typeof INCOME_CATEGORIES)[number],
+  ) => (
+    <CategoryChip
+      key={category.id}
+      id={category.id}
+      label={category.label}
+      icon={category.icon}
+      selected={incomeForm.category === category.id}
+      onSelect={selectIncomeCategory}
+    />
+  );
+  const renderExpenseItem = (item: Expense) => (
+    <ExpenseTransactionRow
+      key={item.id}
+      item={item}
+      onEdit={editExpense}
+      onRemove={removeExpense}
+    />
+  );
 
   return (
     <View style={styles.screen}>
@@ -731,13 +1071,13 @@ const ExpenseManagementScreen = () => {
           <ScopeButton
             label="Cá nhân"
             selected={scope === 'PERSONAL'}
-            onPress={() => changeScope('PERSONAL')}
+            onPress={handlePersonalScope}
           />
           {household ? (
             <ScopeButton
               label={`Hộ ${household.name}`}
               selected={scope === 'HOUSEHOLD'}
-              onPress={() => changeScope('HOUSEHOLD')}
+              onPress={handleHouseholdScope}
             />
           ) : null}
         </View>
@@ -843,74 +1183,7 @@ const ExpenseManagementScreen = () => {
             </View>
             {incomeItems.length ? (
               <View style={styles.expenseList}>
-                {incomeItems.map(item => (
-                  <View key={item.id} style={styles.expenseCard}>
-                    <View style={styles.expenseMeta}>
-                      <View style={styles.tagWrap}>
-                        <Text style={styles.tagIcon}>
-                          {INCOME_CATEGORIES.find(
-                            category => category.id === item.category,
-                          )?.icon ?? '💵'}
-                        </Text>
-                        <Text style={styles.tagText}>
-                          {INCOME_CATEGORIES.find(
-                            category => category.id === item.category,
-                          )?.label ?? 'Khác'}
-                        </Text>
-                      </View>
-                      <Text style={styles.expenseDate}>{item.incomeDate}</Text>
-                    </View>
-                    <View style={styles.expenseTitleRow}>
-                      <Text style={styles.expenseTitle}>{item.title}</Text>
-                      {item.note ? (
-                        <Text style={styles.expenseNote} numberOfLines={1}>
-                          {item.note}
-                        </Text>
-                      ) : null}
-                    </View>
-                    <View style={styles.expenseAmountWrap}>
-                      <Text style={styles.incomeAmount}>
-                        {formatMoney(item.amountVnd)}
-                      </Text>
-                      <View style={styles.rowActions}>
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => editIncome(item)}
-                          style={styles.rowIconButton}
-                          hitSlop={8}
-                        >
-                          <Svg width={17} height={17} viewBox="0 0 24 24">
-                            <Path
-                              d="m14 5 5 5M4 20l4.5-1 10.2-10.2a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z"
-                              fill="none"
-                              stroke={COLORS.green}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.8}
-                            />
-                          </Svg>
-                        </Pressable>
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => removeIncome(item)}
-                          style={styles.rowIconButton}
-                          hitSlop={8}
-                        >
-                          <Svg width={17} height={17} viewBox="0 0 24 24">
-                            <Path
-                              d="M4 7h16M10 11v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3"
-                              fill="none"
-                              stroke={COLORS.danger}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.8}
-                            />
-                          </Svg>
-                        </Pressable>
-                      </View>
-                    </View>
-                  </View>
-                ))}
+                {incomeItems.map(renderIncomeItem)}
               </View>
             ) : (
               <View style={styles.emptyCard}>
@@ -981,9 +1254,7 @@ const ExpenseManagementScreen = () => {
                   <Text style={styles.inputLabel}>Tên khoản chi</Text>
                   <TextInput
                     accessibilityLabel="Tên khoản chi"
-                    onChangeText={title =>
-                      setForm(previous => ({ ...previous, title }))
-                    }
+                    onChangeText={handleExpenseTitleChange}
                     placeholder="Ví dụ: Đi chợ, ăn trưa..."
                     placeholderTextColor="#97A59D"
                     value={form.title}
@@ -995,12 +1266,7 @@ const ExpenseManagementScreen = () => {
                   <TextInput
                     accessibilityLabel="Số tiền thực tế"
                     keyboardType="number-pad"
-                    onChangeText={amount =>
-                      setForm(previous => ({
-                        ...previous,
-                        amount: amount.replace(/[^\d]/g, ''),
-                      }))
-                    }
+                    onChangeText={handleExpenseAmountChange}
                     placeholder="Nhập số tiền đã thanh toán"
                     placeholderTextColor="#97A59D"
                     value={form.amount}
@@ -1011,7 +1277,7 @@ const ExpenseManagementScreen = () => {
                     accessibilityRole="button"
                     accessibilityLabel={`Ngày chi ${form.date}. Chạm để chọn ngày`}
                     accessibilityHint="Mở lịch chọn ngày chi"
-                    onPress={() => setDatePickerVisible(value => !value)}
+                    onPress={handleToggleDatePicker}
                     style={styles.dateButton}
                   >
                     <Text style={styles.dateButtonText}>{form.date}</Text>
@@ -1052,42 +1318,7 @@ const ExpenseManagementScreen = () => {
                   ) : null}
                   <Text style={styles.inputLabel}>Danh mục</Text>
                   <View style={styles.categoryGrid}>
-                    {CATEGORIES.map(category => (
-                      <Pressable
-                        key={category.id}
-                        accessibilityRole="button"
-                        accessibilityState={{
-                          selected: form.category === category.id,
-                        }}
-                        onPress={() => {
-                          setForm(previous => ({
-                            ...previous,
-                            category: category.id,
-                            ...(category.id === 'FOOD' ? {} : { mealId: null }),
-                          }));
-                          if (category.id !== 'FOOD') {
-                            setMealPickerVisible(false);
-                            setMealSearch('');
-                          }
-                        }}
-                        style={[
-                          styles.categoryChip,
-                          form.category === category.id &&
-                            styles.categoryChipSelected,
-                        ]}
-                      >
-                        <Text style={styles.categoryIcon}>{category.icon}</Text>
-                        <Text
-                          style={[
-                            styles.categoryText,
-                            form.category === category.id &&
-                              styles.categoryTextSelected,
-                          ]}
-                        >
-                          {category.label}
-                        </Text>
-                      </Pressable>
-                    ))}
+                    {CATEGORIES.map(renderExpenseCategory)}
                   </View>
                   {form.category === 'FOOD' ? (
                     <>
@@ -1097,17 +1328,11 @@ const ExpenseManagementScreen = () => {
                       {form.mealId ? (
                         <View style={styles.selectedMeal}>
                           <Text style={styles.selectedMealText}>
-                            {meals.find(meal => meal.id === form.mealId)
-                              ?.name ?? form.title}
+                            {selectedMealName}
                           </Text>
                           <Pressable
                             accessibilityRole="button"
-                            onPress={() =>
-                              setForm(previous => ({
-                                ...previous,
-                                mealId: null,
-                              }))
-                            }
+                            onPress={handleClearSelectedMeal}
                           >
                             <Text style={styles.removeMealText}>Bỏ chọn</Text>
                           </Pressable>
@@ -1115,7 +1340,7 @@ const ExpenseManagementScreen = () => {
                       ) : (
                         <Pressable
                           accessibilityRole="button"
-                          onPress={() => setMealPickerVisible(value => !value)}
+                          onPress={handleToggleMealPicker}
                           style={styles.mealPickerButton}
                         >
                           <Text style={styles.mealPickerText}>
@@ -1140,27 +1365,7 @@ const ExpenseManagementScreen = () => {
                               {mealLoadError}
                             </Text>
                           ) : matchingMeals.length ? (
-                            matchingMeals.map(meal => (
-                              <Pressable
-                                key={meal.id}
-                                accessibilityRole="button"
-                                onPress={() => selectMeal(meal)}
-                                style={styles.mealOption}
-                              >
-                                <Text style={styles.mealOptionName}>
-                                  {meal.name}
-                                </Text>
-                                <Text style={styles.mealOptionCategory}>
-                                  {meal.category === 'LUNCH'
-                                    ? 'Bữa trưa'
-                                    : meal.category === 'DINNER'
-                                    ? 'Bữa tối'
-                                    : meal.category === 'BREAKFAST'
-                                    ? 'Bữa sáng'
-                                    : 'Ăn nhẹ'}
-                                </Text>
-                              </Pressable>
-                            ))
+                            matchingMeals.map(renderMealOption)
                           ) : (
                             <Text style={styles.emptyText}>
                               Không tìm thấy món phù hợp.
@@ -1176,9 +1381,7 @@ const ExpenseManagementScreen = () => {
                   <TextInput
                     accessibilityLabel="Ghi chú khoản chi"
                     multiline
-                    onChangeText={note =>
-                      setForm(previous => ({ ...previous, note }))
-                    }
+                    onChangeText={handleExpenseNoteChange}
                     placeholder="Thêm ghi chú..."
                     placeholderTextColor="#97A59D"
                     value={form.note}
@@ -1264,9 +1467,7 @@ const ExpenseManagementScreen = () => {
                   <Text style={styles.inputLabel}>Tên khoản thu</Text>
                   <TextInput
                     accessibilityLabel="Tên khoản thu"
-                    onChangeText={title =>
-                      setIncomeForm(previous => ({ ...previous, title }))
-                    }
+                    onChangeText={handleIncomeTitleChange}
                     placeholder="Ví dụ: Lương tháng, doán hợp đồng..."
                     placeholderTextColor="#97A59D"
                     value={incomeForm.title}
@@ -1276,12 +1477,7 @@ const ExpenseManagementScreen = () => {
                   <TextInput
                     accessibilityLabel="Số tiền nhận"
                     keyboardType="number-pad"
-                    onChangeText={amount =>
-                      setIncomeForm(previous => ({
-                        ...previous,
-                        amount: amount.replace(/[^\d]/g, ''),
-                      }))
-                    }
+                    onChangeText={handleIncomeAmountChange}
                     placeholder="Nhập số tiền đã nhận"
                     placeholderTextColor="#97A59D"
                     value={incomeForm.amount}
@@ -1290,12 +1486,7 @@ const ExpenseManagementScreen = () => {
                   <Text style={styles.inputLabel}>Ngày thu</Text>
                   <TextInput
                     accessibilityLabel="Ngày thu"
-                    onChangeText={date =>
-                      setIncomeForm(previous => ({
-                        ...previous,
-                        date: date.slice(0, 10),
-                      }))
-                    }
+                    onChangeText={handleIncomeDateChange}
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor="#97A59D"
                     value={incomeForm.date}
@@ -1303,37 +1494,7 @@ const ExpenseManagementScreen = () => {
                   />
                   <Text style={styles.inputLabel}>Danh mục</Text>
                   <View style={styles.categoryGrid}>
-                    {INCOME_CATEGORIES.map(category => (
-                      <Pressable
-                        key={category.id}
-                        accessibilityRole="button"
-                        accessibilityState={{
-                          selected: incomeForm.category === category.id,
-                        }}
-                        onPress={() =>
-                          setIncomeForm(previous => ({
-                            ...previous,
-                            category: category.id,
-                          }))
-                        }
-                        style={[
-                          styles.categoryChip,
-                          incomeForm.category === category.id &&
-                            styles.categoryChipSelected,
-                        ]}
-                      >
-                        <Text style={styles.categoryIcon}>{category.icon}</Text>
-                        <Text
-                          style={[
-                            styles.categoryText,
-                            incomeForm.category === category.id &&
-                              styles.categoryTextSelected,
-                          ]}
-                        >
-                          {category.label}
-                        </Text>
-                      </Pressable>
-                    ))}
+                    {INCOME_CATEGORIES.map(renderIncomeCategory)}
                   </View>
                   <Text style={styles.inputLabel}>
                     Ghi chú (không bắt buộc)
@@ -1341,9 +1502,7 @@ const ExpenseManagementScreen = () => {
                   <TextInput
                     accessibilityLabel="Ghi chú khoản thu"
                     multiline
-                    onChangeText={note =>
-                      setIncomeForm(previous => ({ ...previous, note }))
-                    }
+                    onChangeText={handleIncomeNoteChange}
                     placeholder="Thêm ghi chú..."
                     placeholderTextColor="#97A59D"
                     value={incomeForm.note}
@@ -1395,72 +1554,7 @@ const ExpenseManagementScreen = () => {
           </View>
         ) : transactionsVisible && items.length ? (
           <View style={styles.expenseList}>
-            {items.map(item => (
-              <View key={item.id} style={styles.expenseRow}>
-                <View style={styles.expenseIcon}>
-                  <Text style={styles.expenseIconText}>
-                    {item.source === 'MEAL' ? '🍽' : '₫'}
-                  </Text>
-                </View>
-                <View style={styles.expenseCopy}>
-                  <Text style={styles.expenseTitle} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.expenseMeta}>
-                    {categoryLabel(item.category)} · {item.expenseDate}
-                    {item.source === 'MEAL' ? ' · Món trong app' : ''}
-                  </Text>
-                  {item.note ? (
-                    <Text style={styles.expenseNote} numberOfLines={1}>
-                      {item.note}
-                    </Text>
-                  ) : null}
-                </View>
-                <View style={styles.expenseAmountWrap}>
-                  <Text style={styles.expenseAmount}>
-                    {formatMoney(item.amountVnd)}
-                  </Text>
-                  <View style={styles.rowActions}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Sửa ${item.title}`}
-                      onPress={() => editExpense(item)}
-                      style={styles.rowIconButton}
-                      hitSlop={8}
-                    >
-                      <Svg width={17} height={17} viewBox="0 0 24 24">
-                        <Path
-                          d="m14 5 5 5M4 20l4.5-1 10.2-10.2a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z"
-                          fill="none"
-                          stroke={COLORS.green}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.8}
-                        />
-                      </Svg>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Xóa ${item.title}`}
-                      onPress={() => removeExpense(item)}
-                      style={styles.rowIconButton}
-                      hitSlop={8}
-                    >
-                      <Svg width={17} height={17} viewBox="0 0 24 24">
-                        <Path
-                          d="M4 7h16M10 11v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3"
-                          fill="none"
-                          stroke={COLORS.danger}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.8}
-                        />
-                      </Svg>
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-            ))}
+            {items.map(renderExpenseItem)}
           </View>
         ) : transactionsVisible ? (
           <View style={styles.emptyCard}>

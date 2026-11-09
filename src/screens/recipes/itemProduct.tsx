@@ -1,5 +1,6 @@
 import { memo, useCallback } from 'react';
 import {
+  type GestureResponderEvent,
   Pressable,
   StyleSheet,
   Text,
@@ -32,6 +33,22 @@ const ItemProduct = memo(
       onPress(item.id);
     }, [item.id, onPress]);
 
+    const handleFavoritePress = useCallback(
+      (event: GestureResponderEvent) => {
+        event.stopPropagation();
+        handleFavorite();
+      },
+      [handleFavorite],
+    );
+
+    const handleAddPress = useCallback(
+      (event: GestureResponderEvent) => {
+        event.stopPropagation();
+        handleAdd();
+      },
+      [handleAdd],
+    );
+
     return (
       <Pressable
         accessibilityRole="button"
@@ -56,10 +73,7 @@ const ItemProduct = memo(
           </View>
           <TouchableOpacity
             hitSlop={8}
-            onPress={event => {
-              event.stopPropagation();
-              handleFavorite();
-            }}
+            onPress={handleFavoritePress}
             style={[styles.favoriteButton, isFavorite && styles.favoriteActive]}
             accessibilityRole="button"
             accessibilityLabel={
@@ -114,10 +128,7 @@ const ItemProduct = memo(
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={`Thêm ${item.name} vào thực đơn`}
-              onPress={event => {
-                event.stopPropagation();
-                handleAdd();
-              }}
+              onPress={handleAddPress}
               style={styles.addButton}
             >
               <Text style={styles.addText}>＋</Text>

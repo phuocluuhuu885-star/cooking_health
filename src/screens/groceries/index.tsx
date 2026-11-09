@@ -30,6 +30,7 @@ import {
 } from '../../reduxs/reduces/appData';
 import { useAppDispatch } from '../../reduxs/store';
 import { syncApi, setSyncUser } from '../../utils/syncUtils';
+import { createMealExpenses } from '../../utils/expenseApi';
 import { fetchCurrentHousehold } from '../../utils/householdApi';
 import type { GlobalState } from '../../type/global';
 import type {
@@ -57,6 +58,10 @@ import { completeMealPeriod } from '../../utils/mealPlanApi';
 import HomeIngredientSummaryModal from '../home/homeIngredientSummaryModal';
 import PlannedMealItem from './plannedMealItem';
 import HouseholdScreen from '../household';
+import TestBannerAd from '../component/TestBannerAd';
+import MealConsumptionModal, {
+  type MealExpenseEntry,
+} from '../component/MealConsumptionModal';
 
 const EMPTY_NUTRITION: Nutrition = {
   calories: 0,
@@ -102,6 +107,10 @@ const MealPlanScreen = () => {
     ingredientSummaryLoading: false,
     ingredientSummaryError: '',
   });
+  const [consumptionConfirmation, setConsumptionConfirmation] = useState<{
+    mealPeriod: MealPeriod;
+    items: PlannedMeal[];
+  } | null>(null);
   const cachedPersonalMealPlan = useSelector((root: GlobalState) =>
     selectMealPlanForDate(root, state.date),
   );
@@ -116,6 +125,7 @@ const MealPlanScreen = () => {
     cachedPlan: cachedMealPlan,
     ingredientRequestId: 0,
     planRequestId: 0,
+    completionInFlight: false,
   });
   refs.current.cachedPlan = cachedMealPlan;
   const meals = cachedMealPlan?.meals ?? EMPTY_MEALS;
@@ -273,11 +283,17 @@ const MealPlanScreen = () => {
   );
 
   const confirmMealPeriod = useCallback(
-    async (mealPeriod: MealPeriod) => {
-      if (!user?.accessToken) {
+    async (
+      mealPeriod: MealPeriod,
+      items: PlannedMeal[],
+      expenses: MealExpenseEntry[],
+    ) => {
+      if (!user?.accessToken || refs.current.completionInFlight) {
         return;
       }
+      refs.current.completionInFlight = true;
       setState(previous => ({ ...previous, completingPeriod: mealPeriod }));
+      let expenseError = '';
       try {
         const response = await completeMealPeriod(
           user,
@@ -291,6 +307,7 @@ const MealPlanScreen = () => {
           );
           return;
         }
+        setConsumptionConfirmation(null);
         dispatch(invalidateCachedConsumptionReports({ userId: user.id }));
         if (viewMode === 'HOUSEHOLD' && household) {
           dispatch(
@@ -305,10 +322,41 @@ const MealPlanScreen = () => {
             invalidateCachedMealPlan({ userId: user.id, date: state.date }),
           );
         }
+        const expenseFailures = await createMealExpenses(
+          user,
+          viewMode === 'HOUSEHOLD' && household ? 'HOUSEHOLD' : 'PERSONAL',
+          {
+            date: state.date,
+            mealPeriod,
+            expenses: expenses.flatMap(expense => {
+              const meal = items.find(item => item.meal.id === expense.mealId);
+              return meal
+                ? [
+                    {
+                      ...expense,
+                      mealName: meal.meal.name,
+                    },
+                  ]
+                : [];
+            }),
+          },
+        );
+        if (expenseFailures.length > 0) {
+          expenseError = expenseFailures
+            .map(failure => `${failure.mealName}: ${failure.message}`)
+            .join('\n');
+        }
         await loadMealPlan(true);
+        if (expenseError) {
+          Alert.alert(
+            'Bữa ăn đã ghi nhận',
+            `Dinh dưỡng đã được lưu nhưng một số khoản chi chưa được ghi lại:\n${expenseError}`,
+          );
+        }
       } catch {
         Alert.alert('Không thể hoàn thành bữa ăn', 'Vui lòng thử lại sau.');
       } finally {
+        refs.current.completionInFlight = false;
         setState(previous => ({ ...previous, completingPeriod: null }));
       }
     },
@@ -321,26 +369,28 @@ const MealPlanScreen = () => {
     if (unrecordedItems.length === 0) {
       return;
     }
-    Alert.alert(
-      meals[state.selectedPeriod].isCompleted
-        ? 'Ghi nhận món mới đã ăn?'
-        : `Xác nhận đã ăn ${
-            state.selectedPeriod === 'LUNCH' ? 'bữa trưa' : 'bữa tối'
-          }?`,
-      meals[state.selectedPeriod].isCompleted
-        ? 'Các món mới sẽ được cộng vào báo cáo dinh dưỡng. Món đã ghi nhận trước đó không bị tính lặp.'
-        : 'Tất cả món trong bữa sẽ được ghi nhận vào báo cáo dinh dưỡng của bạn.',
-      [
-        { text: 'Chưa ăn', style: 'cancel' },
-        {
-          text: meals[state.selectedPeriod].isCompleted
-            ? 'Ghi nhận thêm'
-            : 'Xác nhận đã ăn',
-          onPress: () => confirmMealPeriod(state.selectedPeriod),
-        },
-      ],
-    );
-  }, [confirmMealPeriod, meals, state.selectedPeriod]);
+    setConsumptionConfirmation({
+      mealPeriod: state.selectedPeriod,
+      items: unrecordedItems,
+    });
+  }, [meals, state.selectedPeriod]);
+
+  const handleCancelConsumptionConfirmation = useCallback(() => {
+    if (state.completingPeriod) return;
+    setConsumptionConfirmation(null);
+  }, [state.completingPeriod]);
+
+  const handleConfirmConsumption = useCallback(
+    (expenses: MealExpenseEntry[]) => {
+      if (!consumptionConfirmation) return;
+      confirmMealPeriod(
+        consumptionConfirmation.mealPeriod,
+        consumptionConfirmation.items,
+        expenses,
+      );
+    },
+    [confirmMealPeriod, consumptionConfirmation],
+  );
 
   const deletePlannedMeal = useCallback(
     (item: PlannedMeal) => {
@@ -537,6 +587,35 @@ const MealPlanScreen = () => {
     }));
   }, []);
   const activePlan = meals[state.selectedPeriod];
+  const selectedMealSummaries = useMemo(
+    () =>
+      selectedMeals.map(item => ({
+        id: item.meal.id,
+        name: item.meal.name,
+        servings: item.servings,
+      })),
+    [selectedMeals],
+  );
+  const confirmationMeals = useMemo(
+    () =>
+      consumptionConfirmation?.items.map(item => ({
+        mealId: item.meal.id,
+        name: item.meal.name,
+        estimatedPrice: item.estimatedPrice,
+      })) ?? [],
+    [consumptionConfirmation],
+  );
+  const renderPlannedMeal = useCallback(
+    (item: PlannedMeal) => (
+      <PlannedMealItem
+        key={item.id}
+        item={item}
+        canDelete={!activePlan.isLocked && !activePlan.isCompleted}
+        onDelete={deletePlannedMeal}
+      />
+    ),
+    [activePlan.isCompleted, activePlan.isLocked, deletePlannedMeal],
+  );
   const viewPeriodIngredients = useCallback(() => {
     if (activePlan.items.length === 0) {
       return;
@@ -578,6 +657,9 @@ const MealPlanScreen = () => {
     PERIODS.map(period => meals[period.id].estimatedPrice),
   );
   const activeEstimatedPrice = activePlan.estimatedPrice;
+  const selectedPeriodLabel =
+    PERIODS.find(period => period.id === state.selectedPeriod)?.label ?? '';
+  const hasUnconsumedMeals = activePlan.items.some(item => !item.isConsumed);
   const dailyCaloriesTarget = user?.healthProfile?.dailyCaloriesTarget;
   const toggleViewMode = useCallback(() => {
     refs.current.ingredientRequestId += 1;
@@ -694,8 +776,7 @@ const MealPlanScreen = () => {
               >
                 <View style={styles.periodHeader}>
                   <Text style={styles.cardTitle}>
-                    {PERIODS.find(period => period.id === state.selectedPeriod)
-                      ?.label ?? ''}
+                    {selectedPeriodLabel}
                   </Text>
                   {activePlan.items.length > 0 ? (
                     <Pressable
@@ -722,16 +803,7 @@ const MealPlanScreen = () => {
                   <Text style={styles.emptyText}>Bạn chưa thêm món</Text>
                 ) : (
                   <>
-                    {activePlan.items.map(item => (
-                      <PlannedMealItem
-                        key={item.id}
-                        item={item}
-                        canDelete={
-                          !activePlan.isLocked && !activePlan.isCompleted
-                        }
-                        onDelete={deletePlannedMeal}
-                      />
-                    ))}
+                    {activePlan.items.map(renderPlannedMeal)}
                     {activePlan.isCompleted ? (
                       <Text style={styles.completedMessage}>
                         Bữa ăn đã được ghi nhận. Món mới sẽ được ghi thêm khi
@@ -743,7 +815,7 @@ const MealPlanScreen = () => {
                         thể xác nhận phần ăn của mình.
                       </Text>
                     ) : null}
-                    {activePlan.items.some(item => !item.isConsumed) ? (
+                    {hasUnconsumedMeals ? (
                       <Pressable
                         accessibilityRole="button"
                         disabled={
@@ -775,22 +847,32 @@ const MealPlanScreen = () => {
               </LinearGradient>
             </>
           )}
+          {viewMode === 'PERSONAL' ? <TestBannerAd /> : null}
           <View style={styles.bottomSpace} />
         </ScrollView>
       )}
       {viewMode === 'PERSONAL' ? (
         <HomeIngredientSummaryModal
           visible={state.ingredientSummaryVisible}
-          selectedMeals={selectedMeals.map(item => ({
-            id: item.meal.id,
-            name: item.meal.name,
-            servings: item.servings,
-          }))}
+          selectedMeals={selectedMealSummaries}
           ingredients={state.ingredientSummary}
           loading={state.ingredientSummaryLoading}
           error={state.ingredientSummaryError}
           onClose={closeIngredientSummary}
           onRetry={loadIngredientSummary}
+        />
+      ) : null}
+      {consumptionConfirmation ? (
+        <MealConsumptionModal
+          visible
+          date={state.date}
+          mealPeriod={consumptionConfirmation.mealPeriod}
+          meals={confirmationMeals}
+          saving={
+            state.completingPeriod === consumptionConfirmation.mealPeriod
+          }
+          onCancel={handleCancelConsumptionConfirmation}
+          onConfirm={handleConfirmConsumption}
         />
       ) : null}
     </View>

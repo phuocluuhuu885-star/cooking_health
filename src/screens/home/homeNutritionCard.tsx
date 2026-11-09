@@ -123,6 +123,25 @@ const HomeNutritionCard = ({
   const calorieRingRadius = 32;
   const calorieRingCircumference = 2 * Math.PI * calorieRingRadius;
 
+  function renderMacro(macro: (typeof MACROS)[number]) {
+    const target = macroTargets[macro.id] ?? null;
+    const value = nutrition?.[macro.id] ?? 0;
+    const percentage =
+      target != null && target > 0 ? Math.round((value / target) * 100) : null;
+
+    return (
+      <MacroProgressRow
+        key={macro.id}
+        label={macro.label}
+        value={value}
+        marker={macro.marker}
+        target={target}
+        percentage={percentage}
+        color={macro.color}
+      />
+    );
+  }
+
   return (
     <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.card}>
       <View style={styles.sectionHeading}>
@@ -202,25 +221,7 @@ const HomeNutritionCard = ({
               </View>
             </View>
             <View style={styles.macroList}>
-              {MACROS.map(macro => {
-                const target = macroTargets[macro.id] ?? null;
-                const value = nutrition?.[macro.id] ?? 0;
-                const percentage =
-                  target != null && target > 0
-                    ? Math.round((value / target) * 100)
-                    : null;
-                return (
-                  <MacroProgressRow
-                    key={macro.id}
-                    label={macro.label}
-                    value={value}
-                    marker={macro.marker}
-                    target={target}
-                    percentage={percentage}
-                    color={macro.color}
-                  />
-                );
-              })}
+              {MACROS.map(renderMacro)}
             </View>
           </View>
           {hasCalorieTarget ? (

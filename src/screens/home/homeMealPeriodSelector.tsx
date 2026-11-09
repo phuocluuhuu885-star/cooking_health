@@ -11,6 +11,22 @@ const MEAL_PERIODS: MealPeriodOption[] = [
 
 const HomeMealPeriodSelector = memo(
   ({ selectedPeriod, periodPlans, onSelect }: HomeMealPeriodSelectorProps) => {
+    function renderPeriod(period: MealPeriodOption) {
+      const selected = selectedPeriod === period.id;
+      const plan = periodPlans[period.id];
+
+      return (
+        <HomeMealPeriodButton
+          key={period.id}
+          period={period}
+          itemCount={plan?.itemCount ?? 0}
+          completed={plan?.isCompleted ?? false}
+          selected={selected}
+          onSelect={onSelect}
+        />
+      );
+    }
+
     return (
       <ScrollView
         accessibilityRole="tablist"
@@ -18,20 +34,7 @@ const HomeMealPeriodSelector = memo(
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.container}
       >
-        {MEAL_PERIODS.map(period => {
-          const selected = selectedPeriod === period.id;
-          const plan = periodPlans[period.id];
-          return (
-            <HomeMealPeriodButton
-              key={period.id}
-              period={period}
-              itemCount={plan?.itemCount ?? 0}
-              completed={plan?.isCompleted ?? false}
-              selected={selected}
-              onSelect={onSelect}
-            />
-          );
-        })}
+        {MEAL_PERIODS.map(renderPeriod)}
       </ScrollView>
     );
   },

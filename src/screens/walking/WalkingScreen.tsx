@@ -51,6 +51,40 @@ const SUMMARY_PERIODS: Array<{ id: SummaryPeriod; label: string }> = [
   { id: 'MONTH', label: 'Tháng này' },
 ];
 
+const SummaryPeriodButton = ({
+  option,
+  selected,
+  onSelect,
+}: {
+  option: (typeof SUMMARY_PERIODS)[number];
+  selected: boolean;
+  onSelect: (period: SummaryPeriod) => void;
+}) => {
+  const handleSelect = useCallback(() => {
+    onSelect(option.id);
+  }, [onSelect, option.id]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={handleSelect}
+      style={styles.periodButton}
+    >
+      {selected ? (
+        <LinearGradient
+          colors={['#FFFFFF', '#EAF6EE']}
+          pointerEvents="none"
+          style={styles.periodButtonGradient}
+        />
+      ) : null}
+      <Text style={[styles.periodText, selected && styles.periodTextSelected]}>
+        {option.label}
+      </Text>
+    </Pressable>
+  );
+};
+
 const WalkingScreen = () => {
   const insets = useSafeAreaInsets();
   const user = useSelector(selectUserInfo);
@@ -281,6 +315,15 @@ const WalkingScreen = () => {
   }, [parsedWeight, startWorkout, weightInput, weightIsValid]);
 
   const handleFinish = useCallback(() => {
+    function handleConfirmFinish() {
+      finishWorkout().then(finished => {
+        if (finished) {
+          refreshHistory();
+          refreshSummary();
+        }
+      });
+    }
+
     Alert.alert(
       'Kết thúc buổi đi bộ?',
       'Bạn có muốn lưu kết quả buổi tập này không?',
@@ -289,14 +332,7 @@ const WalkingScreen = () => {
         {
           text: 'Kết thúc',
           style: 'destructive',
-          onPress: () => {
-            finishWorkout().then(finished => {
-              if (finished) {
-                refreshHistory();
-                refreshSummary();
-              }
-            });
-          },
+          onPress: handleConfirmFinish,
         },
       ],
     );
@@ -320,6 +356,21 @@ const WalkingScreen = () => {
     dailyCaloriesTarget != null && consumedCalories != null
       ? dailyCaloriesTarget - consumedCalories
       : null;
+
+  function renderSummaryPeriod(option: (typeof SUMMARY_PERIODS)[number]) {
+    return (
+      <SummaryPeriodButton
+        key={option.id}
+        option={option}
+        selected={period === option.id}
+        onSelect={setPeriod}
+      />
+    );
+  }
+
+  function renderHistoryItem(item: WalkingWorkout) {
+    return <HistoryRow key={item.id} workout={item} />;
+  }
 
   return (
     <View style={styles.screen}>
@@ -436,7 +487,7 @@ const WalkingScreen = () => {
                   label="Tạm dừng"
                   secondary
                   disabled={walking.busy}
-                  onPress={() => walking.pauseWorkout()}
+                  onPress={walking.pauseWorkout}
                 />
                 <ActionButton
                   label="Kết thúc"
@@ -450,7 +501,7 @@ const WalkingScreen = () => {
                 <ActionButton
                   label="Tiếp tục"
                   disabled={walking.busy}
-                  onPress={() => walking.resumeWorkout()}
+                  onPress={walking.resumeWorkout}
                 />
                 <ActionButton
                   label="Kết thúc"
@@ -572,7 +623,7 @@ const WalkingScreen = () => {
             <Text style={styles.errorText}>{walking.error}</Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => walking.refresh()}
+              onPress={walking.refresh}
             >
               <Text style={styles.retryText}>Tải lại buổi tập</Text>
             </Pressable>
@@ -598,31 +649,7 @@ const WalkingScreen = () => {
             colors={['#FFFFFF', '#EAF6EE']}
             style={styles.periodSelector}
           >
-            {SUMMARY_PERIODS.map(option => (
-              <Pressable
-                key={option.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected: period === option.id }}
-                onPress={() => setPeriod(option.id)}
-                style={styles.periodButton}
-              >
-                {period === option.id ? (
-                  <LinearGradient
-                    colors={['#FFFFFF', '#EAF6EE']}
-                    pointerEvents="none"
-                    style={styles.periodButtonGradient}
-                  />
-                ) : null}
-                <Text
-                  style={[
-                    styles.periodText,
-                    period === option.id && styles.periodTextSelected,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
+            {SUMMARY_PERIODS.map(renderSummaryPeriod)}
           </LinearGradient>
           {summaryError ? (
             <Text style={styles.errorText}>{summaryError}</Text>
@@ -670,9 +697,7 @@ const WalkingScreen = () => {
           {historyError ? (
             <Text style={styles.errorText}>{historyError}</Text>
           ) : history.length > 0 ? (
-            history.map(item => (
-              <HistoryRow key={item.id} workout={item} />
-            ))
+            history.map(renderHistoryItem)
           ) : !historyLoading ? (
             <Text style={styles.emptyText}>
               Chưa có buổi đi bộ nào trong khoảng thời gian này.

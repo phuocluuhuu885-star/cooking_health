@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { KeyboardTypeOptions, StyleSheet, View } from 'react-native';
 import Text from './text';
 import TextInput from './inputBase';
@@ -18,10 +18,11 @@ type IProps = {
 const InputComponent = memo((props: IProps) => {
   const hasTitle = Boolean(props.title);
   const isError = Boolean(props.errMsg);
+  const { inputKey, onTextChange: onTextChangeProp } = props;
 
-  const onTextChange = (text: string) => {
-    props.onTextChange?.(text, props.inputKey);
-  };
+  const onTextChange = useCallback((text: string) => {
+    onTextChangeProp?.(text, inputKey);
+  }, [inputKey, onTextChangeProp]);
 
   return (
     <View style={styles.formGroup}>

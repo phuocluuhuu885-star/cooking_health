@@ -36,6 +36,42 @@ type MealReviewModalProps = {
   onSubmitted: (rating: number) => void;
 };
 
+const RatingStar = ({
+  star,
+  selected,
+  disabled,
+  onSelect,
+}: {
+  star: number;
+  selected: boolean;
+  disabled: boolean;
+  onSelect: (rating: number) => void;
+}) => {
+  const handlePress = useCallback(() => {
+    onSelect(star);
+  }, [onSelect, star]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${star} sao`}
+      accessibilityState={{ selected }}
+      disabled={disabled}
+      onPress={handlePress}
+      style={styles.starButton}
+    >
+      <Text
+        style={[
+          styles.star,
+          selected ? styles.selectedStar : styles.emptyStar,
+        ]}
+      >
+        ★
+      </Text>
+    </Pressable>
+  );
+};
+
 const MealReviewModal = ({
   mealId,
   mealName,
@@ -181,6 +217,18 @@ const MealReviewModal = ({
     token,
   ]);
 
+  const renderRatingStar = (star: number) => {
+    return (
+      <RatingStar
+        key={star}
+        star={star}
+        selected={star <= rating}
+        disabled={submitting}
+        onSelect={setRating}
+      />
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -264,26 +312,7 @@ const MealReviewModal = ({
                 Bạn đánh giá công thức này thế nào?
               </Text>
               <View style={styles.stars}>
-                {[1, 2, 3, 4, 5].map(star => (
-                  <Pressable
-                    key={star}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${star} sao`}
-                    accessibilityState={{ selected: rating === star }}
-                    disabled={submitting}
-                    onPress={() => setRating(star)}
-                    style={styles.starButton}
-                  >
-                    <Text
-                      style={[
-                        styles.star,
-                        star <= rating ? styles.selectedStar : styles.emptyStar,
-                      ]}
-                    >
-                      ★
-                    </Text>
-                  </Pressable>
-                ))}
+                {[1, 2, 3, 4, 5].map(renderRatingStar)}
               </View>
               <Text style={styles.ratingHint}>
                 {rating ? `${rating} / 5 sao` : 'Chọn số sao'}

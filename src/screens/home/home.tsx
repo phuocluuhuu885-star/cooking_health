@@ -70,6 +70,7 @@ import HouseholdChatButton from '../household/HouseholdChatButton';
 import HouseholdHomeButton from '../household/HouseholdHomeButton';
 import HouseholdNotificationButton from '../household/HouseholdNotificationButton';
 import { createStateSetter } from '../../utils/stateUtils';
+import TestBannerAd from '../component/TestBannerAd';
 
 const COLORS = {
   background: '#F5F8F5',
@@ -601,6 +602,7 @@ const HomeScreen = () => {
   const openRecipe = useCallback((mealId: string) => {
     navigate(ScreenKeys.RECIPE_DETAIL, { mealId });
   }, []);
+  const retryDashboard = useCallback(() => loadDashboard(), [loadDashboard]);
   const openAiMealRecommendations = useCallback(() => {
     navigate(ScreenKeys.AI_MEAL_RECOMMENDATIONS);
   }, []);
@@ -624,6 +626,35 @@ const HomeScreen = () => {
   const openFamily = useCallback(() => {
     navigate(ScreenKeys.FAMILY);
   }, []);
+  const openExpenses = useCallback(() => {
+    navigate(ScreenKeys.EXPENSES);
+  }, []);
+  const openWeeklyMealPlan = useCallback(() => {
+    navigate(ScreenKeys.WEEKLY_MEAL_PLAN);
+  }, []);
+  const openEatingProgress = useCallback(() => {
+    navigate(ScreenKeys.EATING_PROGRESS);
+  }, []);
+  const openSmartShopping = useCallback(() => {
+    navigate(ScreenKeys.SMART_SHOPPING);
+  }, []);
+
+  const getExpenseSummaryStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) =>
+      pressed && styles.expenseSummaryPressed,
+    [],
+  );
+
+  function renderSuggestedMeal(meal: (typeof suggestedMeals)[number]) {
+    return (
+      <HomeRecipeCard
+        key={meal.id}
+        meal={meal}
+        onPress={openRecipe}
+        reviewSummary={reviewSummaries[meal.id]}
+      />
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -683,8 +714,8 @@ const HomeScreen = () => {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Mở quản lý chi tiêu"
-          onPress={() => navigate(ScreenKeys.EXPENSES)}
-          style={({ pressed }) => pressed && styles.expenseSummaryPressed}
+          onPress={openExpenses}
+          style={getExpenseSummaryStyle}
         >
           <LinearGradient
             colors={['#FFFFFF', '#F1FAF4']}
@@ -723,9 +754,9 @@ const HomeScreen = () => {
 
         <AICoachBox
           onMealSuggestions={openAiMealRecommendations}
-          onWeeklyPlan={() => navigate(ScreenKeys.WEEKLY_MEAL_PLAN)}
-          onProgressAnalysis={() => navigate(ScreenKeys.EATING_PROGRESS)}
-          onSmartShopping={() => navigate(ScreenKeys.SMART_SHOPPING)}
+          onWeeklyPlan={openWeeklyMealPlan}
+          onProgressAnalysis={openEatingProgress}
+          onSmartShopping={openSmartShopping}
           onAiChat={openAiMealChat}
           onMealScan={openAiMealScan}
         />
@@ -745,7 +776,7 @@ const HomeScreen = () => {
             {user?.accessToken ? (
               <Pressable
                 accessibilityRole="button"
-                onPress={() => loadDashboard()}
+                onPress={retryDashboard}
                 style={styles.retryButton}
               >
                 <Text style={styles.retryText}>Thử lại</Text>
@@ -787,7 +818,7 @@ const HomeScreen = () => {
             <Text style={styles.messageText}>{state.recommendationsError}</Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => loadDashboard()}
+              onPress={retryDashboard}
               style={styles.retryButton}
             >
               <Text style={styles.retryText}>Thử lại</Text>
@@ -796,14 +827,7 @@ const HomeScreen = () => {
         ) : (
           <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.card}>
             {suggestedMeals.length > 0 ? (
-              suggestedMeals.map(meal => (
-                <HomeRecipeCard
-                  key={meal.id}
-                  meal={meal}
-                  onPress={openRecipe}
-                  reviewSummary={reviewSummaries[meal.id]}
-                />
-              ))
+              suggestedMeals.map(renderSuggestedMeal)
             ) : !state.loading ? (
               <Text style={styles.emptyText}>
                 Chưa có món gợi ý cho bữa này.
@@ -811,6 +835,7 @@ const HomeScreen = () => {
             ) : null}
           </LinearGradient>
         )}
+        <TestBannerAd />
         <View style={styles.bottomSpace} />
       </ScrollView>
     </View>

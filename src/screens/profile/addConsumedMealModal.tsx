@@ -1,4 +1,10 @@
-import React, { memo, useEffect, useMemo, useState } from 'react';
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -24,6 +30,84 @@ type Props = {
   user: UserInfo | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
+};
+
+const getMealKey = (item: BackendMeal) => item.id;
+
+const MealSearchResult = ({
+  item,
+  selected,
+  onSelect,
+}: {
+  item: BackendMeal;
+  selected: boolean;
+  onSelect: (item: BackendMeal) => void;
+}) => {
+  const handlePress = useCallback(() => {
+    onSelect(item);
+  }, [item, onSelect]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{
+        selected,
+        disabled: !item.nutritionSummary,
+      }}
+      disabled={!item.nutritionSummary}
+      onPress={handlePress}
+      style={[
+        styles.mealOption,
+        selected && styles.mealOptionSelected,
+        !item.nutritionSummary && styles.mealOptionDisabled,
+      ]}
+    >
+      <View style={styles.mealCopy}>
+        <Text numberOfLines={1} style={styles.mealName}>
+          {item.name}
+        </Text>
+        {item.description ? (
+          <Text numberOfLines={1} style={styles.mealDescription}>
+            {item.description}
+          </Text>
+        ) : null}
+      </View>
+      <Text style={styles.mealCalories}>
+        {item.nutritionSummary
+          ? `${Math.round(item.nutritionSummary.perServing.calories)} kcal/phần`
+          : 'Chưa có dữ liệu'}
+      </Text>
+    </Pressable>
+  );
+};
+
+const MealPeriodButton = ({
+  period,
+  label,
+  selected,
+  onSelect,
+}: {
+  period: MealPeriod;
+  label: string;
+  selected: boolean;
+  onSelect: (period: MealPeriod) => void;
+}) => {
+  const handlePress = useCallback(() => {
+    onSelect(period);
+  }, [onSelect, period]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={handlePress}
+      style={[styles.periodButton, selected && styles.periodButtonSelected]}
+    >
+      <Text style={[styles.periodText, selected && styles.periodTextSelected]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
 };
 
 const AddConsumedMealModal = ({ visible, user, onClose, onSaved }: Props) => {
@@ -85,6 +169,13 @@ const AddConsumedMealModal = ({ visible, user, onClose, onSaved }: Props) => {
     () => createStateSetter(setState, 'error'),
     [setState],
   );
+  const handleQueryChange = useCallback(
+    (value: string) => {
+      setQuery(value);
+      setSelectedMeal(null);
+    },
+    [setQuery, setSelectedMeal],
+  );
 
   useEffect(() => {
     if (!visible) {
@@ -142,26 +233,47 @@ const AddConsumedMealModal = ({ visible, user, onClose, onSaved }: Props) => {
     visible,
   ]);
 
-  const close = (force = false) => {
-    if (saving && !force) {
-      return;
-    }
-    setQuery('');
-    setResults([]);
-    setSelectedMeal(null);
-    setServings('1');
-    setError('');
-    onClose();
-  };
-  const handleClose = () => close();
-
-  const save = async () => {
+  const close = useCallback(
+    (force = false) => {
+      if (saving && !force) {
+        return;
+      }
+      setQuery('');
+      setResults([]);
+      setSelectedMeal(null);
+      setServings('1');
+      setError('');
+      onClose();
+    },
+    [
+      onClose,
+      saving,
+      setError,
+      setQuery,
+      setResults,
+      setSelectedMeal,
+      setServings,
+    ],
+  );
+  const handleClose = useCallback(() => close(), [close]);
+  const handleSelectMeal = useCallback(
+    (item: BackendMeal) => {
+      setSelectedMeal(item);
+      setError('');
+    },
+    [setError, setSelectedMeal],
+  );
+  const save = useCallback(async () => {
     const servingCount = Number(servings.replace(',', '.'));
     if (!selectedMeal) {
       setError('Hãy chọn món bạn đã ăn.');
       return;
     }
-    if (!Number.isFinite(servingCount) || servingCount <= 0 || servingCount > 100) {
+    if (
+      !Number.isFinite(servingCount) ||
+      servingCount <= 0 ||
+      servingCount > 100
+    ) {
       setError('Khẩu phần phải lớn hơn 0 và không quá 100.');
       return;
     }
@@ -186,43 +298,40 @@ const AddConsumedMealModal = ({ visible, user, onClose, onSaved }: Props) => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [
+    close,
+    mealPeriod,
+    onSaved,
+    selectedMeal,
+    servings,
+    setError,
+    setSaving,
+    user,
+  ]);
 
-  const renderMeal = ({ item }: { item: BackendMeal }) => (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{
-        selected: selectedMeal?.id === item.id,
-        disabled: !item.nutritionSummary,
-      }}
-      disabled={!item.nutritionSummary}
-      onPress={() => {
-        setSelectedMeal(item);
-        setError('');
-      }}
-      style={[
-        styles.mealOption,
-        selectedMeal?.id === item.id && styles.mealOptionSelected,
-        !item.nutritionSummary && styles.mealOptionDisabled,
-      ]}
-    >
-      <View style={styles.mealCopy}>
-        <Text numberOfLines={1} style={styles.mealName}>
-          {item.name}
-        </Text>
-        {item.description ? (
-          <Text numberOfLines={1} style={styles.mealDescription}>
-            {item.description}
-          </Text>
-        ) : null}
-      </View>
-      <Text style={styles.mealCalories}>
-        {item.nutritionSummary
-          ? `${Math.round(item.nutritionSummary.perServing.calories)} kcal/phần`
-          : 'Chưa có dữ liệu'}
-      </Text>
-    </Pressable>
+  const renderMeal = useCallback(
+    ({ item }: { item: BackendMeal }) => {
+      return (
+        <MealSearchResult
+          item={item}
+          selected={selectedMeal?.id === item.id}
+          onSelect={handleSelectMeal}
+        />
+      );
+    },
+    [handleSelectMeal, selectedMeal?.id],
   );
+  const renderMealPeriod = ([period, label]: readonly [MealPeriod, string]) => {
+    return (
+      <MealPeriodButton
+        key={period}
+        period={period}
+        label={label}
+        selected={mealPeriod === period}
+        onSelect={setMealPeriod}
+      />
+    );
+  };
 
   return (
     <Modal
@@ -253,10 +362,7 @@ const AddConsumedMealModal = ({ visible, user, onClose, onSaved }: Props) => {
 
           <TextInput
             autoCapitalize="none"
-            onChangeText={value => {
-              setQuery(value);
-              setSelectedMeal(null);
-            }}
+            onChangeText={handleQueryChange}
             placeholder="Tìm món ăn hoặc nguyên liệu"
             placeholderTextColor={COLORS.secondary}
             style={styles.searchInput}
@@ -276,7 +382,7 @@ const AddConsumedMealModal = ({ visible, user, onClose, onSaved }: Props) => {
               <FlatList
                 data={results}
                 keyboardShouldPersistTaps="handled"
-                keyExtractor={item => item.id}
+                keyExtractor={getMealKey}
                 renderItem={renderMeal}
               />
             )}
@@ -287,27 +393,7 @@ const AddConsumedMealModal = ({ visible, user, onClose, onSaved }: Props) => {
             {([
               ['LUNCH', 'Bữa trưa'],
               ['DINNER', 'Bữa tối'],
-            ] as const).map(([period, label]) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: mealPeriod === period }}
-                key={period}
-                onPress={() => setMealPeriod(period)}
-                style={[
-                  styles.periodButton,
-                  mealPeriod === period && styles.periodButtonSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.periodText,
-                    mealPeriod === period && styles.periodTextSelected,
-                  ]}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            ))}
+            ] as const).map(renderMealPeriod)}
           </View>
 
           <Text style={styles.fieldLabel}>Số khẩu phần đã ăn</Text>

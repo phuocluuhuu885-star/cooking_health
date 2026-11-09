@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { createStaticNavigation } from '@react-navigation/native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import StackScreen from './utils/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoadingIndicator from './components/loading';
@@ -11,8 +11,58 @@ import { setupStore } from './reduxs/store';
 import type { StoreAndPersistor } from './reduxs/store';
 import HouseholdMealReminderProvider from './screens/household/HouseholdMealReminderProvider';
 import { createStateSetter } from './utils/stateUtils';
+import eventEmitter, { EventName } from './utils/eventEmitter';
+import { logOutUser, selectUserInfo } from './reduxs/reduces/user';
+import { useAppDispatch } from './reduxs/store';
+import { useSelector } from 'react-redux';
+import { setSyncUser } from './utils/syncUtils';
+import { resetTo } from './utils/navigation';
+import ScreenKeys from './utils/screenKey';
 
 const StackNavigation = createStaticNavigation(StackScreen);
+
+const AuthSessionExpiredHandler = () => {
+  const dispatch = useAppDispatch();
+  const user = useSelector(selectUserInfo);
+  const isPromptVisible = React.useRef(false);
+
+  const handleAcknowledge = React.useCallback(() => {
+    dispatch(logOutUser());
+    setSyncUser(null);
+    resetTo(ScreenKeys.LOGIN);
+  }, [dispatch]);
+
+  React.useEffect(() => {
+    const handleTokenExpiration = () => {
+      if (isPromptVisible.current || !user?.accessToken) return;
+
+      isPromptVisible.current = true;
+      Alert.alert(
+        'Phiên đăng nhập hết hạn',
+        'Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại để tiếp tục.',
+        [{ text: 'OK', onPress: handleAcknowledge }],
+        { cancelable: false },
+      );
+    };
+
+    eventEmitter.on(EventName.expireToken, handleTokenExpiration);
+    return () => {
+      eventEmitter.off(EventName.expireToken, handleTokenExpiration);
+    };
+  }, [handleAcknowledge, user?.accessToken]);
+
+  React.useEffect(() => {
+    setSyncUser(user ?? null);
+  }, [user]);
+
+  React.useEffect(() => {
+    if (user?.accessToken) {
+      isPromptVisible.current = false;
+    }
+  }, [user?.accessToken]);
+
+  return null;
+};
 
 const styles = StyleSheet.create({
   loadingScreen: {
@@ -117,6 +167,7 @@ export default function App() {
         >
           <HouseholdMealReminderProvider>
             <StackNavigation />
+            <AuthSessionExpiredHandler />
             <LoadingIndicator />
           </HouseholdMealReminderProvider>
         </PersistGate>

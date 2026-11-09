@@ -22,6 +22,9 @@ const PlannedMealItem = ({
   const handlePress = useCallback(() => {
     navigate(ScreenKeys.RECIPE_DETAIL, { mealId: item.meal.id });
   }, [item.meal.id]);
+  const handleDelete = useCallback(() => {
+    onDelete?.(item);
+  }, [item, onDelete]);
   return (
     <LinearGradient colors={['#FFFFFF', '#F0F8F2']} style={styles.row}>
       <View style={styles.mealHeader}>
@@ -64,7 +67,7 @@ const PlannedMealItem = ({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Xóa ${item.meal.name} khỏi thực đơn`}
-            onPress={() => onDelete(item)}
+            onPress={handleDelete}
             hitSlop={8}
             style={styles.deleteButton}
           >

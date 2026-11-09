@@ -72,6 +72,7 @@ export type MealPeriod = 'LUNCH' | 'DINNER';
 export type AiMealChatSuggestion = {
   mealId: string;
   name: string;
+  imageUrl: string | null;
   mealPeriod: MealPeriod;
   nutrition: {
     calories: number | null;
@@ -79,6 +80,15 @@ export type AiMealChatSuggestion = {
     carbsG: number | null;
     fatG: number | null;
   };
+};
+
+export type AiMealChatHistoryEntry = {
+  role: 'assistant' | 'user';
+  text: string;
+  suggestions?: Array<{
+    mealId: string;
+    mealPeriod: MealPeriod;
+  }>;
 };
 
 export type AiMealChatResponse = {
@@ -107,6 +117,8 @@ export type AiMealScanResult = {
     name: string;
     estimatedAmount: string;
     estimatedWeightG: number | null;
+    estimatedQuantity: number | null;
+    quantityUnit: string | null;
     nutrition: AiMealScanNutrition;
     confidence: 'LOW' | 'MEDIUM' | 'HIGH';
   }>;
@@ -119,6 +131,13 @@ export type AiMealScanResponse = {
   message?: string;
   ErrorMessage?: string;
   data?: AiMealScanResult;
+};
+
+export type AddScannedConsumedMealResponse = {
+  success: boolean;
+  message?: string;
+  ErrorMessage?: string;
+  data?: DailyConsumedMeal;
 };
 
 export type EstimatedPriceRange = {
@@ -234,7 +253,7 @@ export type DailyConsumedMeal = {
   mealPeriod: MealPeriod;
   servings: number;
   consumedAt: string;
-  source: 'PERSONAL' | 'HOUSEHOLD' | 'MANUAL';
+  source: 'PERSONAL' | 'HOUSEHOLD' | 'MANUAL' | 'SCANNED';
   nutrition: Nutrition | null;
 };
 
@@ -384,7 +403,6 @@ export type DailyConsumedMealsCardProps = {
   loading: boolean;
   error: string;
   onRetry: () => void;
-  onAddMeal?: () => void;
 };
 
 export type ConsumptionReportCardProps = {

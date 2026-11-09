@@ -7,6 +7,10 @@ type Props = {
   onPress: () => void;
 };
 
+function getButtonStyle({ pressed }: { pressed: boolean }) {
+  return [styles.button, pressed && styles.pressed];
+}
+
 const HouseholdHomeButton = ({ hasHousehold, onPress }: Props) => (
   <Pressable
     accessibilityRole="button"
@@ -15,7 +19,7 @@ const HouseholdHomeButton = ({ hasHousehold, onPress }: Props) => (
     }
     accessibilityHint="Mở không gian gia đình và các tính năng dùng chung"
     onPress={onPress}
-    style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+    style={getButtonStyle}
   >
     <Svg width={23} height={23} viewBox="0 0 24 24">
       <Circle

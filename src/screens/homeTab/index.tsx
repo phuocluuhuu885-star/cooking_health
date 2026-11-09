@@ -14,6 +14,11 @@ import HealthProfile from '../profile/healthProfile';
 import { createStateSetter } from '../../utils/stateUtils';
 import HealthDashboardScreen from '../home/HealthDashboardScreen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import PremiumModal from '../component/PremiumModal';
+import {
+  isPremiumWelcomePending,
+  markPremiumWelcomeSeen,
+} from '../../utils/premiumWelcome';
 
 const screens = {
   HomeTab: HomeScreen,
@@ -22,29 +27,91 @@ const screens = {
   Groceries: Groceries,
   Profile: Profile,
 };
+const screenEntries = Object.entries(screens) as Array<
+  [keyof typeof screens, (typeof screens)[keyof typeof screens]]
+>;
 const Tab = createBottomTabNavigator();
 
 const HomeView = () => {
   const user = useSelector(selectUserInfo);
   const insets = useSafeAreaInsets();
-  const [state, setState] = useState({ visibleHealthProfile: false });
-  const { visibleHealthProfile } = state;
+  const [state, setState] = useState({
+    visibleHealthProfile: false,
+    visiblePremium: false,
+    healthProfilePromptHandledForUserId: null as string | null,
+  });
+  const {
+    visibleHealthProfile,
+    visiblePremium,
+    healthProfilePromptHandledForUserId,
+  } = state;
   const setVisibleHealthProfile = useMemo(
     () => createStateSetter(setState, 'visibleHealthProfile'),
     [setState],
   );
-  const closeHealthProfile = useMemo(
-    () => () => setVisibleHealthProfile(false),
-    [setVisibleHealthProfile],
+  const setVisiblePremium = useMemo(
+    () => createStateSetter(setState, 'visiblePremium'),
+    [setState],
+  );
+  const setHealthProfilePromptHandledForUserId = useMemo(
+    () => createStateSetter(setState, 'healthProfilePromptHandledForUserId'),
+    [setState],
+  );
+  const closeHealthProfile = useCallback(
+    () => {
+      setVisibleHealthProfile(false);
+      if (user?.id) {
+        setHealthProfilePromptHandledForUserId(user.id);
+      }
+    },
+    [setHealthProfilePromptHandledForUserId, setVisibleHealthProfile, user?.id],
+  );
+  const closePremium = useCallback(
+    () => setVisiblePremium(false),
+    [setVisiblePremium],
   );
   const renderTabBar = useCallback(
     (props: BottomTabBarProps) => <HomeBottomView {...props} />,
+    [],
+  );
+  const renderScreen = useCallback(
+    ([name, component]: (typeof screenEntries)[number]) => (
+      <Tab.Screen
+        key={name}
+        name={name}
+        component={component}
+        initialParams={{ isTab: true }}
+      />
+    ),
     [],
   );
 
   useEffect(() => {
     setVisibleHealthProfile(Boolean(user?.accessToken && !user.healthProfile));
   }, [setVisibleHealthProfile, user?.accessToken, user?.healthProfile]);
+
+  useEffect(() => {
+    if (
+      !user?.id ||
+      !user.accessToken ||
+      !isPremiumWelcomePending(user.id) ||
+      visibleHealthProfile ||
+      (!user.healthProfile &&
+        healthProfilePromptHandledForUserId !== user.id)
+    ) {
+      return;
+    }
+
+    markPremiumWelcomeSeen(user.id);
+    setVisiblePremium(true);
+  }, [
+    healthProfilePromptHandledForUserId,
+    setVisiblePremium,
+    user?.accessToken,
+    user?.healthProfile,
+    user?.id,
+    visibleHealthProfile,
+  ]);
 
   if (!user?.accessToken) {
     return <RecipeLibrary />;
@@ -58,6 +125,7 @@ const HomeView = () => {
           visible={visibleHealthProfile}
         />
       )}
+      <PremiumModal visible={visiblePremium} onClose={closePremium} />
       <Tab.Navigator
         initialRouteName="HomeTab"
         screenOptions={{
@@ -70,14 +138,7 @@ const HomeView = () => {
         }}
         tabBar={renderTabBar}
       >
-        {Object.entries(screens).map(([name, component]) => (
-          <Tab.Screen
-            key={name}
-            name={name}
-            component={component}
-            initialParams={{ isTab: true }}
-          />
-        ))}
+        {screenEntries.map(renderScreen)}
       </Tab.Navigator>
     </>
   );

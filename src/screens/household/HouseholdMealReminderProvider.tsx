@@ -30,6 +30,7 @@ import {
 import { setSyncUser } from '../../utils/syncUtils';
 import type { MealPeriod } from '../../utils/types/meal';
 import { createStateSetter } from '../../utils/stateUtils';
+import { notifyIfTokenAuthenticationFailure } from '../../utils/authSession';
 
 type MealReminderResult = {
   success: boolean;
@@ -46,6 +47,8 @@ type HouseholdMealReminderContextValue = {
 
 const HouseholdMealReminderContext =
   createContext<HouseholdMealReminderContextValue | null>(null);
+
+function ignoreRequestClose() {}
 
 const useHouseholdMealReminder = () => {
   const context = useContext(HouseholdMealReminderContext);
@@ -127,9 +130,21 @@ const HouseholdMealReminderProvider = ({
       if (!householdId) return;
       socket.emit('meal:reminder:subscribe', { householdId }, response => {
         if (!response.success) {
+          if (notifyIfTokenAuthenticationFailure(response, user.accessToken)) return;
           console.warn('Could not subscribe to household meal reminders', response.message);
         }
       });
+    };
+    const handleSocketConnectError = (error: Error) => {
+      if (
+        notifyIfTokenAuthenticationFailure(
+          { message: error.message },
+          user.accessToken,
+        )
+      ) {
+        return;
+      }
+      console.warn('Could not connect to household meal reminders', error);
     };
     const handleReminder = (reminder: HouseholdMealReminder) => {
       if (reminder.householdId !== effectRefs.householdId) return;
@@ -175,6 +190,7 @@ const HouseholdMealReminderProvider = ({
     };
 
     socket.on('connect', subscribeToHousehold);
+    socket.on('connect_error', handleSocketConnectError);
     socket.on('meal:reminder:started', handleReminder);
     socket.on('meal:reminder:state', handleReminderState);
     socket.on('meal:reminder:dismissed', handleDismiss);
@@ -205,6 +221,7 @@ const HouseholdMealReminderProvider = ({
       effectRefs.householdId = null;
       effectRefs.activeReminder = null;
       socket.off('connect', subscribeToHousehold);
+      socket.off('connect_error', handleSocketConnectError);
       socket.off('meal:reminder:started', handleReminder);
       socket.off('meal:reminder:state', handleReminderState);
       socket.off('meal:reminder:dismissed', handleDismiss);
@@ -313,7 +330,7 @@ const HouseholdMealReminderProvider = ({
       {children}
       <Modal
         animationType="fade"
-        onRequestClose={() => undefined}
+        onRequestClose={ignoreRequestClose}
         transparent
         visible={Boolean(activeReminder)}
       >

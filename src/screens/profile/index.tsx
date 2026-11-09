@@ -28,6 +28,7 @@ import {
 } from '../../utils/aiRecommendationConsent';
 import { deleteUserAccount } from '../../utils/userApi';
 import HealthProfile from './healthProfile';
+import PremiumModal from '../component/PremiumModal';
 
 const COLORS = {
   background: '#F5F7F5',
@@ -72,6 +73,63 @@ const ACCOUNT_OPTIONS = [
     icon: 'delete',
   },
 ] as const;
+
+const AccountOptionRow = ({
+  option,
+  index,
+  description,
+  onSelect,
+}: {
+  option: (typeof ACCOUNT_OPTIONS)[number];
+  index: number;
+  description: string;
+  onSelect: (optionId: (typeof ACCOUNT_OPTIONS)[number]['id']) => void;
+}) => {
+  const handlePress = useCallback(() => {
+    onSelect(option.id);
+  }, [onSelect, option.id]);
+  const getStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.optionRow,
+      index < ACCOUNT_OPTIONS.length - 1 && styles.optionRowDivider,
+      pressed && styles.optionPressed,
+    ],
+    [index],
+  );
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${option.title}. ${description}`}
+      onPress={handlePress}
+      style={getStyle}
+    >
+      <ProfileOptionIcon
+        name={option.icon}
+        danger={option.id === 'DELETE'}
+      />
+      <View style={styles.optionCopy}>
+        <Text
+          style={[
+            styles.optionTitle,
+            option.id === 'DELETE' && styles.deleteOptionTitle,
+          ]}
+        >
+          {option.title}
+        </Text>
+        <Text style={styles.optionDescription}>{description}</Text>
+      </View>
+      <Text
+        style={[
+          styles.optionChevron,
+          option.id === 'DELETE' && styles.deleteOptionTitle,
+        ]}
+      >
+        ›
+      </Text>
+    </Pressable>
+  );
+};
 
 const ProfileOptionIcon = ({
   name,
@@ -210,6 +268,7 @@ const Profile = () => {
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
   const [healthProfileVisible, setHealthProfileVisible] = useState(false);
+  const [premiumVisible, setPremiumVisible] = useState(false);
   const [deleteAccountVisible, setDeleteAccountVisible] = useState(false);
   const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -345,6 +404,86 @@ const Profile = () => {
     );
   }, [dispatch]);
 
+  const handleOpenPersonalInfo = useCallback(() => {
+    navigate(ScreenKeys.PERSONAL_INFO, { section: 'BASIC' });
+  }, []);
+  const handleOpenConsumedMeals = useCallback(() => {
+    navigate(ScreenKeys.DAILY_CONSUMED_MEALS);
+  }, []);
+  const handleOpenHealthProfile = useCallback(() => {
+    setHealthProfileVisible(true);
+  }, []);
+  const handleOpenPremium = useCallback(() => {
+    setPremiumVisible(true);
+  }, []);
+  const handleClosePremium = useCallback(() => {
+    setPremiumVisible(false);
+  }, []);
+  const handleOpenExpenses = useCallback(() => {
+    navigate(ScreenKeys.EXPENSES);
+  }, []);
+  const handleOpenExpenseReport = useCallback(() => {
+    navigate(ScreenKeys.EXPENSE_REPORT);
+  }, []);
+  const handleCloseHealthProfile = useCallback(() => {
+    setHealthProfileVisible(false);
+  }, []);
+  const getIdentityPressStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => pressed && styles.pressed,
+    [],
+  );
+  const getPremiumPressStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.premiumPressable,
+      pressed && styles.pressed,
+    ],
+    [],
+  );
+  const getOptionPressStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.optionRow,
+      pressed && styles.optionPressed,
+    ],
+    [],
+  );
+  const getReportOptionPressStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.optionRow,
+      styles.optionRowDivider,
+      pressed && styles.optionPressed,
+    ],
+    [],
+  );
+  const getLogoutPressStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.optionRow,
+      styles.logoutRow,
+      pressed && styles.optionPressed,
+    ],
+    [],
+  );
+  const renderAccountOption = (
+    option: (typeof ACCOUNT_OPTIONS)[number],
+    index: number,
+  ) => {
+    const description =
+      option.id === 'GEMINI'
+        ? geminiConsentGranted
+          ? 'Đang bật · chạm để thu hồi đồng ý'
+          : 'Chưa bật đồng ý chia sẻ trên thiết bị này'
+        : option.description;
+
+    return (
+      <AccountOptionRow
+        key={option.id}
+        option={option}
+        index={index}
+        description={description}
+        onSelect={handleAccountOption}
+      />
+    );
+  };
+
   return (
     <View style={styles.screen}>
       <LinearGradient
@@ -380,10 +519,8 @@ const Profile = () => {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Mở thông tin cá nhân"
-            onPress={() =>
-              navigate(ScreenKeys.PERSONAL_INFO, { section: 'BASIC' })
-            }
-            style={({ pressed }) => pressed && styles.pressed}
+            onPress={handleOpenPersonalInfo}
+            style={getIdentityPressStyle}
           >
             <LinearGradient
               colors={['#FFFFFF', '#F6FCF8']}
@@ -417,15 +554,56 @@ const Profile = () => {
             </LinearGradient>
           </Pressable>
 
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Khám phá gói Premium"
+            onPress={handleOpenPremium}
+            style={getPremiumPressStyle}
+          >
+            <LinearGradient
+              colors={['#145D3E', '#168653', '#2CA36D']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.premiumCard}
+            >
+              <View style={styles.premiumIcon}>
+                <Text style={styles.premiumIconText}>✦</Text>
+              </View>
+              <View style={styles.premiumCopy}>
+                <Text style={styles.premiumTitle}>Khám phá Premium</Text>
+                <Text style={styles.premiumDescription}>
+                  Mở rộng hành trình ăn uống khỏe mạnh
+                </Text>
+              </View>
+              <Text style={styles.premiumChevron}>›</Text>
+            </LinearGradient>
+          </Pressable>
+
+          <Text style={styles.sectionHeading}>Dinh dưỡng</Text>
+          <View style={styles.optionsCard}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mở nhật ký món ăn"
+              onPress={handleOpenConsumedMeals}
+              style={getOptionPressStyle}
+            >
+              <ProfileOptionIcon name="report" />
+              <View style={styles.optionCopy}>
+                <Text style={styles.optionTitle}>Nhật ký món ăn</Text>
+                <Text style={styles.optionDescription}>
+                  Xem món đã ăn và dinh dưỡng theo ngày
+                </Text>
+              </View>
+              <Text style={styles.optionChevron}>›</Text>
+            </Pressable>
+          </View>
+
           <Text style={styles.sectionHeading}>Sức khỏe</Text>
           <View style={styles.optionsCard}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => setHealthProfileVisible(true)}
-              style={({ pressed }) => [
-                styles.optionRow,
-                pressed && styles.optionPressed,
-              ]}
+              onPress={handleOpenHealthProfile}
+              style={getOptionPressStyle}
             >
               <ProfileOptionIcon name="health" />
               <View style={styles.optionCopy}>
@@ -444,11 +622,8 @@ const Profile = () => {
           <View style={styles.optionsCard}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => navigate(ScreenKeys.EXPENSES)}
-              style={({ pressed }) => [
-                styles.optionRow,
-                pressed && styles.optionPressed,
-              ]}
+              onPress={handleOpenExpenses}
+              style={getOptionPressStyle}
             >
               <ProfileOptionIcon name="money" />
               <View style={styles.optionCopy}>
@@ -461,12 +636,8 @@ const Profile = () => {
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              onPress={() => navigate(ScreenKeys.EXPENSE_REPORT)}
-              style={({ pressed }) => [
-                styles.optionRow,
-                styles.optionRowDivider,
-                pressed && styles.optionPressed,
-              ]}
+              onPress={handleOpenExpenseReport}
+              style={getReportOptionPressStyle}
             >
               <ProfileOptionIcon name="report" />
               <View style={styles.optionCopy}>
@@ -481,62 +652,13 @@ const Profile = () => {
 
           <Text style={styles.sectionHeading}>Tài khoản & quyền riêng tư</Text>
           <View style={styles.optionsCard}>
-            {ACCOUNT_OPTIONS.map((option, index) => {
-              const description =
-                option.id === 'GEMINI'
-                  ? geminiConsentGranted
-                    ? 'Đang bật · chạm để thu hồi đồng ý'
-                    : 'Chưa bật đồng ý chia sẻ trên thiết bị này'
-                  : option.description;
-              return (
-                <Pressable
-                  key={option.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${option.title}. ${description}`}
-                  onPress={() => handleAccountOption(option.id)}
-                  style={({ pressed }) => [
-                    styles.optionRow,
-                    index < ACCOUNT_OPTIONS.length - 1 &&
-                      styles.optionRowDivider,
-                    pressed && styles.optionPressed,
-                  ]}
-                >
-                  <ProfileOptionIcon
-                    name={option.icon}
-                    danger={option.id === 'DELETE'}
-                  />
-                  <View style={styles.optionCopy}>
-                    <Text
-                      style={[
-                        styles.optionTitle,
-                        option.id === 'DELETE' && styles.deleteOptionTitle,
-                      ]}
-                    >
-                      {option.title}
-                    </Text>
-                    <Text style={styles.optionDescription}>{description}</Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.optionChevron,
-                      option.id === 'DELETE' && styles.deleteOptionTitle,
-                    ]}
-                  >
-                    ›
-                  </Text>
-                </Pressable>
-              );
-            })}
+            {ACCOUNT_OPTIONS.map(renderAccountOption)}
 
             {user?.accessToken ? (
               <Pressable
                 accessibilityRole="button"
                 onPress={confirmLogOut}
-                style={({ pressed }) => [
-                  styles.optionRow,
-                  styles.logoutRow,
-                  pressed && styles.optionPressed,
-                ]}
+                style={getLogoutPressStyle}
               >
                 <ProfileOptionIcon name="logout" />
                 <View style={styles.optionCopy}>
@@ -555,8 +677,9 @@ const Profile = () => {
 
       <HealthProfile
         visible={healthProfileVisible}
-        onClose={() => setHealthProfileVisible(false)}
+        onClose={handleCloseHealthProfile}
       />
+      <PremiumModal visible={premiumVisible} onClose={handleClosePremium} />
       <Modal
         animationType="fade"
         onRequestClose={closeDeleteAccountModal}
@@ -742,6 +865,50 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 18,
     backgroundColor: '#E8F7EE',
+  },
+  premiumPressable: {
+    marginTop: 14,
+    borderRadius: 10,
+  },
+  premiumCard: {
+    minHeight: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
+    borderRadius: 10,
+  },
+  premiumIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  premiumIconText: {
+    color: '#FCE7A2',
+    fontSize: 24,
+  },
+  premiumCopy: {
+    flex: 1,
+  },
+  premiumTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  premiumDescription: {
+    marginTop: 4,
+    color: '#E4F6EB',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  premiumChevron: {
+    color: '#FFFFFF',
+    fontSize: 25,
+    lineHeight: 28,
   },
   sectionHeading: {
     marginTop: 21,

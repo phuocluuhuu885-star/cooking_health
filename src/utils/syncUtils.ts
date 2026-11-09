@@ -1,15 +1,23 @@
 import { Platform } from 'react-native';
 import axios, { AxiosInstance } from 'axios';
 import DeviceInfo from 'react-native-device-info';
-import eventEmitter, { EventName } from './eventEmitter';
 import configs from '../abase/constant/config';
 import { ApiType } from '../type/apiType';
 import { addLogApi } from './logUltis';
 import { UserInfo } from '../type/user';
+import {
+  isCurrentAuthenticatedRequest,
+  isTokenAuthenticationFailure,
+  isTokenAuthenticationError,
+  markTokenAuthenticationError,
+  notifyTokenAuthenticationFailure,
+  setActiveAuthToken,
+} from './authSession';
 
 let user: UserInfo | null = null;
 export const setSyncUser = (u: UserInfo | null) => {
   user = u;
+  setActiveAuthToken(u?.accessToken ?? null);
 };
 
 // export const getSyncPassengerId = () => {
@@ -60,13 +68,48 @@ export const getCurrentVersion = () => {
 
 //==== init request
 const defaultTimeout = 15000;
+const handleAuthenticatedResponse = <
+  T extends { config: any; data: any; status: number },
+>(
+  response: T,
+): T => {
+  if (
+    isCurrentAuthenticatedRequest(response.config) &&
+    isTokenAuthenticationFailure(response.status, response.data)
+  ) {
+    notifyTokenAuthenticationFailure();
+    response.data = { IsError: true, IsAuthError: true };
+  }
+  return response;
+};
+
+const handleAuthenticatedError = (error: unknown) => {
+  if (
+    axios.isAxiosError(error) &&
+    isCurrentAuthenticatedRequest(error.config) &&
+    isTokenAuthenticationFailure(error.response?.status, error.response?.data)
+  ) {
+    notifyTokenAuthenticationFailure();
+    markTokenAuthenticationError(error);
+  }
+  return Promise.reject(error);
+};
+
+axios.interceptors.response.use(
+  handleAuthenticatedResponse,
+  handleAuthenticatedError,
+);
+
 const syncRequestBase = axios.create({
   baseURL: configs.baseUrl,
   timeout: defaultTimeout,
 });
 
 syncRequestBase.interceptors.request.use(config => {
-  config.metadata = { startTime: Date.now() };
+  config.metadata = {
+    startTime: Date.now(),
+    hasAuthToken: Boolean(user?.accessToken),
+  };
 
   if (!(config.data instanceof FormData)) {
     config.headers['Content-Type'] = 'application/json';
@@ -102,14 +145,14 @@ syncRequestBase.interceptors.response.use(
       type: 'success',
       data: response,
     });
-    return response;
+    return handleAuthenticatedResponse(response);
   },
   error => {
     addLogApi({
       type: 'error',
       data: error,
     });
-    return Promise.reject(error);
+    return handleAuthenticatedError(error);
   },
 );
 
@@ -121,7 +164,10 @@ const syncRequestDCApi = axios.create({
 });
 
 syncRequestDCApi.interceptors.request.use(config => {
-  config.metadata = { startTime: Date.now() };
+  config.metadata = {
+    startTime: Date.now(),
+    hasAuthToken: Boolean(user?.accessToken),
+  };
 
   if (!(config.data instanceof FormData)) {
     config.headers['Content-Type'] = 'application/json';
@@ -163,14 +209,14 @@ syncRequestDCApi.interceptors.response.use(
       type: 'success',
       data: response,
     });
-    return response;
+    return handleAuthenticatedResponse(response);
   },
   error => {
     addLogApi({
       type: 'error',
       data: error,
     });
-    return Promise.reject(error);
+    return handleAuthenticatedError(error);
   },
 );
 
@@ -274,21 +320,6 @@ export async function syncApi(
       url: response.config.url,
       status: response.status,
     });
-    if (response.status === 401) {
-      console.warn(`${subUrl} error 401`);
-      eventEmitter.emit(EventName.expireToken, { IsExpire: true });
-      return {
-        IsError: true,
-        ErrorMessage: 'Unauthorized',
-      };
-    }
-    // if (response.status === 403) {
-    //     console.warn(`${subUrl} error 403`);
-    //     return {
-    //         IsError: true,
-    //         ErrorMessage: "Ứng dụng sử dụng phiên bản cũ, vui lòng cập nhật phiên bản mới!"
-    //     }
-    // }
 
     //error
     if (response.status === 999) {
@@ -319,33 +350,16 @@ export async function syncApi(
     }
     return responseData;
   } catch (error: any) {
+    if (isTokenAuthenticationError(error)) {
+      return {
+        IsError: true,
+        IsAuthError: true,
+      };
+    }
+
     if (axios.isAxiosError(error) && error.response?.data) {
       return error.response.data;
     }
-
-    // if (error?.status === 401) {
-    //     console.warn(`${subUrl} error 401`);
-    //     eventEmitter.emit(EventName.expireToken, { IsExpire: true });
-
-    //     return {
-    //         IsError: true,
-    //         ErrorMessage: "Unauthorized"
-    //     }
-    // }
-    // if (error?.status === 403) {
-    //     console.warn(`${subUrl} error 403`);
-    //     return {
-    //         IsError: true,
-    //         ErrorMessage: "Ứng dụng sử dụng phiên bản cũ, vui lòng cập nhật phiên bản mới!"
-    //     }
-    // }
-
-    // if (error?.name === 'AbortError') {
-    //     return {
-    //         IsError: true,
-    //         ErrorMessage: "Request timeout exceeded"
-    //     }
-    // }
 
     return {
       IsError: true,

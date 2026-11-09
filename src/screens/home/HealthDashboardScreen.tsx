@@ -17,7 +17,6 @@ import Svg, {
   Stop,
   Text as SvgText,
 } from 'react-native-svg';
-import LinearGradient from '../../components/LinearGradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -39,6 +38,7 @@ import type {
   WaterIntakeResponse,
 } from '../../utils/types';
 import type { ActivityLevel, BmiCategory, Goal } from '../../type/user';
+import TestBannerAd from '../component/TestBannerAd';
 
 const WATER_REFERENCE_GOAL_ML = 2000;
 const WATER_AMOUNTS_ML = [250, 500];
@@ -110,6 +110,29 @@ const getDateRange = (today: string) => {
   };
 };
 
+const WaterAmountButton = ({
+  amountMl,
+  onAdd,
+}: {
+  amountMl: number;
+  onAdd: (amountMl: number) => void;
+}) => {
+  const handleAdd = useCallback(() => {
+    onAdd(amountMl);
+  }, [amountMl, onAdd]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Ghi nhận ${amountMl} ml nước`}
+      onPress={handleAdd}
+      style={styles.waterButton}
+    >
+      <Text style={styles.waterButtonText}>+ {amountMl} ml</Text>
+    </Pressable>
+  );
+};
+
 const getResponseError = (response: {
   message?: string;
   ErrorMessage?: string;
@@ -127,12 +150,14 @@ const MetricCard = ({
   caption: string;
 }) => (
   <View style={styles.metricCard}>
-    <Text style={styles.metricLabel}>{label}</Text>
+    <View style={styles.metricCopy}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricCaption}>{caption}</Text>
+    </View>
     <Text style={styles.metricValue}>
       {value}
       {unit ? <Text style={styles.metricUnit}> {unit}</Text> : null}
     </Text>
-    <Text style={styles.metricCaption}>{caption}</Text>
   </View>
 );
 
@@ -185,16 +210,11 @@ const SectionCard = ({
   subtitle?: string;
   children: React.ReactNode;
 }) => (
-  <LinearGradient
-    colors={['#FFFFFF', '#F3FAF5']}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-    style={styles.card}
-  >
+  <View style={styles.card}>
     <Text style={styles.sectionTitle}>{title}</Text>
     {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
     {children}
-  </LinearGradient>
+  </View>
 );
 
 const WeeklyCaloriesChart = ({
@@ -234,6 +254,60 @@ const WeeklyCaloriesChart = ({
   const targetY =
     dailyTarget && dailyTarget > 0 ? yForCalories(dailyTarget) : null;
 
+  function renderGridLine(ratio: number) {
+    const y =
+      CHART_PLOT.bottom - ratio * (CHART_PLOT.bottom - CHART_PLOT.top);
+
+    return (
+      <React.Fragment key={ratio}>
+        <Line
+          x1={CHART_PLOT.left}
+          y1={y}
+          x2={CHART_PLOT.right}
+          y2={y}
+          stroke={COLORS.border}
+          strokeDasharray="3 4"
+        />
+        <SvgText
+          x={CHART_PLOT.left - 6}
+          y={y + 3}
+          textAnchor="end"
+          fontSize="8"
+          fill={COLORS.secondary}
+        >
+          {formatNumber(chartMax * ratio)}
+        </SvgText>
+      </React.Fragment>
+    );
+  }
+
+  function renderChartPoint(point: (typeof points)[number]) {
+    return (
+      <React.Fragment key={point.date}>
+        <Circle
+          cx={point.x}
+          cy={point.y}
+          r={3.5}
+          fill={COLORS.white}
+          stroke={COLORS.green}
+          strokeWidth={2}
+        />
+        <SvgText
+          x={point.x}
+          y={CHART_PLOT.bottom + 18}
+          textAnchor="middle"
+          fontSize="8"
+          fill={COLORS.secondary}
+        >
+          {new Date(`${point.date}T00:00:00.000Z`).toLocaleDateString(
+            'vi-VN',
+            { weekday: 'short', timeZone: 'UTC' },
+          )}
+        </SvgText>
+      </React.Fragment>
+    );
+  }
+
   return (
     <View>
       <Svg
@@ -248,31 +322,7 @@ const WeeklyCaloriesChart = ({
             <Stop offset="1" stopColor={COLORS.green} stopOpacity="0.02" />
           </SvgLinearGradient>
         </Defs>
-        {[0, 0.5, 1].map(ratio => {
-          const y =
-            CHART_PLOT.bottom - ratio * (CHART_PLOT.bottom - CHART_PLOT.top);
-          return (
-            <React.Fragment key={ratio}>
-              <Line
-                x1={CHART_PLOT.left}
-                y1={y}
-                x2={CHART_PLOT.right}
-                y2={y}
-                stroke={COLORS.border}
-                strokeDasharray="3 4"
-              />
-              <SvgText
-                x={CHART_PLOT.left - 6}
-                y={y + 3}
-                textAnchor="end"
-                fontSize="8"
-                fill={COLORS.secondary}
-              >
-                {formatNumber(chartMax * ratio)}
-              </SvgText>
-            </React.Fragment>
-          );
-        })}
+        {[0, 0.5, 1].map(renderGridLine)}
         {targetY !== null ? (
           <Line
             x1={CHART_PLOT.left}
@@ -295,30 +345,7 @@ const WeeklyCaloriesChart = ({
             strokeLinecap="round"
           />
         ) : null}
-        {points.map(point => (
-          <React.Fragment key={point.date}>
-            <Circle
-              cx={point.x}
-              cy={point.y}
-              r={3.5}
-              fill={COLORS.white}
-              stroke={COLORS.green}
-              strokeWidth={2}
-            />
-            <SvgText
-              x={point.x}
-              y={CHART_PLOT.bottom + 18}
-              textAnchor="middle"
-              fontSize="8"
-              fill={COLORS.secondary}
-            >
-              {new Date(`${point.date}T00:00:00.000Z`).toLocaleDateString(
-                'vi-VN',
-                { weekday: 'short', timeZone: 'UTC' },
-              )}
-            </SvgText>
-          </React.Fragment>
-        ))}
+        {points.map(renderChartPoint)}
       </Svg>
       {dailyTarget ? (
         <View style={styles.chartLegend}>
@@ -505,7 +532,51 @@ const HealthDashboardScreen = () => {
   const consumedCalories = todayNutrition?.nutrition.calories ?? 0;
   const calorieTarget = healthProfile?.dailyCaloriesTarget ?? 0;
   const calorieDifference = calorieTarget - consumedCalories;
-  const openWalking = () => navigate(ScreenKeys.WALKING);
+  const openWalking = useCallback(() => navigate(ScreenKeys.WALKING), []);
+  const macroItems = [
+    ['Chất đạm', todayNutrition?.nutrition.proteinG ?? 0],
+    ['Tinh bột', todayNutrition?.nutrition.carbsG ?? 0],
+    ['Chất béo', todayNutrition?.nutrition.fatG ?? 0],
+  ];
+
+  function renderMacro(item: (typeof macroItems)[number]) {
+    const [label, amount] = item;
+
+    return (
+      <View key={String(label)} style={styles.macroBox}>
+        <Text style={styles.macroAmount}>{formatNumber(Number(amount), 1)} g</Text>
+        <Text style={styles.macroLabel}>{String(label)}</Text>
+      </View>
+    );
+  }
+
+  function renderWaterAmount(amountMl: number) {
+    return (
+      <WaterAmountButton
+        key={amountMl}
+        amountMl={amountMl}
+        onAdd={addWater}
+      />
+    );
+  }
+
+  function renderWaterDay(day: NonNullable<DashboardState['water']>['dailyTotals'][number]) {
+    return (
+      <View key={day.date} style={styles.historyRow}>
+        <Text style={styles.historyDate}>
+          {new Date(`${day.date}T00:00:00.000Z`).toLocaleDateString('vi-VN', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'numeric',
+            timeZone: 'UTC',
+          })}
+        </Text>
+        <Text style={styles.historyAmount}>
+          {formatNumber(day.totalMl)} ml
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -533,8 +604,8 @@ const HealthDashboardScreen = () => {
           title="Dinh dưỡng đã tiêu thụ"
           subtitle={
             state.calorieReport
-              ? `Hôm nay và tuần ${state.calorieReport.startDate} – ${state.calorieReport.endDate} · Chỉ tính món đã xác nhận đã ăn`
-              : 'Tổng hợp dưỡng chất từ các món đã ghi nhận là đã ăn'
+              ? `Món đã xác nhận · ${state.calorieReport.startDate} – ${state.calorieReport.endDate}`
+              : 'Chỉ tính các món đã ghi nhận là đã ăn'
           }
         >
           {state.errors.nutrition ? (
@@ -587,7 +658,7 @@ const HealthDashboardScreen = () => {
               {healthProfile ? (
                 <>
                   <Text style={styles.subsectionTitle}>
-                    Dưỡng chất hôm nay · đã tiêu thụ / mục tiêu
+                    Dưỡng chất hôm nay
                   </Text>
                   <View style={styles.nutrients}>
                     <NutrientProgressRow
@@ -622,18 +693,7 @@ const HealthDashboardScreen = () => {
                     Dưỡng chất đã tiêu thụ hôm nay
                   </Text>
                   <View style={styles.macroGrid}>
-                    {[
-                      ['Chất đạm', todayNutrition.nutrition.proteinG],
-                      ['Tinh bột', todayNutrition.nutrition.carbsG],
-                      ['Chất béo', todayNutrition.nutrition.fatG],
-                    ].map(([label, amount]) => (
-                      <View key={String(label)} style={styles.macroBox}>
-                        <Text style={styles.macroAmount}>
-                          {formatNumber(Number(amount), 1)} g
-                        </Text>
-                        <Text style={styles.macroLabel}>{String(label)}</Text>
-                      </View>
-                    ))}
+                    {macroItems.map(renderMacro)}
                   </View>
                   <Text style={styles.caption}>
                     {todayNutrition.consumedItems} món đã ghi nhận
@@ -650,6 +710,7 @@ const HealthDashboardScreen = () => {
                 </Text>
               )}
               <Text style={styles.subsectionTitle}>Xu hướng calo 7 ngày</Text>
+              <View style={styles.sectionDivider} />
               <View style={styles.weekSummary}>
                 <View>
                   <Text style={styles.summaryLabel}>TỔNG TUẦN</Text>
@@ -682,24 +743,21 @@ const HealthDashboardScreen = () => {
 
         <SectionCard
           title="Hoạt động đi bộ"
-          subtitle="Tổng trong 7 ngày gần nhất"
+          subtitle="7 ngày gần nhất"
         >
           {dailyStepTarget !== null &&
           stepTargetDistanceKm !== null &&
           stepTargetCalories !== null ? (
             <View style={styles.stepGoal}>
               <Text style={styles.stepGoalLabel}>
-                MỤC TIÊU GỢI Ý THEO HỒ SƠ
+                MỤC TIÊU THEO HỒ SƠ
               </Text>
               <Text style={styles.stepGoalValue}>
                 {formatNumber(dailyStepTarget)} bước/ngày
               </Text>
-              <Text style={styles.caption}>
-                Theo mức vận động và mục tiêu trong hồ sơ. Với chiều cao và cân
-                nặng hiện tại, tương đương khoảng{' '}
-                {formatNumber(stepTargetDistanceKm, 1)} km và tiêu hao khoảng{' '}
-                {formatNumber(stepTargetCalories)} kcal nếu đi liên tục ở nhịp
-                độ vừa.
+              <Text style={styles.stepGoalCaption}>
+                Ước tính {formatNumber(stepTargetDistanceKm, 1)} km ·{' '}
+                {formatNumber(stepTargetCalories)} kcal ở nhịp độ vừa
               </Text>
             </View>
           ) : (
@@ -763,7 +821,7 @@ const HealthDashboardScreen = () => {
 
         <SectionCard
           title="Nước uống hôm nay"
-          subtitle="Ghi nhận lượng nước bạn đã uống trong ngày"
+          subtitle="Lượng nước đã ghi nhận"
         >
           {state.errors.water ? (
             <Text style={styles.inlineError}>{state.errors.water}</Text>
@@ -779,45 +837,17 @@ const HealthDashboardScreen = () => {
               </View>
               <ProgressBar progress={waterProgress} color="#3197D6" />
               <View style={styles.waterActions}>
-                {WATER_AMOUNTS_ML.map(amountMl => (
-                  <Pressable
-                    key={amountMl}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Ghi nhận ${amountMl} ml nước`}
-                    onPress={() => addWater(amountMl)}
-                    style={styles.waterButton}
-                  >
-                    <Text style={styles.waterButtonText}>+ {amountMl} ml</Text>
-                  </Pressable>
-                ))}
+                {WATER_AMOUNTS_ML.map(renderWaterAmount)}
               </View>
               <Text style={styles.caption}>
-                Mốc 2.000 ml chỉ là mốc theo dõi chung; nhu cầu thay đổi theo
-                từng người, thời tiết và hoạt động. Chỉ ghi nhận đồ uống bạn
-                thực sự đã uống.
+                Mốc 2.000 ml chỉ để tham khảo; nhu cầu thực tế tùy từng người.
               </Text>
               {state.water?.dailyTotals.length ? (
                 <View style={styles.waterHistory}>
                   <Text style={styles.historyTitle}>
                     Lượng đã ghi nhận · 7 ngày
                   </Text>
-                  {state.water.dailyTotals.map(day => (
-                    <View key={day.date} style={styles.historyRow}>
-                      <Text style={styles.historyDate}>
-                        {new Date(
-                          `${day.date}T00:00:00.000Z`,
-                        ).toLocaleDateString('vi-VN', {
-                          weekday: 'short',
-                          day: 'numeric',
-                          month: 'numeric',
-                          timeZone: 'UTC',
-                        })}
-                      </Text>
-                      <Text style={styles.historyAmount}>
-                        {formatNumber(day.totalMl)} ml
-                      </Text>
-                    </View>
-                  ))}
+                  {state.water.dailyTotals.map(renderWaterDay)}
                 </View>
               ) : null}
             </>
@@ -839,8 +869,8 @@ const HealthDashboardScreen = () => {
 
         {healthProfile ? (
           <SectionCard
-            title="Thông tin sức khỏe & mục tiêu"
-            subtitle="Thông tin cá nhân và các chỉ số ước tính trong hồ sơ"
+            title="Hồ sơ sức khỏe"
+            subtitle="Thông tin cá nhân và mục tiêu"
           >
             {state.healthHistory.length === 0 ? (
               <>
@@ -921,9 +951,8 @@ const HealthDashboardScreen = () => {
               </Text>
             </View>
             <Text style={styles.caption}>
-              BMI và cân nặng được theo dõi ở biểu đồ phía trên. BMR, TDEE và
-              khoảng cân nặng khỏe mạnh là số liệu ước tính từ hồ sơ, không phải
-              phép đo hoặc chẩn đoán y tế.
+              BMR, TDEE và khoảng cân nặng là số liệu ước tính, không phải chẩn
+              đoán y tế.
             </Text>
           </SectionCard>
         ) : (
@@ -939,6 +968,7 @@ const HealthDashboardScreen = () => {
           Báo cáo dựa trên dữ liệu bạn ghi nhận trong HealthAndCook. Dữ liệu còn
           thiếu không được tự suy đoán
         </Text>
+        <TestBannerAd />
       </ScrollView>
     </View>
   );
@@ -963,7 +993,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingHorizontal: 18,
   },
-  content: { gap: 12, paddingTop: 6 },
+  content: { gap: 10, paddingTop: 4 },
   loading: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -971,59 +1001,59 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   metricCard: {
-    flexGrow: 1,
-    flexBasis: '30%',
-    minWidth: 100,
-    padding: 11,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 11,
-    backgroundColor: COLORS.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
+  metricCopy: { flex: 1 },
   metricLabel: {
-    color: COLORS.secondary,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  metricValue: {
-    marginTop: 6,
-    color: COLORS.text,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  metricUnit: { fontSize: 11, fontWeight: '700' },
-  metricCaption: {
-    marginTop: 3,
-    color: COLORS.secondary,
-    fontSize: 9,
-    lineHeight: 13,
-  },
-  card: {
-    padding: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 14,
-  },
-  sectionTitle: { color: COLORS.text, fontSize: 15, fontWeight: '800' },
-  sectionSubtitle: {
-    marginTop: 3,
-    marginBottom: 10,
-    color: COLORS.secondary,
-    fontSize: 10,
-    lineHeight: 15,
-  },
-  subsectionTitle: {
-    marginTop: 10,
-    marginBottom: 8,
     color: COLORS.text,
     fontSize: 12,
+    fontWeight: '700',
+  },
+  metricValue: {
+    color: COLORS.text,
+    fontSize: 16,
     fontWeight: '800',
+    textAlign: 'right',
+  },
+  metricUnit: { color: COLORS.secondary, fontSize: 11, fontWeight: '700' },
+  metricCaption: {
+    marginTop: 2,
+    color: COLORS.secondary,
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  card: {
+    padding: 15,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+    backgroundColor: COLORS.white,
+  },
+  sectionTitle: { color: COLORS.text, fontSize: 16, fontWeight: '800' },
+  sectionSubtitle: {
+    marginTop: 3,
+    marginBottom: 8,
+    color: COLORS.secondary,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  subsectionTitle: {
+    marginTop: 12,
+    marginBottom: 8,
+    color: COLORS.secondary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   todayCalories: {
-    padding: 11,
+    padding: 12,
     borderRadius: 10,
-    backgroundColor: COLORS.lightGreen,
+    backgroundColor: '#F2F8F4',
   },
   todayCaloriesHeader: {
     flexDirection: 'row',
@@ -1089,9 +1119,10 @@ const styles = StyleSheet.create({
   nutrientValue: { color: COLORS.secondary, fontSize: 10, fontWeight: '700' },
   macroBox: {
     flex: 1,
-    padding: 9,
-    borderRadius: 9,
-    backgroundColor: COLORS.lightGreen,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#F4F7F5',
   },
   macroAmount: { color: COLORS.text, fontSize: 12, fontWeight: '800' },
   macroLabel: { marginTop: 3, color: COLORS.secondary, fontSize: 10 },
@@ -1103,9 +1134,9 @@ const styles = StyleSheet.create({
   },
   stepGoal: {
     marginBottom: 10,
-    padding: 11,
+    padding: 12,
     borderRadius: 10,
-    backgroundColor: COLORS.lightGreen,
+    backgroundColor: '#F2F8F4',
   },
   stepGoalLabel: {
     color: COLORS.green,
@@ -1119,7 +1150,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
-  walkingGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  stepGoalCaption: {
+    marginTop: 3,
+    color: COLORS.secondary,
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  walkingGrid: { gap: 0 },
+  sectionDivider: {
+    height: 1,
+    marginTop: 10,
+    marginBottom: 2,
+    backgroundColor: COLORS.border,
+  },
   textButton: { alignSelf: 'flex-start', marginTop: 8, paddingVertical: 5 },
   textButtonLabel: { color: COLORS.green, fontSize: 11, fontWeight: '800' },
   waterHeader: {
@@ -1138,8 +1181,8 @@ const styles = StyleSheet.create({
     minHeight: 40,
     borderWidth: 1,
     borderColor: '#CFE5F3',
-    borderRadius: 9,
-    backgroundColor: '#EFF8FD',
+    borderRadius: 8,
+    backgroundColor: '#F2F8FB',
   },
   waterButtonText: { color: '#176A9E', fontSize: 12, fontWeight: '800' },
   waterHistory: {

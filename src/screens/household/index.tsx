@@ -54,6 +54,7 @@ import type {
 import type { GlobalState } from '../../type/global';
 import type { RootStackParamList } from '../../utils/types/navigation';
 import { completeMealPeriod } from '../../utils/mealPlanApi';
+import { createMealExpenses } from '../../utils/expenseApi';
 import { aggregateMealIngredients } from '../../utils/homeUtils';
 import HomeIngredientSummaryModal from '../home/homeIngredientSummaryModal';
 import HouseholdChatButton from './HouseholdChatButton';
@@ -73,6 +74,9 @@ import HouseholdMealPollCard from './components/HouseholdMealPollCard';
 import HouseholdMemberRow from './components/HouseholdMemberRow';
 import HouseholdPlannedMealRow from './components/HouseholdPlannedMealRow';
 import { COLORS } from './components/styles';
+import MealConsumptionModal, {
+  type MealExpenseEntry,
+} from '../component/MealConsumptionModal';
 import {
   formatHouseholdDeadlineDateTime,
   getCurrentMealPeriod,
@@ -80,6 +84,8 @@ import {
   getHouseholdDateKey,
   getMealPeriodSummary,
 } from '../../utils/householdScreenUtils';
+
+const MEAL_PERIODS = ['LUNCH', 'DINNER'] as const;
 
 const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
   const route =
@@ -129,6 +135,10 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
       error: '',
     },
   });
+  const [consumptionConfirmation, setConsumptionConfirmation] = useState<{
+    mealPeriod: MealPeriod;
+    items: HouseholdPlannedMeal[];
+  } | null>(null);
   const [householdSettingsVisible, setHouseholdSettingsVisible] = useState(false);
   const {
     membersExpanded,
@@ -191,6 +201,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
   const requestRefs = useRef({
     householdLoad: 0,
     ingredientLoad: 0,
+    completionInFlight: false,
   });
 
   const loadHousehold = useCallback(
@@ -944,11 +955,21 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
   }, [loadHousehold]);
 
   const handleConfirmCompleteHouseholdMeal = useCallback(
-    async (mealPeriod: MealPeriod) => {
-      if (!user?.accessToken || !household) {
+    async (
+      mealPeriod: MealPeriod,
+      items: HouseholdPlannedMeal[],
+      expenses: MealExpenseEntry[],
+    ) => {
+      if (
+        !user?.accessToken ||
+        !household ||
+        requestRefs.current.completionInFlight
+      ) {
         return;
       }
+      requestRefs.current.completionInFlight = true;
       setState(previous => ({ ...previous, completingPeriod: mealPeriod }));
+      let expenseError = '';
       try {
         const response = await completeMealPeriod(user, 'HOUSEHOLD', {
           date: state.date,
@@ -961,6 +982,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
           );
           return;
         }
+        setConsumptionConfirmation(null);
         dispatch(invalidateCachedConsumptionReports({ userId: user.id }));
         dispatch(
           invalidateCachedHouseholdMealPlan({
@@ -969,51 +991,174 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
             date: state.date,
           }),
         );
+        const expenseFailures = await createMealExpenses(user, 'HOUSEHOLD', {
+          date: state.date,
+          mealPeriod,
+          expenses: expenses.flatMap(expense => {
+            const meal = items.find(item => item.meal.id === expense.mealId);
+            return meal
+              ? [
+                  {
+                    ...expense,
+                    mealName: meal.meal.name,
+                  },
+                ]
+              : [];
+          }),
+        });
+        if (expenseFailures.length > 0) {
+          expenseError = expenseFailures
+            .map(failure => `${failure.mealName}: ${failure.message}`)
+            .join('\n');
+        }
         await loadHousehold();
+        if (expenseError) {
+          Alert.alert(
+            'Bữa ăn đã ghi nhận',
+            `Dinh dưỡng đã được lưu nhưng một số khoản chi chưa được ghi lại:\n${expenseError}`,
+          );
+        }
       } catch {
         Alert.alert('Không thể hoàn thành bữa ăn', 'Vui lòng thử lại sau.');
       } finally {
+        requestRefs.current.completionInFlight = false;
         setState(previous => ({ ...previous, completingPeriod: null }));
       }
     },
     [dispatch, household, loadHousehold, state.date, user],
   );
 
+  const handleCancelConsumptionConfirmation = useCallback(() => {
+    if (state.completingPeriod) return;
+    setConsumptionConfirmation(null);
+  }, [state.completingPeriod]);
+
+  const handleConfirmConsumption = useCallback(
+    (expenses: MealExpenseEntry[]) => {
+      if (!consumptionConfirmation) return;
+      handleConfirmCompleteHouseholdMeal(
+        consumptionConfirmation.mealPeriod,
+        consumptionConfirmation.items,
+        expenses,
+      );
+    },
+    [consumptionConfirmation, handleConfirmCompleteHouseholdMeal],
+  );
+
   const handleCompleteLunch = useCallback(() => {
     const plan = state.mealPlan?.meals.LUNCH;
-    if (!plan || getFinalizedMeals(plan.items, plan.poll).length === 0) {
+    const items = plan
+      ? getFinalizedMeals(plan.items, plan.poll).filter(item => !item.isConsumed)
+      : [];
+    if (items.length === 0) {
       return;
     }
-    Alert.alert(
-      'Xác nhận đã ăn bữa trưa?',
-      'Toàn bộ món trong bữa trưa sẽ được lưu vào báo cáo dinh dưỡng của bạn. Không thể hoàn tác.',
-      [
-        { text: 'Chưa ăn', style: 'cancel' },
-        {
-          text: 'Đã ăn',
-          onPress: () => handleConfirmCompleteHouseholdMeal('LUNCH'),
-        },
-      ],
-    );
-  }, [handleConfirmCompleteHouseholdMeal, state.mealPlan]);
+    setConsumptionConfirmation({ mealPeriod: 'LUNCH', items });
+  }, [state.mealPlan]);
 
   const handleCompleteDinner = useCallback(() => {
     const plan = state.mealPlan?.meals.DINNER;
-    if (!plan || getFinalizedMeals(plan.items, plan.poll).length === 0) {
+    const items = plan
+      ? getFinalizedMeals(plan.items, plan.poll).filter(item => !item.isConsumed)
+      : [];
+    if (items.length === 0) {
       return;
     }
-    Alert.alert(
-      'Xác nhận đã ăn bữa tối?',
-      'Toàn bộ món trong bữa tối sẽ được lưu vào báo cáo dinh dưỡng của bạn. Không thể hoàn tác.',
-      [
-        { text: 'Chưa ăn', style: 'cancel' },
-        {
-          text: 'Đã ăn',
-          onPress: () => handleConfirmCompleteHouseholdMeal('DINNER'),
-        },
-      ],
+    setConsumptionConfirmation({ mealPeriod: 'DINNER', items });
+  }, [state.mealPlan]);
+
+  const handleOpenChat = useCallback(() => {
+    if (!household) {
+      return;
+    }
+    navigate(ScreenKeys.HOUSEHOLD_CHAT, {
+      householdId: household.id,
+      householdName: household.name,
+    });
+  }, [household]);
+  const handleOpenHouseholdSettings = useCallback(() => {
+    setHouseholdSettingsVisible(true);
+  }, []);
+  const handleOpenShoppingList = useCallback(() => {
+    setShoppingListVisible(true);
+  }, [setShoppingListVisible]);
+  const handleSelectLunch = useCallback(() => {
+    setSelectedMealPeriod('LUNCH');
+  }, [setSelectedMealPeriod]);
+  const handleSelectDinner = useCallback(() => {
+    setSelectedMealPeriod('DINNER');
+  }, [setSelectedMealPeriod]);
+  const handleCancelPollDeadline = useCallback(() => {
+    setPollDeadlineVisible(false);
+  }, [setPollDeadlineVisible]);
+  const handleCloseShoppingList = useCallback(() => {
+    setShoppingListVisible(false);
+  }, [setShoppingListVisible]);
+  const handleCloseHouseholdSettings = useCallback(() => {
+    setHouseholdSettingsVisible(false);
+  }, []);
+  const confirmationMeals = useMemo(
+    () =>
+      consumptionConfirmation?.items.map(item => ({
+        mealId: item.meal.id,
+        name: item.meal.name,
+        estimatedPrice: item.estimatedPrice,
+      })) ?? [],
+    [consumptionConfirmation],
+  );
+
+  function renderMealPeriodTab(period: MealPeriod) {
+    const selected = selectedMealPeriod === period;
+    const plan = state.mealPlan?.meals[period];
+    const handleSelect =
+      period === 'LUNCH' ? handleSelectLunch : handleSelectDinner;
+    const mealSummary = getMealPeriodSummary(
+      plan,
+      household?.mealVotingEnabled ?? false,
     );
-  }, [handleConfirmCompleteHouseholdMeal, state.mealPlan]);
+
+    return (
+      <Pressable
+        key={period}
+        accessibilityRole="button"
+        accessibilityLabel={`${
+          period === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'
+        }, ${mealSummary}`}
+        accessibilityState={{ selected }}
+        onPress={handleSelect}
+        style={[
+          styles.mealPeriodTab,
+          selected && styles.mealPeriodTabSelected,
+        ]}
+      >
+        {selected ? (
+          <LinearGradient
+            colors={['#FFFFFF', '#EAF6EE']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : null}
+        <Text
+          style={[
+            styles.mealPeriodTabTitle,
+            selected && styles.mealPeriodTabTitleSelected,
+          ]}
+        >
+          {period === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.mealPeriodTabSummary,
+            selected && styles.mealPeriodTabSummarySelected,
+          ]}
+        >
+          {mealSummary}
+        </Text>
+      </Pressable>
+    );
+  }
 
   return (
     <View style={[styles.screen, embedded && styles.embeddedScreen]}>
@@ -1032,12 +1177,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                 <View style={styles.headerActions}>
                   <HouseholdChatButton
                     unreadCount={chatUnreadCount}
-                    onPress={() =>
-                      navigate(ScreenKeys.HOUSEHOLD_CHAT, {
-                        householdId: household.id,
-                        householdName: household.name,
-                      })
-                    }
+                    onPress={handleOpenChat}
                   />
                 </View>
               ) : null
@@ -1065,7 +1205,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                 {household.currentRole === 'ADMIN' ? (
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => setHouseholdSettingsVisible(true)}
+                    onPress={handleOpenHouseholdSettings}
                     style={styles.householdSettingsButton}
                   >
                     <Text style={styles.householdSettingsButtonText}>
@@ -1091,7 +1231,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                 }
                 accessibilityState={{ disabled: shoppingListDisabled }}
                 disabled={shoppingListDisabled}
-                onPress={() => setShoppingListVisible(true)}
+                onPress={handleOpenShoppingList}
                 style={[
                   styles.shoppingListButton,
                   shoppingListDisabled && styles.shoppingListButtonDisabled,
@@ -1261,57 +1401,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                     accessibilityRole="tablist"
                     style={styles.mealPeriodTabs}
                   >
-                    {(['LUNCH', 'DINNER'] as const).map(period => {
-                      const selected = selectedMealPeriod === period;
-                      const plan = state.mealPlan?.meals[period];
-                      return (
-                        <Pressable
-                          key={period}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${
-                            period === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'
-                          }, ${getMealPeriodSummary(
-                            plan,
-                            household.mealVotingEnabled,
-                          )}`}
-                          accessibilityState={{ selected }}
-                          onPress={() => setSelectedMealPeriod(period)}
-                          style={[
-                            styles.mealPeriodTab,
-                            selected && styles.mealPeriodTabSelected,
-                          ]}
-                        >
-                          {selected ? (
-                            <LinearGradient
-                              colors={['#FFFFFF', '#EAF6EE']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={StyleSheet.absoluteFill}
-                            />
-                          ) : null}
-                          <Text
-                            style={[
-                              styles.mealPeriodTabTitle,
-                              selected && styles.mealPeriodTabTitleSelected,
-                            ]}
-                          >
-                            {period === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'}
-                          </Text>
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.mealPeriodTabSummary,
-                              selected && styles.mealPeriodTabSummarySelected,
-                            ]}
-                          >
-                            {getMealPeriodSummary(
-                              plan,
-                              household.mealVotingEnabled,
-                            )}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
+                    {MEAL_PERIODS.map(renderMealPeriodTab)}
                   </View>
                   {!isVoting ? (
                     <HouseholdMealPeriodCard
@@ -1447,7 +1537,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                       : household.dinnerPollCloseTime ?? '17:00'
                   }
                   saving={pollDeadlineSaving}
-                  onCancel={() => setPollDeadlineVisible(false)}
+                  onCancel={handleCancelPollDeadline}
                   onConfirm={handleSetPollDeadline}
                 />
               </>
@@ -1537,6 +1627,19 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
         onClose={closeIngredientSummary}
         onRetry={loadAcceptedIngredients}
       />
+      {consumptionConfirmation ? (
+        <MealConsumptionModal
+          visible
+          date={state.date}
+          mealPeriod={consumptionConfirmation.mealPeriod}
+          meals={confirmationMeals}
+          saving={
+            state.completingPeriod === consumptionConfirmation.mealPeriod
+          }
+          onCancel={handleCancelConsumptionConfirmation}
+          onConfirm={handleConfirmConsumption}
+        />
+      ) : null}
       <HouseholdShoppingListModal
         visible={shoppingListVisible}
         token={user?.accessToken}
@@ -1544,14 +1647,14 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
         mealPeriod={selectedMealPeriod}
         disabled={shoppingListDisabled}
         householdName={household?.name ?? 'Gia đình'}
-        onClose={() => setShoppingListVisible(false)}
+        onClose={handleCloseShoppingList}
       />
       {household?.currentRole === 'ADMIN' ? (
         <HouseholdSettingsModal
           visible={householdSettingsVisible}
           mealVotingEnabled={household.mealVotingEnabled}
           saving={pollVotingSaving}
-          onClose={() => setHouseholdSettingsVisible(false)}
+          onClose={handleCloseHouseholdSettings}
           onVotingChange={handleSetMealVotingEnabled}
         />
       ) : null}

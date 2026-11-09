@@ -4,17 +4,21 @@ import type { HomeMealPeriodProps } from '../../utils/types';
 import HomeMealItem from './homeMealItem';
 
 const HomeMealPeriod = memo(
-  ({ title, items, onPress }: HomeMealPeriodProps) => (
-    <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
-      {items.map(item => (
-        <HomeMealItem key={item.id} item={item} onPress={onPress} />
-      ))}
-      {items.length === 0 ? (
-        <Text style={styles.empty}>Chưa có món nào được lên lịch.</Text>
-      ) : null}
-    </View>
-  ),
+  ({ title, items, onPress }: HomeMealPeriodProps) => {
+    function renderItem(item: (typeof items)[number]) {
+      return <HomeMealItem key={item.id} item={item} onPress={onPress} />;
+    }
+
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>{title}</Text>
+        {items.map(renderItem)}
+        {items.length === 0 ? (
+          <Text style={styles.empty}>Chưa có món nào được lên lịch.</Text>
+        ) : null}
+      </View>
+    );
+  },
 );
 
 export default HomeMealPeriod;

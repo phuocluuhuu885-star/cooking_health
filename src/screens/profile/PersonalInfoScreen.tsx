@@ -98,6 +98,41 @@ const ACCOUNT_OPTIONS: Array<{
   },
 ];
 
+const AccountOptionRow = ({
+  option,
+  description,
+  onPress,
+}: {
+  option: (typeof ACCOUNT_OPTIONS)[number];
+  description: string;
+  onPress: (option: (typeof ACCOUNT_OPTIONS)[number]) => void;
+}) => {
+  const handlePress = useCallback(() => {
+    onPress(option);
+  }, [onPress, option]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={handlePress}
+      style={styles.optionRow}
+    >
+      <View style={styles.optionCopy}>
+        <Text
+          style={[
+            styles.optionTitle,
+            option.id === 'DELETE' && styles.optionDanger,
+          ]}
+        >
+          {option.title}
+        </Text>
+        <Text style={styles.optionDescription}>{description}</Text>
+      </View>
+      <Text style={styles.optionChevron}>›</Text>
+    </Pressable>
+  );
+};
+
 const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
@@ -165,8 +200,29 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
     () => createStateSetter(setState, 'deleteAccountPassword'),
     [setState],
   );
+  const closeDeleteAccountModal = useCallback(() => {
+    setDeleteAccountVisible(false);
+  }, [setDeleteAccountVisible]);
+  const cancelAccountDeletion = useCallback(() => {
+    setDeleteAccountVisible(false);
+    setDeleteAccountPassword('');
+  }, [setDeleteAccountPassword, setDeleteAccountVisible]);
+  const renderAccountOption = (option: (typeof ACCOUNT_OPTIONS)[number]) => (
+    <AccountOptionRow
+      key={option.id}
+      option={option}
+      description={
+        option.id === 'GEMINI'
+          ? geminiConsentGranted
+            ? 'Đang bật — chạm để thu hồi'
+            : 'Chưa bật — chạm để xem trạng thái'
+          : option.description
+      }
+      onPress={onHandleOptionPress}
+    />
+  );
 
-  const selectAvatar = async () => {
+  const selectAvatar = useCallback(async () => {
     if (!user?.accessToken) {
       Alert.alert('Cần đăng nhập', 'Vui lòng đăng nhập để đổi ảnh đại diện.');
       return;
@@ -195,9 +251,9 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
     } finally {
       setSavingAvatar(false);
     }
-  };
+  }, [dispatch, setSavingAvatar, user]);
 
-  const savePersonalInfo = async () => {
+  const savePersonalInfo = useCallback(async () => {
     if (!user?.accessToken) {
       Alert.alert('Cần đăng nhập', 'Vui lòng đăng nhập để cập nhật thông tin.');
       return;
@@ -236,9 +292,9 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
     } finally {
       setSavingProfile(false);
     }
-  };
+  }, [dispatch, setSavingProfile, state.fullName, user]);
 
-  const submitPasswordChange = async () => {
+  const submitPasswordChange = useCallback(async () => {
     if (!user?.accessToken) {
       Alert.alert('Cần đăng nhập', 'Vui lòng đăng nhập để đổi mật khẩu.');
       return;
@@ -285,9 +341,16 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
     } finally {
       setChangingPassword(false);
     }
-  };
+  }, [
+    setChangingPassword,
+    setState,
+    state.confirmPassword,
+    state.currentPassword,
+    state.newPassword,
+    user,
+  ]);
 
-  const submitAccountDeletion = async () => {
+  const submitAccountDeletion = useCallback(async () => {
     if (!user?.accessToken) {
       Alert.alert('Cần đăng nhập', 'Vui lòng đăng nhập lại để xóa tài khoản.');
       return;
@@ -328,9 +391,9 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
     } finally {
       setDeletingAccount(false);
     }
-  };
+  }, [dispatch, setDeletingAccount, state.deleteAccountPassword, user]);
 
-  const confirmAccountDeletion = () => {
+  const confirmAccountDeletion = useCallback(() => {
     Alert.alert(
       'Xóa tài khoản vĩnh viễn?',
       'Hồ sơ, dữ liệu sức khỏe, lịch sử đi bộ và thực đơn gắn với tài khoản sẽ bị xóa. Thao tác này không thể hoàn tác.',
@@ -343,9 +406,9 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
         },
       ],
     );
-  };
+  }, [setDeleteAccountVisible]);
 
-  const revokeGeminiConsent = () => {
+  const revokeGeminiConsent = useCallback(() => {
     if (!user?.id) return;
     if (!geminiConsentGranted) {
       Alert.alert(
@@ -369,9 +432,9 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
         },
       ],
     );
-  };
+  }, [geminiConsentGranted, setGeminiConsentGranted, user?.id]);
 
-  const onHandleOptionPress = (option: any) => {
+  const onHandleOptionPress = useCallback((option: (typeof ACCOUNT_OPTIONS)[number]) => {
     if (option.id === 'BASIC' || option.id === 'PASSWORD') {
       navigate(ScreenKeys.PERSONAL_INFO, { section: option.id }, true);
       return;
@@ -387,7 +450,7 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
     if (option.id === 'PRIVACY') {
       navigate(ScreenKeys.PRIVACY_POLICY, { mode: 'view' }, true);
     }
-  };
+  }, [confirmAccountDeletion, revokeGeminiConsent]);
 
   return (
     <View style={styles.screen}>
@@ -422,37 +485,7 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
                 Chọn nội dung bạn muốn quản lý.
               </Text>
               <View style={styles.optionsList}>
-                {ACCOUNT_OPTIONS.map(option => {
-                  const description =
-                    option.id === 'GEMINI'
-                      ? geminiConsentGranted
-                        ? 'Đang bật — chạm để thu hồi'
-                        : 'Chưa bật — chạm để xem trạng thái'
-                      : option.description;
-                  return (
-                    <Pressable
-                      key={option.id}
-                      accessibilityRole="button"
-                      onPress={() => onHandleOptionPress(option)}
-                      style={styles.optionRow}
-                    >
-                      <View style={styles.optionCopy}>
-                        <Text
-                          style={[
-                            styles.optionTitle,
-                            option.id === 'DELETE' && styles.optionDanger,
-                          ]}
-                        >
-                          {option.title}
-                        </Text>
-                        <Text style={styles.optionDescription}>
-                          {description}
-                        </Text>
-                      </View>
-                      <Text style={styles.optionChevron}>›</Text>
-                    </Pressable>
-                  );
-                })}
+                {ACCOUNT_OPTIONS.map(renderAccountOption)}
               </View>
             </LinearGradient>
           ) : null}
@@ -598,7 +631,7 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
 
       <Modal
         animationType="fade"
-        onRequestClose={() => setDeleteAccountVisible(false)}
+        onRequestClose={closeDeleteAccountModal}
         transparent
         visible={state.deleteAccountVisible}
       >
@@ -617,10 +650,7 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
               <Pressable
                 accessibilityRole="button"
                 disabled={state.deletingAccount}
-                onPress={() => {
-                  setDeleteAccountVisible(false);
-                  setDeleteAccountPassword('');
-                }}
+                onPress={cancelAccountDeletion}
                 style={styles.cancelDeleteButton}
               >
                 <Text style={styles.cancelDeleteText}>Hủy</Text>

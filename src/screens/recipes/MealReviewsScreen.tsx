@@ -138,6 +138,25 @@ const MealReviewsScreen = ({ route }: MealReviewScreenProps) => {
     setRefreshIndex(previous => previous + 1);
   }, [setRatingModalVisible, setRefreshIndex]);
 
+  const handleOpenRatingModal = useCallback(() => {
+    setRatingModalVisible(true);
+  }, [setRatingModalVisible]);
+
+  const handleCloseRatingModal = useCallback(() => {
+    setRatingModalVisible(false);
+  }, [setRatingModalVisible]);
+
+  const handleRetryLoadReviews = useCallback(() => {
+    loadReviews();
+  }, [loadReviews]);
+
+  const reviewCount = data?.reviews.length;
+  const handleLoadMore = useCallback(() => {
+    if (reviewCount != null) {
+      loadReviews(reviewCount, true);
+    }
+  }, [loadReviews, reviewCount]);
+
   const renderReview = (review: MealReview) => (
     <View key={review.id} style={styles.reviewItem}>
       <View style={styles.reviewHeader}>
@@ -196,7 +215,7 @@ const MealReviewsScreen = ({ route }: MealReviewScreenProps) => {
           ) : null}
           <Pressable
             accessibilityRole="button"
-            onPress={() => setRatingModalVisible(true)}
+            onPress={handleOpenRatingModal}
             style={styles.rateButton}
           >
             <Text style={styles.rateButtonText}>
@@ -221,7 +240,7 @@ const MealReviewsScreen = ({ route }: MealReviewScreenProps) => {
             <Text style={styles.errorText}>{error}</Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => loadReviews()}
+              onPress={handleRetryLoadReviews}
               style={styles.retryButton}
             >
               <Text style={styles.retryText}>Thử lại</Text>
@@ -244,7 +263,7 @@ const MealReviewsScreen = ({ route }: MealReviewScreenProps) => {
               <Pressable
                 accessibilityRole="button"
                 disabled={loadingMore}
-                onPress={() => loadReviews(data.reviews.length, true)}
+                onPress={handleLoadMore}
                 style={styles.loadMoreButton}
               >
                 {loadingMore ? (
@@ -263,7 +282,7 @@ const MealReviewsScreen = ({ route }: MealReviewScreenProps) => {
         mealName={mealName}
         token={user?.accessToken}
         visible={ratingModalVisible}
-        onClose={() => setRatingModalVisible(false)}
+        onClose={handleCloseRatingModal}
         onSubmitted={handleReviewSubmitted}
       />
     </View>
