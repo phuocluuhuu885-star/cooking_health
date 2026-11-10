@@ -236,7 +236,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 18,
   },
   header: {
     flexDirection: 'row',
@@ -266,12 +265,13 @@ const styles = StyleSheet.create({
   },
   title: { marginTop: 2, color: COLORS.text, fontSize: 19, fontWeight: '800' },
   subtitle: { marginTop: 3, color: COLORS.secondary, fontSize: 11 },
-  content: { paddingTop: 8 },
+  content: { paddingTop: 8, paddingHorizontal: 16 },
   loading: {
     minHeight: 180,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
+    paddingHorizontal: 16,
   },
   card: {
     padding: 14,

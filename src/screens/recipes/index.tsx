@@ -43,7 +43,15 @@ import { navigate } from '../../utils/navigation';
 import ScreenKeys from '../../utils/screenKey';
 import { fetchCurrentHousehold } from '../../utils/householdApi';
 import { addMealToPlan } from '../../utils/mealPlanApi';
+import { getUtcDateKey } from '../../utils/dateUtils';
+import { getApiError } from '../../utils/homeUtils';
+import {
+  hasAiRecommendationConsent,
+  requestAiRecommendationConsent,
+  saveAiRecommendationConsent,
+} from '../../utils/aiRecommendationConsent';
 import type {
+  AiMealRecommendationsResponse,
   Category,
   MealPeriod,
   MealPlanDestination,
@@ -55,7 +63,6 @@ import MealPlanComposerModal from './MealPlanComposerModal';
 import { fetchMealReviewSummaries } from '../../utils/mealReviewApi';
 import { findRecipe, toRecipe } from '../../utils/recipeScreenUtils';
 import { createStateSetter } from '../../utils/stateUtils';
-import TestBannerAd from '../component/TestBannerAd';
 
 const CATEGORIES: Category[] = [
   { id: 'all', title: 'Tất cả' },
@@ -63,7 +70,17 @@ const CATEGORIES: Category[] = [
   { id: 'LUNCH', title: 'Bữa trưa' },
   { id: 'DINNER', title: 'Bữa tối' },
   { id: 'SNACK', title: 'Ăn nhẹ' },
+  { id: 'VEGETARIAN', title: 'Món chay' },
 ];
+
+const getMealCategoryFilters = (selectedCategory: string) => ({
+  ...(selectedCategory !== 'all' && selectedCategory !== 'VEGETARIAN'
+    ? { category: selectedCategory }
+    : {}),
+  ...(selectedCategory === 'VEGETARIAN' ? { vegetarian: true } : {}),
+});
+
+type LoginPromptContext = 'entry' | 'add';
 
 const RecipeLibrary = () => {
   const insets = useSafeAreaInsets();
@@ -94,6 +111,13 @@ const RecipeLibrary = () => {
     composerSaving: false,
   });
   const [loginPromptVisible, setLoginPromptVisible] = useState(false);
+  const [loginPromptContext, setLoginPromptContext] =
+    useState<LoginPromptContext>('add');
+  const [aiSuggestion, setAiSuggestion] = useState<{
+    recipe: Recipe;
+  } | null>(null);
+  const [aiSuggestionError, setAiSuggestionError] = useState('');
+  const aiSuggestionRequestId = useRef(0);
   const { selectedRecipe, reviewSummaries, composerVisible, composerSaving } =
     state;
   const setSelectedRecipe = useMemo(
@@ -138,16 +162,12 @@ const RecipeLibrary = () => {
               q: state.search.trim(),
               page: 1,
               limit: 100,
-              ...(state.selectedCategory !== 'all'
-                ? { category: state.selectedCategory }
-                : {}),
+              ...getMealCategoryFilters(state.selectedCategory),
             }
           : {
               page: 1,
               limit: 100,
-              ...(state.selectedCategory !== 'all'
-                ? { category: state.selectedCategory }
-                : {}),
+              ...getMealCategoryFilters(state.selectedCategory),
             };
 
         try {
@@ -214,9 +234,7 @@ const RecipeLibrary = () => {
       ...(isSearch ? { q: state.search.trim() } : {}),
       page,
       limit: 100,
-      ...(state.selectedCategory !== 'all'
-        ? { category: state.selectedCategory }
-        : {}),
+      ...getMealCategoryFilters(state.selectedCategory),
     };
     setState(previous => ({ ...previous, loadingMore: true }));
 
@@ -296,6 +314,10 @@ const RecipeLibrary = () => {
   const closeLoginPrompt = useCallback(() => {
     setLoginPromptVisible(false);
   }, []);
+  const showLoginPrompt = useCallback((context: LoginPromptContext) => {
+    setLoginPromptContext(context);
+    setLoginPromptVisible(true);
+  }, []);
   const confirmLogin = useCallback(() => {
     setLoginPromptVisible(false);
     navigate(ScreenKeys.LOGIN);
@@ -311,7 +333,7 @@ const RecipeLibrary = () => {
   const handleAddRecipe = useCallback(
     async (recipeId: string) => {
       if (!user?.accessToken) {
-        setLoginPromptVisible(true);
+        showLoginPrompt('add');
         return;
       }
 
@@ -340,7 +362,10 @@ const RecipeLibrary = () => {
             error instanceof Error ? error.message : 'Vui lòng thử lại sau.';
         }
       }
-      const recipe = findRecipe(recipeId, state.recipes, cachedMeals);
+      const recipe =
+        aiSuggestion?.recipe.id === recipeId
+          ? aiSuggestion.recipe
+          : findRecipe(recipeId, state.recipes, cachedMeals);
       if (!recipe) {
         Alert.alert('Không thể thêm món', 'Không tìm thấy thông tin món ăn.');
         return;
@@ -393,8 +418,10 @@ const RecipeLibrary = () => {
       householdLoaded,
       household,
       mealPlanDestination,
+      aiSuggestion,
       setComposerVisible,
       setSelectedRecipe,
+      showLoginPrompt,
       state.recipes,
       user,
     ],
@@ -434,7 +461,7 @@ const RecipeLibrary = () => {
     ) => {
       if (!user?.accessToken) {
         setComposerVisible(false);
-        setLoginPromptVisible(true);
+        showLoginPrompt('add');
         return;
       }
       if (!selectedRecipe) {
@@ -539,6 +566,7 @@ const RecipeLibrary = () => {
       setComposerSaving,
       setComposerVisible,
       setSelectedRecipe,
+      showLoginPrompt,
       user,
     ],
   );
@@ -554,6 +582,115 @@ const RecipeLibrary = () => {
       ? cachedMeals.map(meal => meal.id)
       : state.recipes.map(recipe => recipe.id)
   ).join(',');
+
+  const loadAiSuggestion = useCallback(async () => {
+    const requestId = ++aiSuggestionRequestId.current;
+    const isVegetarian = state.selectedCategory === 'VEGETARIAN';
+    try {
+      const response = (await syncApi(apiConst.getAiMealRecommendations, {
+        date: getUtcDateKey(new Date()),
+        consent: true,
+        ...(isVegetarian ? { vegetarian: true } : {}),
+      })) as AiMealRecommendationsResponse;
+      if (requestId !== aiSuggestionRequestId.current) return;
+      if (!response?.success || !response.data?.recommendations) {
+        throw new Error(
+          response?.message ||
+            response?.ErrorMessage ||
+            'Không thể tạo gợi ý món ăn lúc này.',
+        );
+      }
+
+      const recommendationData = response.data;
+      const periods: MealPeriod[] =
+        state.selectedCategory === 'LUNCH'
+          ? ['LUNCH']
+          : state.selectedCategory === 'DINNER'
+            ? ['DINNER']
+            : ['LUNCH', 'DINNER'];
+      const recommendation = periods
+        .flatMap(period => recommendationData.recommendations[period])
+        .find(item => item.meal);
+      if (!recommendation) {
+        setAiSuggestion(null);
+        setAiSuggestionError('');
+        return;
+      }
+
+      setAiSuggestion({
+        recipe: toRecipe({
+          ...recommendation.meal,
+          isVegetarian:
+            isVegetarian || recommendation.meal.isVegetarian || false,
+        }),
+      });
+      setAiSuggestionError('');
+    } catch (error) {
+      if (requestId !== aiSuggestionRequestId.current) return;
+      console.warn('Failed to load personalized meal suggestion', error);
+      setAiSuggestion(null);
+      setAiSuggestionError(
+        getApiError(error, 'Chưa thể tải gợi ý món ăn lúc này.'),
+      );
+    }
+  }, [state.selectedCategory]);
+
+  const requestAiSuggestion = useCallback(() => {
+    if (!user?.accessToken || !user.id) {
+      setAiSuggestion(null);
+      setAiSuggestionError('');
+      return;
+    }
+    if (!user.healthProfile) {
+      setAiSuggestion(null);
+      setAiSuggestionError(
+        'Hoàn thành hồ sơ sức khỏe để nhận gợi ý phù hợp với cơ thể bạn.',
+      );
+      return;
+    }
+    if (
+      state.selectedCategory === 'BREAKFAST' ||
+      state.selectedCategory === 'SNACK'
+    ) {
+      setAiSuggestion(null);
+      setAiSuggestionError('');
+      return;
+    }
+
+    if (
+      user.healthProfile.age < 18 ||
+      hasAiRecommendationConsent(user.id)
+    ) {
+      loadAiSuggestion();
+      return;
+    }
+
+    setAiSuggestion(null);
+    setAiSuggestionError('');
+    const userId = user.id;
+    function handleConsent() {
+      saveAiRecommendationConsent(userId, true);
+      loadAiSuggestion();
+    }
+    requestAiRecommendationConsent(handleConsent);
+  }, [loadAiSuggestion, state.selectedCategory, user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      requestAiSuggestion();
+      return () => {
+        aiSuggestionRequestId.current += 1;
+      };
+    }, [requestAiSuggestion]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.accessToken) {
+        showLoginPrompt('entry');
+      }
+    }, [showLoginPrompt, user?.accessToken]),
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -604,6 +741,7 @@ const RecipeLibrary = () => {
       <ItemProduct
         item={item}
         width={cardWidth}
+        isRecommended={aiSuggestion?.recipe.id === item.id}
         isFavorite={state.favorites.includes(item.id)}
         onFavorite={handleFavorite}
         onAdd={handleAddRecipe}
@@ -613,6 +751,7 @@ const RecipeLibrary = () => {
     ),
     [
       cardWidth,
+      aiSuggestion?.recipe.id,
       state.favorites,
       handleFavorite,
       handleAddRecipe,
@@ -628,9 +767,27 @@ const RecipeLibrary = () => {
     isUnfilteredCatalog && catalogLoaded
       ? cachedMeals.map(toRecipe)
       : state.recipes;
-  const displayedRecipes = state.favoritesOnly
-    ? catalogRecipes.filter(recipe => state.favorites.includes(recipe.id))
+  const canShowAiSuggestion =
+    aiSuggestion !== null &&
+    !state.search.trim() &&
+    (state.selectedCategory === 'all' ||
+      state.selectedCategory === 'VEGETARIAN' ||
+      aiSuggestion.recipe.category.includes(state.selectedCategory)) &&
+    (!state.favoritesOnly ||
+      state.favorites.includes(aiSuggestion.recipe.id));
+  const recipesWithAiSuggestion = canShowAiSuggestion
+    ? [
+        aiSuggestion.recipe,
+        ...catalogRecipes.filter(
+          recipe => recipe.id !== aiSuggestion.recipe.id,
+        ),
+      ]
     : catalogRecipes;
+  const displayedRecipes = state.favoritesOnly
+    ? recipesWithAiSuggestion.filter(recipe =>
+        state.favorites.includes(recipe.id),
+      )
+    : recipesWithAiSuggestion;
   const listHeader = (
     <View style={styles.listHeader}>
       <View>
@@ -707,6 +864,9 @@ const RecipeLibrary = () => {
           <Text style={styles.eyebrow}>BẾP CỦA BẠN</Text>
           <Text style={styles.title}>Khám phá món ngon</Text>
           <Text style={styles.subtitle}>Tìm cảm hứng cho bữa ăn tiếp theo</Text>
+          {aiSuggestionError ? (
+            <Text style={styles.aiSuggestionHint}>{aiSuggestionError}</Text>
+          ) : null}
         </View>
 
         <View
@@ -802,7 +962,6 @@ const RecipeLibrary = () => {
             }
           />
         )}
-        <TestBannerAd />
       </View>
       <MealPlanComposerModal
         visible={composerVisible}
@@ -820,6 +979,16 @@ const RecipeLibrary = () => {
         visible={loginPromptVisible}
         onClose={closeLoginPrompt}
         onConfirm={confirmLogin}
+        title={
+          loginPromptContext === 'entry'
+            ? 'Đăng nhập để vào Bếp của bạn'
+            : undefined
+        }
+        message={
+          loginPromptContext === 'entry'
+            ? 'Đăng nhập hoặc tạo tài khoản để lưu món yêu thích và thêm món vào thực đơn của bạn.'
+            : undefined
+        }
       />
     </View>
   );
@@ -863,6 +1032,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: '#748078',
     fontSize: 14,
+  },
+  aiSuggestionHint: {
+    marginTop: 6,
+    color: '#68766E',
+    fontSize: 12,
+    lineHeight: 17,
   },
   searchContainer: {
     height: 50,

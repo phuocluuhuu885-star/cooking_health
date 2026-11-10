@@ -22,6 +22,7 @@ import DailyPlannedMealsScreen from '../screens/home/DailyPlannedMealsScreen';
 import HealthDashboardScreen from '../screens/home/HealthDashboardScreen';
 import ExpenseManagementScreen from '../screens/profile/ExpenseManagementScreen';
 import ExpenseReportScreen from '../screens/profile/ExpenseReportScreen';
+import HouseholdHealthScreen from '../screens/household/HouseholdHealthScreen';
 
 const HomeStack = createStackNavigator<RootStackParamList>({
   initialRouteName: ScreenKeys.PRIVACY_POLICY,
@@ -42,6 +43,7 @@ const HomeStack = createStackNavigator<RootStackParamList>({
     [ScreenKeys.SMART_SHOPPING]: SmartShoppingScreen,
     [ScreenKeys.DAILY_PLANNED_MEALS]: DailyPlannedMealsScreen,
     [ScreenKeys.FAMILY]: HouseholdScreen,
+    [ScreenKeys.HOUSEHOLD_HEALTH]: HouseholdHealthScreen,
     [ScreenKeys.HOUSEHOLD_CHAT]: HouseholdChatScreen,
     [ScreenKeys.NOTIFICATIONS]: HouseholdNotificationsScreen,
     [ScreenKeys.HEALTH_DASHBOARD]: HealthDashboardScreen,

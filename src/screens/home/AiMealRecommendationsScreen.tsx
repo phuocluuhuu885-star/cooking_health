@@ -32,6 +32,7 @@ import { scaleEstimatedPrice } from '../../utils/priceUtils';
 import ScreenKeys from '../../utils/screenKey';
 import {
   hasAiRecommendationConsent,
+  requestAiRecommendationConsent,
   saveAiRecommendationConsent,
 } from '../../utils/aiRecommendationConsent';
 import { getUtcDateKey } from '../../utils/dateUtils';
@@ -209,17 +210,7 @@ const AiMealRecommendationsScreen = () => {
       loadRecommendations();
     }
 
-    Alert.alert(
-      'Đồng ý dùng gợi ý AI?',
-      'Nếu tiếp tục, Health&Cook sẽ gửi mục tiêu kcal và dinh dưỡng, tổng món đã ăn hôm nay cùng thông tin các món phù hợp đến Google Gemini để xếp hạng. Không gửi tên, email, mã tài khoản, tuổi, giới tính, chiều cao, cân nặng hoặc BMI. Bạn có thể từ chối và vẫn xem gợi ý món thông thường.',
-      [
-        { text: 'Để sau', style: 'cancel' },
-        {
-          text: 'Đồng ý và tiếp tục',
-          onPress: handleConsent,
-        },
-      ],
-    );
+    requestAiRecommendationConsent(handleConsent);
   }, [loadRecommendations, user]);
 
   useFocusEffect(
@@ -553,7 +544,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 18,
   },
   header: {
     flexDirection: 'row',
@@ -597,7 +587,7 @@ const styles = StyleSheet.create({
   },
   refreshText: { color: COLORS.green, fontSize: 27, lineHeight: 31 },
   disabled: { opacity: 0.55 },
-  content: { paddingTop: 8 },
+  content: { paddingTop: 8,paddingHorizontal: 16 },
   card: {
     padding: 14,
     marginBottom: 12,

@@ -4,6 +4,7 @@ import type {
   MealPeriodPlan,
   PlannedMeal,
 } from './meal';
+import type { HealthProfile } from '../../type/user';
 
 export type HouseholdRole = 'ADMIN' | 'MEMBER';
 
@@ -17,6 +18,64 @@ export type HouseholdMember = {
   };
   role: HouseholdRole;
   joinedAt: string;
+};
+
+export type HouseholdHealthDaily = {
+  nutrition: {
+    calories: number;
+    proteinG: number;
+    carbsG: number;
+    fatG: number;
+  };
+  waterMl: number;
+  walking: {
+    steps: number;
+    distanceMeters: number;
+    durationSeconds: number;
+    caloriesBurned: number;
+  };
+};
+
+export type HouseholdHealthOverviewMember = {
+  userId: string;
+  role: HouseholdRole;
+  name: string;
+  shared: boolean;
+  canUpdate: boolean;
+  profile: HealthProfile | null;
+  daily: HouseholdHealthDaily | null;
+};
+
+export type HouseholdHealthOverviewResponse = {
+  success: boolean;
+  message?: string;
+  data?: {
+    date: string;
+    members: HouseholdHealthOverviewMember[];
+  };
+};
+
+export type HouseholdMemberHealthResponse = {
+  success: boolean;
+  message?: string;
+  data?: {
+    date: string;
+    member: {
+      userId: string;
+      role: HouseholdRole;
+      name: string;
+      profile: HealthProfile | null;
+      canUpdate: boolean;
+    };
+    daily: HouseholdHealthDaily;
+    weightHistory: Array<{
+      id: string;
+      weightKg: number;
+      bmi: number;
+      measuredAt: string;
+      recordedByUserId: string | null;
+    }>;
+  };
 };
 
 export type Household = {

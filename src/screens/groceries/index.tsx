@@ -58,7 +58,6 @@ import { completeMealPeriod } from '../../utils/mealPlanApi';
 import HomeIngredientSummaryModal from '../home/homeIngredientSummaryModal';
 import PlannedMealItem from './plannedMealItem';
 import HouseholdScreen from '../household';
-import TestBannerAd from '../component/TestBannerAd';
 import MealConsumptionModal, {
   type MealExpenseEntry,
 } from '../component/MealConsumptionModal';
@@ -847,7 +846,6 @@ const MealPlanScreen = () => {
               </LinearGradient>
             </>
           )}
-          {viewMode === 'PERSONAL' ? <TestBannerAd /> : null}
           <View style={styles.bottomSpace} />
         </ScrollView>
       )}

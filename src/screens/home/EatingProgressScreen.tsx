@@ -502,9 +502,8 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 18,
   },
-  content: { paddingTop: 4 },
+  content: { paddingTop: 4,paddingHorizontal: 16 },
   intro: {
     marginBottom: 14,
     color: COLORS.secondary,

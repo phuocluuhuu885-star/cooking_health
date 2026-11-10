@@ -119,7 +119,9 @@ const SuggestionCard = ({
           resizeMode="cover"
         />
       ) : (
-        <View style={[styles.suggestionImage, styles.suggestionImagePlaceholder]}>
+        <View
+          style={[styles.suggestionImage, styles.suggestionImagePlaceholder]}
+        >
           <Text style={styles.suggestionImagePlaceholderText}>🍽</Text>
         </View>
       )}
@@ -440,9 +442,7 @@ const AiMealChatScreen = () => {
           {sending ? (
             <View style={styles.thinking}>
               <ActivityIndicator color={COLORS.green} size="small" />
-              <Text style={styles.thinkingText}>
-                Đang đối chiếu dữ liệu Health&Cook...
-              </Text>
+              <Text style={styles.thinkingText}>Đang tìm kiếm...</Text>
             </View>
           ) : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -501,10 +501,15 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 18,
   },
   keyboardArea: { flex: 1 },
-  messages: { flexGrow: 1, gap: 12, paddingTop: 8, paddingBottom: 16 },
+  messages: {
+    flexGrow: 1,
+    gap: 12,
+    paddingTop: 8,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+  },
   scopeNotice: {
     padding: 12,
     borderRadius: 8,
@@ -551,7 +556,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: COLORS.lightGreen,
   },
-  suggestionImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  suggestionImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   suggestionImagePlaceholderText: { fontSize: 24 },
   suggestionDetails: { flex: 1, gap: 4 },
   suggestionName: { color: COLORS.text, fontSize: 12, fontWeight: '800' },
@@ -608,9 +616,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+    paddingHorizontal: 16,
   },
   input: {
     flex: 1,
+    height: 42,
     maxHeight: 110,
     minHeight: 42,
     paddingHorizontal: 12,

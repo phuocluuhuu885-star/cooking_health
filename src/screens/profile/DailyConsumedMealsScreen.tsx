@@ -179,7 +179,6 @@ const DailyConsumedMealsScreen = () => {
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        eyebrow="NHẬT KÝ DINH DƯỠNG"
         title="Thực phẩm đã tiêu thụ"
         backAccessibilityLabel="Quay lại hồ sơ cá nhân"
         rightAction={
@@ -195,60 +194,62 @@ const DailyConsumedMealsScreen = () => {
           ) : null
         }
       />
-      <View style={styles.dateNavigator}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Xem ngày trước"
-          onPress={handlePreviousDate}
-          style={styles.dateArrow}
-        >
-          <Text style={styles.dateArrowText}>‹</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Chọn ngày. ${formatDateLabel(state.date)}`}
-          onPress={handleOpenCalendar}
-          style={styles.selectedDateButton}
-        >
-          <Text style={styles.selectedDateText}>
-            {formatDateLabel(state.date)}
-          </Text>
-          <Text style={styles.calendarHint}>Nhấn để mở lịch</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Xem ngày tiếp theo"
-          accessibilityState={{ disabled: !canGoForward }}
-          disabled={!canGoForward}
-          onPress={handleNextDate}
-          style={[styles.dateArrow, !canGoForward && styles.dateArrowDisabled]}
-        >
-          <Text
-            style={[
-              styles.dateArrowText,
-              !canGoForward && styles.dateArrowTextDisabled,
-            ]}
+      <View style={styles.body}>
+        <View style={styles.dateNavigator}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Xem ngày trước"
+            onPress={handlePreviousDate}
+            style={styles.dateArrow}
           >
-            ›
-          </Text>
-        </Pressable>
-      </View>
+            <Text style={styles.dateArrowText}>‹</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Chọn ngày. ${formatDateLabel(state.date)}`}
+            onPress={handleOpenCalendar}
+            style={styles.selectedDateButton}
+          >
+            <Text style={styles.selectedDateText}>
+              {formatDateLabel(state.date)}
+            </Text>
+            <Text style={styles.calendarHint}>Nhấn để mở lịch</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Xem ngày tiếp theo"
+            accessibilityState={{ disabled: !canGoForward }}
+            disabled={!canGoForward}
+            onPress={handleNextDate}
+            style={[styles.dateArrow, !canGoForward && styles.dateArrowDisabled]}
+          >
+            <Text
+              style={[
+                styles.dateArrowText,
+                !canGoForward && styles.dateArrowTextDisabled,
+              ]}
+            >
+              ›
+            </Text>
+          </Pressable>
+        </View>
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: insets.bottom + 18 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <DailyConsumedMeals
-          items={state.items}
-          loading={state.loading}
-          error={state.error}
-          onRetry={loadConsumedMeals}
-          onPressMeal={openMeal}
-        />
-      </ScrollView>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: insets.bottom + 18 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <DailyConsumedMeals
+            items={state.items}
+            loading={state.loading}
+            error={state.error}
+            onRetry={loadConsumedMeals}
+            onPressMeal={openMeal}
+          />
+        </ScrollView>
+      </View>
       <Modal
         animationType="fade"
         transparent
@@ -308,8 +309,8 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 18,
   },
+  body: { flex: 1, paddingHorizontal: 16 },
   content: { flexGrow: 1 },
   dateNavigator: {
     flexDirection: 'row',

@@ -17,6 +17,7 @@ export const toRecipe = (meal: BackendMeal): Recipe => ({
   fat: meal.nutritionSummary?.perServing.fatG ?? 0,
   category: [meal.category],
   nutritionAvailable: meal.nutritionSummary !== null,
+  isVegetarian: meal.isVegetarian ?? false,
 });
 
 export const findRecipe = (

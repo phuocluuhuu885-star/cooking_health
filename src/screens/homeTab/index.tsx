@@ -4,7 +4,11 @@ import {
 } from '@react-navigation/bottom-tabs';
 import HomeScreen from '../home/home';
 import Profile from '../profile';
-import HomeBottomView from './homeBottomView';
+import HomeBottomView, {
+  BOTTOM_TAB_AD_SLOT_HEIGHT,
+  BOTTOM_TAB_BAR_HEIGHT,
+} from './homeBottomView';
+import { BANNER_SURFACE_COLOR } from '../component/TestBannerAd';
 import Groceries from '../groceries';
 import RecipeLibrary from '../recipes';
 import { useSelector } from 'react-redux';
@@ -131,9 +135,13 @@ const HomeView = () => {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            height: insets.bottom + 66,
-            backgroundColor: 'transparent',
+            height:
+              insets.bottom + BOTTOM_TAB_BAR_HEIGHT + BOTTOM_TAB_AD_SLOT_HEIGHT,
+            backgroundColor: BANNER_SURFACE_COLOR,
             borderTopWidth: 0,
+            borderBottomWidth: 0,
+            elevation: 0,
+            shadowOpacity: 0,
           },
         }}
         tabBar={renderTabBar}

@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  memo
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useState, memo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -28,10 +22,7 @@ import {
   getWalkingSummary,
   getWalkingWorkoutHistory,
 } from '../../utils/walkingApi';
-import type {
-  WalkingSummary,
-  WalkingWorkout,
-} from '../../utils/types/walking';
+import type { WalkingSummary, WalkingWorkout } from '../../utils/types/walking';
 import type { DailyConsumedMealsResponse } from '../../utils/types/meal';
 import useWalkingWorkout from './useWalkingWorkout';
 import {
@@ -204,13 +195,7 @@ const WalkingScreen = () => {
     } finally {
       setHistoryLoading(false);
     }
-  }, [
-    range.from,
-    range.to,
-    setHistory,
-    setHistoryError,
-    setHistoryLoading,
-  ]);
+  }, [range.from, range.to, setHistory, setHistoryError, setHistoryLoading]);
 
   const refreshSummary = useCallback(async () => {
     setSummaryLoading(true);
@@ -226,13 +211,7 @@ const WalkingScreen = () => {
     } finally {
       setSummaryLoading(false);
     }
-  }, [
-    range.from,
-    range.to,
-    setSummary,
-    setSummaryError,
-    setSummaryLoading,
-  ]);
+  }, [range.from, range.to, setSummary, setSummaryError, setSummaryLoading]);
 
   useEffect(() => {
     refreshHistory();
@@ -262,8 +241,10 @@ const WalkingScreen = () => {
     }
 
     try {
-      const response: DailyConsumedMealsResponse =
-        await getDailyConsumedMeals(user, today);
+      const response: DailyConsumedMealsResponse = await getDailyConsumedMeals(
+        user,
+        today,
+      );
       if (
         !response.success ||
         !response.data ||
@@ -374,6 +355,12 @@ const WalkingScreen = () => {
 
   return (
     <View style={styles.screen}>
+      <ScreenHeader
+        eyebrow="HOẠT ĐỘNG THỂ CHẤT"
+        title="Theo dõi đi bộ"
+        backAccessibilityLabel="Quay lại hồ sơ"
+      />
+
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -381,12 +368,6 @@ const WalkingScreen = () => {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <ScreenHeader
-          eyebrow="HOẠT ĐỘNG THỂ CHẤT"
-          title="Theo dõi đi bộ"
-          backAccessibilityLabel="Quay lại hồ sơ"
-        />
-
         <View style={styles.foregroundNotice}>
           <Text style={styles.noticeText}>
             {Platform.OS === 'android'
@@ -405,10 +386,10 @@ const WalkingScreen = () => {
                 {isActive
                   ? 'ĐANG ĐI BỘ'
                   : isPaused
-                    ? 'ĐANG TẠM DỪNG'
-                    : isFinished
-                      ? 'BUỔI TẬP ĐÃ LƯU'
-                      : 'SẴN SÀNG'}
+                  ? 'ĐANG TẠM DỪNG'
+                  : isFinished
+                  ? 'BUỔI TẬP ĐÃ LƯU'
+                  : 'SẴN SÀNG'}
               </Text>
               <Text style={styles.sessionDate}>
                 {walking.workout
@@ -422,7 +403,9 @@ const WalkingScreen = () => {
           </View>
 
           <View style={styles.heroMetric}>
-            <Text style={styles.heroValue}>{walking.steps.toLocaleString()}</Text>
+            <Text style={styles.heroValue}>
+              {walking.steps.toLocaleString()}
+            </Text>
             <Text style={styles.heroLabel}>bước chân</Text>
           </View>
 
@@ -565,8 +548,8 @@ const WalkingScreen = () => {
                     caloriesToTarget == null
                       ? 'So với mục tiêu'
                       : caloriesToTarget >= 0
-                        ? 'Còn trong mục tiêu'
-                        : 'Vượt mục tiêu'
+                      ? 'Còn trong mục tiêu'
+                      : 'Vượt mục tiêu'
                   }
                   value={
                     caloriesToTarget == null
@@ -621,10 +604,7 @@ const WalkingScreen = () => {
         {walking.error ? (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>{walking.error}</Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={walking.refresh}
-            >
+            <Pressable accessibilityRole="button" onPress={walking.refresh}>
               <Text style={styles.retryText}>Tải lại buổi tập</Text>
             </Pressable>
           </View>
@@ -716,73 +696,79 @@ const Metric = memo(({ label, value }: { label: string; value: string }) => (
   </View>
 ));
 
-const ActionButton = memo(({ 
-  label,
-  onPress,
-  disabled,
-  secondary = false,
-  destructive = false,
-}: {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  secondary?: boolean;
-  destructive?: boolean;
-}) => (
-  <Pressable
-    accessibilityRole="button"
-    disabled={disabled}
-    onPress={onPress}
-    style={[
-      styles.actionButton,
-      secondary && styles.secondaryAction,
-      destructive && styles.destructiveAction,
-      disabled && styles.disabledAction,
-    ]}
-  >
-    <Text
+const ActionButton = memo(
+  ({
+    label,
+    onPress,
+    disabled,
+    secondary = false,
+    destructive = false,
+  }: {
+    label: string;
+    onPress: () => void;
+    disabled?: boolean;
+    secondary?: boolean;
+    destructive?: boolean;
+  }) => (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
       style={[
-        styles.actionText,
-        secondary && styles.secondaryActionText,
+        styles.actionButton,
+        secondary && styles.secondaryAction,
+        destructive && styles.destructiveAction,
+        disabled && styles.disabledAction,
       ]}
     >
-      {label}
-    </Text>
-  </Pressable>
-));
+      <Text
+        style={[styles.actionText, secondary && styles.secondaryActionText]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  ),
+);
 
-const StatusLine = memo(({ label, status }: {
-  label: string;
-  status: 'checking' | 'available' | 'denied' | 'unavailable';
-}) => {
-  const text =
-    status === 'available'
-      ? 'Sẵn sàng'
-      : status === 'denied'
+const StatusLine = memo(
+  ({
+    label,
+    status,
+  }: {
+    label: string;
+    status: 'checking' | 'available' | 'denied' | 'unavailable';
+  }) => {
+    const text =
+      status === 'available'
+        ? 'Sẵn sàng'
+        : status === 'denied'
         ? 'Chưa được cấp quyền'
         : status === 'unavailable'
-          ? 'Không khả dụng'
-          : 'Đang kiểm tra';
-  return (
-    <View style={styles.statusLine}>
-      <Text style={styles.statusLabel}>{label}</Text>
-      <Text
-        style={[
-          styles.statusValue,
-          status === 'available' && styles.statusAvailable,
-          status === 'denied' && styles.statusDenied,
-        ]}
-      >
-        {text}
-      </Text>
-    </View>
-  );
-});
+        ? 'Không khả dụng'
+        : 'Đang kiểm tra';
+    return (
+      <View style={styles.statusLine}>
+        <Text style={styles.statusLabel}>{label}</Text>
+        <Text
+          style={[
+            styles.statusValue,
+            status === 'available' && styles.statusAvailable,
+            status === 'denied' && styles.statusDenied,
+          ]}
+        >
+          {text}
+        </Text>
+      </View>
+    );
+  },
+);
 
 const HistoryRow = memo(({ workout }: { workout: WalkingWorkout }) => (
   <View style={styles.historyRow}>
     <View style={styles.historyCopy}>
-      <Text style={styles.historyDate}>{formatWorkoutDate(workout.startedAt)}</Text>
+      <Text style={styles.historyDate}>
+        {formatWorkoutDate(workout.startedAt)}
+      </Text>
       <Text style={styles.historyMetrics}>
         {workout.steps.toLocaleString()} bước ·{' '}
         {(workout.distanceMeters / 1000).toFixed(2)} km ·{' '}
@@ -944,7 +930,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF3F2',
   },
   errorText: { color: COLORS.danger, fontSize: 12, lineHeight: 18 },
-  retryText: { marginTop: 8, color: COLORS.green, fontSize: 12, fontWeight: '700' },
+  retryText: {
+    marginTop: 8,
+    color: COLORS.green,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   sectionCard: {
     padding: 15,
     marginTop: 14,

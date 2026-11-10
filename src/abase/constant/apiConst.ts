@@ -28,6 +28,9 @@ type API = {
   updateHealthProfile: ApiType;
   getHealthProfileHistory: ApiType;
   getCurrentHousehold: ApiType;
+  getHouseholdHealthOverview: ApiType;
+  getHouseholdMemberHealth: ApiType;
+  updateHouseholdMemberHealth: ApiType;
   createHousehold: ApiType;
   joinHousehold: ApiType;
   createHouseholdInvitation: ApiType;
@@ -176,6 +179,18 @@ const apiConst: API = {
   getCurrentHousehold: {
     method: 'get',
     url: 'api/households/current',
+  },
+  getHouseholdHealthOverview: {
+    method: 'get',
+    url: 'api/households/current/health',
+  },
+  getHouseholdMemberHealth: {
+    method: 'get',
+    url: 'api/households/current/members/:memberId/health',
+  },
+  updateHouseholdMemberHealth: {
+    method: 'put',
+    url: 'api/households/current/members/:memberId/health',
   },
   createHousehold: {
     method: 'post',

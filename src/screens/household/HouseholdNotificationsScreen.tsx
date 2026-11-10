@@ -359,7 +359,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   sharedHeader: {
-    paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.border,
   },

@@ -8,6 +8,8 @@ import {
 import { useIsFocused } from '@react-navigation/native';
 import { initializeGoogleMobileAds } from '../../utils/googleMobileAds';
 
+export const BANNER_SURFACE_COLOR = '#F5F8F5';
+
 const TestBannerAd = () => {
   const isFocused = useIsFocused();
   const [initialized, setInitialized] = useState(false);
@@ -59,7 +61,10 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 50,
-    marginVertical: 8,
+    minHeight: 66,
+    backgroundColor: BANNER_SURFACE_COLOR,
+    borderWidth: 0,
+    elevation: 0,
+    shadowOpacity: 0,
   },
 });

@@ -19,6 +19,7 @@ const ItemProduct = memo(
     onFavorite,
     onAdd,
     onPress,
+    isRecommended = false,
     reviewSummary,
   }: RecipeCardProps) => {
     const handleFavorite = useCallback(() => {
@@ -68,6 +69,11 @@ const ItemProduct = memo(
               <Text style={styles.placeholderText}>Health&Cook</Text>
             </View>
           )}
+          {isRecommended ? (
+            <View style={styles.recommendationBadge}>
+              <Text style={styles.recommendationBadgeText}>Gợi ý cho bạn</Text>
+            </View>
+          ) : null}
           <View style={styles.timeBadge}>
             <Text style={styles.timeBadgeText}>{item.time} phút</Text>
           </View>
@@ -183,6 +189,21 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
     backgroundColor: 'rgba(23, 43, 35, 0.82)',
+  },
+  recommendationBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    maxWidth: 70,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#168653',
+  },
+  recommendationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
   },
   timeBadgeText: {
     color: '#FFFFFF',

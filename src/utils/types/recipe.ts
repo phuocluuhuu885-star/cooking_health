@@ -13,6 +13,7 @@ export type Recipe = {
   fat: number;
   category: string[];
   nutritionAvailable?: boolean;
+  isVegetarian?: boolean;
 };
 
 export type Category = {
@@ -27,6 +28,7 @@ export type RecipeCardProps = {
   onFavorite: (id: string) => void;
   onAdd: (id: string) => void;
   onPress: (id: string) => void;
+  isRecommended?: boolean;
   reviewSummary?: MealReviewSummary;
 };
 
@@ -42,6 +44,7 @@ export type BackendMeal = Pick<
   | 'name'
   | 'imageUrl'
   | 'category'
+  | 'isVegetarian'
   | 'prepTimeMinutes'
   | 'cookTimeMinutes'
 > & {

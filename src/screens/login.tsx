@@ -117,6 +117,13 @@ const Login = () => {
     }));
   }, []);
 
+  const onToggleLoginPasswordVisibility = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      showLoginPassword: !prev.showLoginPassword,
+    }));
+  }, []);
+
   const onFullNameChange = useCallback((value: string) => {
     setState(prev => ({
       ...prev,
@@ -138,10 +145,24 @@ const Login = () => {
     }));
   }, []);
 
+  const onToggleRegisterPasswordVisibility = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      showRegisterPassword: !prev.showRegisterPassword,
+    }));
+  }, []);
+
   const onConfirmPasswordChange = useCallback((value: string) => {
     setState(prev => ({
       ...prev,
       confirmPassword: value,
+    }));
+  }, []);
+
+  const onToggleConfirmPasswordVisibility = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      showConfirmPassword: !prev.showConfirmPassword,
     }));
   }, []);
 
@@ -356,6 +377,10 @@ const Login = () => {
                     value={state.loginPassword}
                     inputKey="password"
                     onTextChange={onLoginPasswordChange}
+                    isPasswordVisible={state.showLoginPassword}
+                    onTogglePasswordVisibility={
+                      onToggleLoginPasswordVisibility
+                    }
                     errMsg={state.errorMsg.password}
                   />
                   <TouchableOpacity
@@ -395,6 +420,10 @@ const Login = () => {
                     value={state.registerPassword}
                     inputKey="password"
                     onTextChange={onRegisterPasswordChange}
+                    isPasswordVisible={state.showRegisterPassword}
+                    onTogglePasswordVisibility={
+                      onToggleRegisterPasswordVisibility
+                    }
                     errMsg={state.errorMsg.registerPassword}
                   />
                   <InputComponent
@@ -404,6 +433,10 @@ const Login = () => {
                     value={state.confirmPassword}
                     inputKey="password"
                     onTextChange={onConfirmPasswordChange}
+                    isPasswordVisible={state.showConfirmPassword}
+                    onTogglePasswordVisibility={
+                      onToggleConfirmPasswordVisibility
+                    }
                     errMsg={state.errorMsg.confirmPassword}
                   />
                   <TouchableOpacity

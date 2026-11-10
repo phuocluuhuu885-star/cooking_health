@@ -1076,6 +1076,9 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
       householdName: household.name,
     });
   }, [household]);
+  const handleOpenHouseholdHealth = useCallback(() => {
+    navigate(ScreenKeys.HOUSEHOLD_HEALTH);
+  }, []);
   const handleOpenHouseholdSettings = useCallback(() => {
     setHouseholdSettingsVisible(true);
   }, []);
@@ -1162,29 +1165,27 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
 
   return (
     <View style={[styles.screen, embedded && styles.embeddedScreen]}>
+      {!embedded ? (
+        <ScreenHeader
+          title="Gia đình"
+          subtitle="Thực đơn chung cho gia đình của bạn."
+          rightAction={
+            household ? (
+              <View style={styles.headerActions}>
+                <HouseholdChatButton
+                  unreadCount={chatUnreadCount}
+                  onPress={handleOpenChat}
+                />
+              </View>
+            ) : null
+          }
+        />
+      ) : null}
       <ScrollView
         contentContainerStyle={[styles.content, scrollContentInsets]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {!embedded ? (
-          <ScreenHeader
-            title="Gia đình"
-            subtitle="Thực đơn chung cho gia đình của bạn."
-            style={styles.sharedHeader}
-            rightAction={
-              household ? (
-                <View style={styles.headerActions}>
-                  <HouseholdChatButton
-                    unreadCount={chatUnreadCount}
-                    onPress={handleOpenChat}
-                  />
-                </View>
-              ) : null
-            }
-          />
-        ) : null}
-
         {state.loading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={COLORS.green} />
@@ -1303,6 +1304,21 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
                   {membersExpanded ? 'Ẩn' : 'Xem'}
                 </Text>
               </Pressable>
+              {household.currentRole === 'ADMIN' ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={handleOpenHouseholdHealth}
+                  style={styles.membersHealthButton}
+                >
+                  <Text style={styles.membersHealthTitle}>
+                    Theo dõi sức khỏe gia đình
+                  </Text>
+                  <Text style={styles.membersHealthDescription}>
+                    Xem dinh dưỡng, cân nặng và hoạt động của thành viên đã
+                    đồng ý chia sẻ.
+                  </Text>
+                </Pressable>
+              ) : null}
               {membersExpanded ? household.members.map(renderMember) : null}
             </View>
             {state.mealPlan ? (
@@ -1665,8 +1681,7 @@ const HouseholdScreen = ({ embedded = false }: { embedded?: boolean }) => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   embeddedScreen: { marginBottom: 0 },
-  content: { paddingHorizontal: 18 },
-  sharedHeader: { paddingHorizontal: 0 },
+  content: { paddingHorizontal: 16 },
   topBar: {
     minHeight: 48,
     flexDirection: 'row',
@@ -1800,6 +1815,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  membersHealthButton: {
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#E7F4EC',
+  },
+  membersHealthTitle: {
+    color: COLORS.green,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  membersHealthDescription: {
+    marginTop: 4,
+    color: COLORS.secondary,
+    fontSize: 11,
+    lineHeight: 16,
   },
   membersToggle: { color: COLORS.green, fontSize: 13, fontWeight: '800' },
   mealPlanCard: {

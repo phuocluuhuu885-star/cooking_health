@@ -464,7 +464,6 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
             : 'Thông tin cá nhân'
         }
         backAccessibilityLabel="Quay lại hồ sơ cá nhân"
-        style={styles.sharedHeader}
       />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -711,7 +710,6 @@ const COLORS = {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
-  sharedHeader: { paddingHorizontal: 16 },
   keyboardArea: { flex: 1 },
   header: {
     flexDirection: 'row',

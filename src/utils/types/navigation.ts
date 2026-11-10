@@ -20,6 +20,7 @@ export type RootStackParamList = {
   [ScreenKeys.FAMILY]:
     | { date?: string; mealPeriod?: 'LUNCH' | 'DINNER' }
     | undefined;
+  [ScreenKeys.HOUSEHOLD_HEALTH]: { memberId?: string } | undefined;
   [ScreenKeys.HOUSEHOLD_CHAT]: {
     householdId: string;
     householdName: string;

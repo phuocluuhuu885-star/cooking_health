@@ -51,6 +51,7 @@ export type HealthProfile = {
   targetProteinG: number;
   targetCarbsG: number;
   targetFatG: number;
+  allowFamilyHealthManagement: boolean;
 
   createdAt: string;
   updatedAt: string;

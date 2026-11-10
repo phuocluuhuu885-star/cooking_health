@@ -5,12 +5,16 @@ type LoginRequiredModalProps = {
   visible: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  title?: string;
+  message?: string;
 };
 
 const LoginRequiredModal = ({
   visible,
   onClose,
   onConfirm,
+  title = 'Đăng nhập để thêm món',
+  message = 'Đăng nhập hoặc tạo tài khoản để lưu món ăn vào thực đơn cá nhân hay thực đơn gia đình.',
 }: LoginRequiredModalProps) => {
   const confirmLogin = useCallback(() => {
     onConfirm();
@@ -34,11 +38,8 @@ const LoginRequiredModal = ({
           <View style={styles.icon}>
             <Text style={styles.iconText}>⌑</Text>
           </View>
-          <Text style={styles.title}>Đăng nhập để thêm món</Text>
-          <Text style={styles.message}>
-            Đăng nhập hoặc tạo tài khoản để lưu món ăn vào thực đơn cá nhân hay
-            thực đơn gia đình.
-          </Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.message}>{message}</Text>
           <Pressable
             accessibilityRole="button"
             onPress={confirmLogin}

@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import Svg, { Circle, Path } from 'react-native-svg';
 import ScreenHeader from '../component/ScreenHeader';
+import HouseholdScopeSwitch from '../component/HouseholdScopeSwitch';
 import { selectCurrentHousehold } from '../../reduxs/reduces/appData';
 import { selectUserInfo } from '../../reduxs/reduces/user';
 import type {
@@ -181,12 +182,9 @@ const ExpenseReportScreen = () => {
     },
     [month],
   );
-  const handlePersonalScope = useCallback(() => {
-    setScope('PERSONAL');
-  }, []);
-  const handleHouseholdScope = useCallback(() => {
-    setScope('HOUSEHOLD');
-  }, []);
+  const handleToggleScope = useCallback(() => {
+    setScope(scope === 'PERSONAL' ? 'HOUSEHOLD' : 'PERSONAL');
+  }, [scope]);
   const handlePreviousMonth = useCallback(() => {
     moveMonth(-1);
   }, [moveMonth]);
@@ -234,20 +232,14 @@ const ExpenseReportScreen = () => {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.scopeRow}>
-          <ScopeButton
-            label="Cá nhân"
-            selected={scope === 'PERSONAL'}
-            onPress={handlePersonalScope}
-          />
-          {household ? (
-            <ScopeButton
-              label={`Hộ ${household.name}`}
-              selected={scope === 'HOUSEHOLD'}
-              onPress={handleHouseholdScope}
-            />
-          ) : null}
-        </View>
+        <HouseholdScopeSwitch
+          enabled={scope === 'HOUSEHOLD'}
+          householdAvailable={Boolean(household)}
+          personalLabel="Báo cáo cá nhân"
+          householdLabel={`Báo cáo hộ ${household?.name ?? ''}`}
+          description="Chuyển đổi phạm vi báo cáo thu chi."
+          onToggle={handleToggleScope}
+        />
 
         <View style={styles.monthCard}>
           <Pressable
@@ -352,52 +344,11 @@ const ExpenseReportScreen = () => {
   );
 };
 
-const ScopeButton = ({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) => (
-  <Pressable
-    accessibilityRole="button"
-    accessibilityState={{ selected }}
-    onPress={onPress}
-    style={[styles.scopeButton, selected && styles.scopeButtonSelected]}
-  >
-    <Text
-      style={[
-        styles.scopeButtonText,
-        selected && styles.scopeButtonTextSelected,
-      ]}
-    >
-      {label}
-    </Text>
-  </Pressable>
-);
-
 export default ExpenseReportScreen;
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
-  content: { paddingHorizontal: 20, paddingTop: 8, gap: 14 },
-  scopeRow: { flexDirection: 'row', gap: 8 },
-  scopeButton: {
-    borderRadius: 18,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-  },
-  scopeButtonSelected: {
-    backgroundColor: COLORS.green,
-    borderColor: COLORS.green,
-  },
-  scopeButtonText: { color: COLORS.secondary, fontSize: 13, fontWeight: '700' },
-  scopeButtonTextSelected: { color: COLORS.white },
+  content: { paddingHorizontal: 16, paddingTop: 8, gap: 14 },
   monthCard: {
     flexDirection: 'row',
     alignItems: 'center',

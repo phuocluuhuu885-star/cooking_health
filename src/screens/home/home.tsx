@@ -70,7 +70,6 @@ import HouseholdChatButton from '../household/HouseholdChatButton';
 import HouseholdHomeButton from '../household/HouseholdHomeButton';
 import HouseholdNotificationButton from '../household/HouseholdNotificationButton';
 import { createStateSetter } from '../../utils/stateUtils';
-import TestBannerAd from '../component/TestBannerAd';
 
 const COLORS = {
   background: '#F5F8F5',
@@ -835,7 +834,6 @@ const HomeScreen = () => {
             ) : null}
           </LinearGradient>
         )}
-        <TestBannerAd />
         <View style={styles.bottomSpace} />
       </ScrollView>
     </View>

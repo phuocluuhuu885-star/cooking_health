@@ -60,6 +60,7 @@ import type {
   MealsResponse,
 } from '../../utils/types';
 import ScreenHeader from '../component/ScreenHeader';
+import HouseholdScopeSwitch from '../component/HouseholdScopeSwitch';
 import '../../utils/calendarLocale';
 
 const CATEGORIES: Array<{
@@ -918,12 +919,9 @@ const ExpenseManagementScreen = () => {
     setEditingIncomeId(null);
     setIncomeForm(emptyIncomeForm());
   }, []);
-  const handlePersonalScope = useCallback(() => {
-    changeScope('PERSONAL');
-  }, [changeScope]);
-  const handleHouseholdScope = useCallback(() => {
-    changeScope('HOUSEHOLD');
-  }, [changeScope]);
+  const handleToggleScope = useCallback(() => {
+    changeScope(scope === 'PERSONAL' ? 'HOUSEHOLD' : 'PERSONAL');
+  }, [changeScope, scope]);
   const handleExpenseTitleChange = useCallback(
     (title: string) => {
       setForm(previous => ({ ...previous, title }));
@@ -1067,20 +1065,14 @@ const ExpenseManagementScreen = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.scopeRow}>
-          <ScopeButton
-            label="Cá nhân"
-            selected={scope === 'PERSONAL'}
-            onPress={handlePersonalScope}
-          />
-          {household ? (
-            <ScopeButton
-              label={`Hộ ${household.name}`}
-              selected={scope === 'HOUSEHOLD'}
-              onPress={handleHouseholdScope}
-            />
-          ) : null}
-        </View>
+        <HouseholdScopeSwitch
+          enabled={scope === 'HOUSEHOLD'}
+          householdAvailable={Boolean(household)}
+          personalLabel="Chi tiêu cá nhân"
+          householdLabel={`Chi tiêu hộ ${household?.name ?? ''}`}
+          description="Chuyển đổi phạm vi quản lý chi tiêu."
+          onToggle={handleToggleScope}
+        />
 
         <LinearGradient
           colors={['#FFFFFF', '#F3FAF5']}
@@ -1570,32 +1562,6 @@ const ExpenseManagementScreen = () => {
   );
 };
 
-const ScopeButton = ({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) => (
-  <Pressable
-    accessibilityRole="button"
-    accessibilityState={{ selected }}
-    onPress={onPress}
-    style={[styles.scopeButton, selected && styles.scopeButtonSelected]}
-  >
-    <Text
-      style={[
-        styles.scopeButtonText,
-        selected && styles.scopeButtonTextSelected,
-      ]}
-    >
-      {label}
-    </Text>
-  </Pressable>
-);
-
 const MealBudgetCard = ({
   period,
   title,
@@ -1679,24 +1645,8 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 16,
   },
-  content: { paddingTop: 8, gap: 16 },
-  scopeRow: { flexDirection: 'row', gap: 8 },
-  scopeButton: {
-    borderRadius: 18,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-  },
-  scopeButtonSelected: {
-    backgroundColor: COLORS.green,
-    borderColor: COLORS.green,
-  },
-  scopeButtonText: { color: COLORS.secondary, fontSize: 13, fontWeight: '700' },
-  scopeButtonTextSelected: { color: COLORS.white },
+  content: { paddingTop: 8, gap: 16, paddingHorizontal: 16 },
   summaryCard: {
     borderRadius: 8,
     padding: 20,

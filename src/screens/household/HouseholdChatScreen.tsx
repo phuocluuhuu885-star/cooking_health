@@ -540,7 +540,6 @@ export default HouseholdChatScreen;
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   sharedHeader: {
-    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     backgroundColor: COLORS.white,
@@ -575,7 +574,7 @@ const styles = StyleSheet.create({
   messagesContent: {
     flexGrow: 1,
     justifyContent: 'flex-end',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
   messageRow: {

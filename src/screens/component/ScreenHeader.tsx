@@ -16,6 +16,7 @@ type ScreenHeaderProps = {
   subtitle?: string;
   backAccessibilityLabel?: string;
   onBack?: () => void;
+  showBackButton?: boolean;
   rightAction?: ReactNode;
   style?: StyleProp<ViewStyle>;
 };
@@ -33,6 +34,7 @@ const ScreenHeader = ({
   subtitle,
   backAccessibilityLabel = 'Quay lại',
   onBack = goBack,
+  showBackButton = true,
   rightAction,
   style,
 }: ScreenHeaderProps) => {
@@ -40,14 +42,16 @@ const ScreenHeader = ({
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }, style]}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={backAccessibilityLabel}
-        onPress={onBack}
-        style={styles.backButton}
-      >
-        <Text style={styles.backText}>‹</Text>
-      </Pressable>
+      {showBackButton ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={backAccessibilityLabel}
+          onPress={onBack}
+          style={styles.backButton}
+        >
+          <Text style={styles.backText}>‹</Text>
+        </Pressable>
+      ) : null}
       <View style={styles.copy}>
         {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
         <Text numberOfLines={1} style={styles.title}>
@@ -70,6 +74,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingBottom: 8,
+    borderBottomWidth:1,
+    paddingHorizontal: 16,
+    borderBottomColor: 'rgba(0,0,0,0.07)',
   },
   backButton: {
     width: 40,
@@ -77,7 +84,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
-    backgroundColor: COLORS.white,
   },
   backText: {
     marginTop: -4,

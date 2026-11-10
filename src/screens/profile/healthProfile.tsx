@@ -13,6 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import LinearGradient from '../../components/LinearGradient';
 import { syncApi } from '../../utils/syncUtils';
 import { onHideLoading, onShowLoading } from '../../components/loading';
@@ -24,6 +25,7 @@ import { selectUserInfo, updateHealthProfile } from '../../reduxs/reduces/user';
 import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createStateSetter } from '../../utils/stateUtils';
+import type { HealthProfile as HealthProfileData } from '../../type/user';
 
 type Gender = 'MALE' | 'FEMALE';
 
@@ -83,6 +85,7 @@ type FormState = {
   gender: Gender | null;
   activityLevel: ActivityLevel | null;
   goal: Goal | null;
+  allowFamilyHealthManagement: boolean;
   errorMsg: Record<string, string>;
   isLoading: boolean;
 };
@@ -91,6 +94,9 @@ type HealthProfileProps = {
   visible: boolean;
   onClose: () => void;
   onUpdated?: () => void;
+  memberUserId?: string;
+  memberName?: string;
+  initialProfile?: HealthProfileData | null;
 };
 
 const GENDER_OPTIONS: Option<Gender>[] = [
@@ -150,11 +156,19 @@ const GOAL_OPTIONS: Option<Goal>[] = [
   },
 ];
 
-const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
+const HealthProfile = ({
+  visible,
+  onClose,
+  onUpdated,
+  memberUserId,
+  memberName,
+  initialProfile,
+}: HealthProfileProps) => {
   const { height } = useWindowDimensions();
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
-  const profile = useSelector(selectUserInfo)?.healthProfile;
+  const ownProfile = useSelector(selectUserInfo)?.healthProfile;
+  const profile = memberUserId ? initialProfile : ownProfile;
   const [state, setState] = useState<FormState>({
     age: '',
     heightCm: '',
@@ -162,6 +176,7 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
     gender: null,
     activityLevel: null,
     goal: null,
+    allowFamilyHealthManagement: false,
     errorMsg: {},
     isLoading: false,
   });
@@ -184,6 +199,8 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
       gender: profile?.gender ?? null,
       activityLevel: profile?.activityLevel ?? null,
       goal: profile?.goal ?? null,
+      allowFamilyHealthManagement:
+        profile?.allowFamilyHealthManagement ?? false,
       errorMsg: {},
     }));
   }, [profile, visible]);
@@ -249,6 +266,13 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
     [onChangeField],
   );
 
+  const toggleFamilyHealthManagement = useCallback(() => {
+    onChangeField(
+      'allowFamilyHealthManagement',
+      !state.allowFamilyHealthManagement,
+    );
+  }, [onChangeField, state.allowFamilyHealthManagement]);
+
   const validate = useCallback(() => {
     const errorMsg: Record<string, string> = {};
 
@@ -303,13 +327,23 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
       setIsLoading(true);
       onShowLoading();
 
-      const res = await syncApi(apiConst.updateHealthProfile, {
+      const requestApi = memberUserId
+        ? apiConst.updateHouseholdMemberHealth
+        : apiConst.updateHealthProfile;
+      const res = await syncApi(requestApi, {
+        ...(memberUserId ? { memberId: memberUserId } : {}),
         age: Number(state.age),
         heightCm: Number(state.heightCm),
         weightKg: Number(state.weightKg),
         gender: state.gender,
         activityLevel: state.activityLevel,
         goal: state.goal,
+        ...(!memberUserId
+          ? {
+              allowFamilyHealthManagement:
+                state.allowFamilyHealthManagement,
+            }
+          : {}),
       });
 
       if (!res?.success) {
@@ -323,12 +357,16 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
         return;
       }
 
-      dispatch(updateHealthProfile(res.data?.healthProfile ?? res.data));
+      if (!memberUserId) {
+        dispatch(updateHealthProfile(res.data?.healthProfile ?? res.data));
+      }
       onUpdated?.();
 
       Alert.alert(
         'Thông báo',
-        'Cập nhật thông tin tình trạng sức khỏe thành công\nHãy theo dõi lượng calo trong hồ sơ cá nhân của bạn',
+        memberUserId
+          ? `Đã cập nhật hồ sơ sức khỏe cho ${memberName || 'thành viên'}.`
+          : 'Cập nhật thông tin tình trạng sức khỏe thành công\nHãy theo dõi lượng calo trong hồ sơ cá nhân của bạn',
         [
           {
             text: 'Đồng ý',
@@ -350,7 +388,16 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
       setIsLoading(false);
       onHideLoading();
     }
-  }, [dispatch, onClose, onUpdated, setIsLoading, state, validate]);
+  }, [
+    dispatch,
+    memberName,
+    memberUserId,
+    onClose,
+    onUpdated,
+    setIsLoading,
+    state,
+    validate,
+  ]);
 
   const renderGenderOption = (option: Option<Gender>) =>
     <OptionRow option={option} selectedValue={state.gender} onSelect={onSelectGender} />;
@@ -369,7 +416,7 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
       <View style={styles.overlay}>
         <KeyboardAvoidingView
           style={styles.keyboardContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View
             style={[
@@ -391,21 +438,30 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
             </View>
             <View style={styles.modalHeader}>
               <View style={styles.headerIcon}>
-                <Text style={styles.headerIconText}>🥗</Text>
+                <Svg width={25} height={25} viewBox="0 0 24 24">
+                  <Path
+                    d="M20.8 8.8c0 4.1-8.8 10-8.8 10s-8.8-5.9-8.8-10A4.4 4.4 0 0 1 12 6.4a4.4 4.4 0 0 1 8.8 2.4ZM6.5 12h3l1.5-2.5 2.1 5 1.5-2.5h3.9"
+                    fill="none"
+                    stroke={colors.Green.g400}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.6}
+                  />
+                </Svg>
               </View>
 
               <View style={styles.headerContent}>
-                <Text style={styles.title}>Thông tin cá nhân</Text>
+                <Text style={styles.title}>Hồ sơ sức khỏe</Text>
 
                 <Text style={styles.description}>
-                  Hãy cho NutriCart biết một chút về bạn để xây dựng chế độ dinh
-                  dưỡng phù hợp.
+                  Nhập thông tin cơ thể, mức vận động và mục tiêu để cá nhân hóa
+                  nhu cầu dinh dưỡng của bạn.
                 </Text>
               </View>
 
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Đóng cập nhật thông tin cá nhân"
+                accessibilityLabel="Đóng hồ sơ sức khỏe"
                 hitSlop={10}
                 disabled={isLoading}
                 style={styles.closeButton}
@@ -440,8 +496,10 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
                       isRequire
                       value={state.age}
                       inputKey="age"
+                      keyboardType="number-pad"
                       onTextChange={onAgeChange}
                       errMsg={state.errorMsg.age}
+                      variant="health"
                     />
                   </View>
 
@@ -451,8 +509,10 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
                       isRequire
                       value={state.heightCm}
                       inputKey="heightCm"
+                      keyboardType="decimal-pad"
                       onTextChange={onHeightChange}
                       errMsg={state.errorMsg.heightCm}
+                      variant="health"
                     />
                   </View>
                 </View>
@@ -462,8 +522,10 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
                   isRequire
                   value={state.weightKg}
                   inputKey="weightKg"
+                  keyboardType="decimal-pad"
                   onTextChange={onWeightChange}
                   errMsg={state.errorMsg.weightKg}
+                  variant="health"
                 />
 
                 <Text style={styles.hint}>
@@ -527,6 +589,52 @@ const HealthProfile = ({ visible, onClose, onUpdated }: HealthProfileProps) => {
                 )}
               </View>
 
+              <View style={styles.card}>
+                <LinearGradient
+                  colors={['#FFFFFF', '#F3FAF5']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                {!memberUserId ? (
+                  <>
+                    <Text style={styles.sectionTitle}>
+                      Chia sẻ với gia đình
+                    </Text>
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      accessibilityState={{
+                        checked: state.allowFamilyHealthManagement,
+                      }}
+                      onPress={toggleFamilyHealthManagement}
+                      style={styles.sharingRow}
+                    >
+                      <View style={styles.optionContent}>
+                        <Text style={styles.optionTitle}>
+                          Cho quản trị viên gia đình theo dõi sức khỏe
+                        </Text>
+                        <Text style={styles.optionDescription}>
+                          Cho phép xem hồ sơ, cân nặng, dinh dưỡng, nước uống
+                          và hoạt động; đồng thời cập nhật hồ sơ sức khỏe cho
+                          bạn. Bạn có thể tắt quyền này bất cứ lúc nào.
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.checkbox,
+                          state.allowFamilyHealthManagement &&
+                            styles.checkboxSelected,
+                        ]}
+                      >
+                        {state.allowFamilyHealthManagement ? (
+                          <Text style={styles.checkboxMark}>✓</Text>
+                        ) : null}
+                      </View>
+                    </Pressable>
+                  </>
+                ) : null}
+              </View>
+
               {!!state.errorMsg.submit && (
                 <Text style={styles.submitError}>{state.errorMsg.submit}</Text>
               )}
@@ -569,6 +677,7 @@ const styles = StyleSheet.create({
   },
 
   keyboardContainer: {
+    flex: 1,
     width: '100%',
     maxHeight: '100%',
   },
@@ -613,10 +722,6 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
 
-  headerIconText: {
-    fontSize: 22,
-  },
-
   headerContent: {
     flex: 1,
     gap: 3,
@@ -638,7 +743,7 @@ const styles = StyleSheet.create({
   closeButton: {
     width: 34,
     height: 34,
-    borderRadius: 8,
+    borderRadius: 17,
     backgroundColor: colors.Gray.g100,
     alignItems: 'center',
     justifyContent: 'center',
@@ -654,7 +759,7 @@ const styles = StyleSheet.create({
   },
 
   scrollView: {
-    flexGrow: 0,
+    flex: 1,
   },
 
   scrollContent: {
@@ -754,6 +859,31 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: colors.Green.g400,
   },
+  sharingRow: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.Gray.g300,
+    borderRadius: 8,
+    backgroundColor: 'white',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.Gray.g300,
+    borderRadius: 6,
+  },
+  checkboxSelected: {
+    borderColor: colors.Green.g400,
+    backgroundColor: colors.Green.g400,
+  },
+  checkboxMark: { color: 'white', fontSize: 14, fontWeight: '800' },
 
   errorText: {
     fontSize: 11,

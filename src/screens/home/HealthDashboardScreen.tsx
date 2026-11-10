@@ -38,7 +38,6 @@ import type {
   WaterIntakeResponse,
 } from '../../utils/types';
 import type { ActivityLevel, BmiCategory, Goal } from '../../type/user';
-import TestBannerAd from '../component/TestBannerAd';
 
 const WATER_REFERENCE_GOAL_ML = 2000;
 const WATER_AMOUNTS_ML = [250, 500];
@@ -583,6 +582,7 @@ const HealthDashboardScreen = () => {
       <ScreenHeader
         eyebrow="SỨC KHỎE CỦA BẠN"
         title="Theo dõi sức khỏe"
+        showBackButton={false}
       />
       <ScrollView
         contentContainerStyle={[
@@ -968,7 +968,6 @@ const HealthDashboardScreen = () => {
           Báo cáo dựa trên dữ liệu bạn ghi nhận trong HealthAndCook. Dữ liệu còn
           thiếu không được tự suy đoán
         </Text>
-        <TestBannerAd />
       </ScrollView>
     </View>
   );
@@ -991,9 +990,8 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 18,
   },
-  content: { gap: 10, paddingTop: 4 },
+  content: { gap: 10, paddingTop: 4, paddingHorizontal: 16 },
   loading: {
     flexDirection: 'row',
     alignItems: 'center',

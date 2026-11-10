@@ -17,6 +17,7 @@ const ScreenKeys = keyMirror({
   SMART_SHOPPING: null,
   DAILY_PLANNED_MEALS: null,
   FAMILY: null,
+  HOUSEHOLD_HEALTH: null,
   HOUSEHOLD_CHAT: null,
   NOTIFICATIONS: null,
   HEALTH_DASHBOARD: null,

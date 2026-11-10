@@ -726,9 +726,8 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 18,
   },
-  content: { gap: 14, paddingTop: 8 },
+  content: { gap: 14, paddingTop: 8, paddingHorizontal: 16 },
   notice: {
     padding: 14,
     borderRadius: 12,

@@ -22,6 +22,7 @@ export type RecipeDetailMeal = {
   description: string | null;
   imageUrl: string | null;
   category: MealCategory;
+  isVegetarian?: boolean;
   servings: number;
   prepTimeMinutes: number;
   cookTimeMinutes: number;
@@ -280,6 +281,7 @@ export type AiMealRecommendation = {
     | 'description'
     | 'imageUrl'
     | 'category'
+    | 'isVegetarian'
     | 'prepTimeMinutes'
     | 'cookTimeMinutes'
     | 'nutritionSummary'

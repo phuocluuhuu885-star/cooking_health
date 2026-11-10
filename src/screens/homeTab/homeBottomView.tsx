@@ -5,6 +5,12 @@ import { useSafeAreaFrame } from 'react-native-safe-area-context';
 import LinearGradient from '../../components/LinearGradient';
 import { AppImage } from '../../abase/component';
 import { colors } from '../../abase/constant';
+import TestBannerAd, {
+  BANNER_SURFACE_COLOR,
+} from '../component/TestBannerAd';
+
+export const BOTTOM_TAB_BAR_HEIGHT = 66;
+export const BOTTOM_TAB_AD_SLOT_HEIGHT = 66;
 
 type IProps = BottomTabBarProps & {};
 
@@ -28,11 +34,16 @@ const HomeBottomView = memo((props: IProps) => {
     () =>
       StyleSheet.create({
         container: {
-          height: insets.bottom + 66,
+          height:
+            insets.bottom + BOTTOM_TAB_BAR_HEIGHT + BOTTOM_TAB_AD_SLOT_HEIGHT,
           alignItems: 'center',
           justifyContent: 'flex-end',
           paddingBottom: insets.bottom + 8,
-          backgroundColor: 'transparent',
+          backgroundColor: BANNER_SURFACE_COLOR,
+          borderTopWidth: 0,
+          borderBottomWidth: 0,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         containerStyle: {
           alignSelf: 'center',
@@ -45,6 +56,7 @@ const HomeBottomView = memo((props: IProps) => {
   return (
     <View style={styleView.container}>
       <View style={styleView.containerStyle}>
+        <TestBannerAd />
         <View style={styles.menuWrapper}>
           <LinearGradient
             colors={['#FFFFFF', '#F0F9F4']}

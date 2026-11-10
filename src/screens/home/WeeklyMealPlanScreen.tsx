@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { AppImage } from '../../abase/component';
 import ScreenHeader from '../component/ScreenHeader';
+import HouseholdScopeSwitch from '../component/HouseholdScopeSwitch';
 import apiConst from '../../abase/constant/apiConst';
 import {
   invalidateCachedHouseholdMealPlan,
@@ -406,13 +407,9 @@ const WeeklyMealPlanScreen = () => {
     },
     [],
   );
-  const modePressHandlers = useMemo(
-    () => ({
-      PERSONAL: () => changePlanMode('PERSONAL'),
-      FAMILY: () => changePlanMode('FAMILY'),
-    }),
-    [changePlanMode],
-  );
+  const handleTogglePlanMode = useCallback(() => {
+    changePlanMode(planMode === 'PERSONAL' ? 'FAMILY' : 'PERSONAL');
+  }, [changePlanMode, planMode]);
   const budgetPressHandlers = useMemo(
     () =>
       new Map(
@@ -607,31 +604,6 @@ const WeeklyMealPlanScreen = () => {
       state.loading,
       state.saving,
     ],
-  );
-  const renderModeOption = useCallback(
-    (mode: 'PERSONAL' | 'FAMILY') => {
-      const selected = planMode === mode;
-      return (
-        <Pressable
-          key={mode}
-          accessibilityRole="button"
-          accessibilityState={{ selected }}
-          disabled={state.loading || state.saving}
-          onPress={modePressHandlers[mode]}
-          style={[styles.modeButton, selected && styles.modeButtonSelected]}
-        >
-          <Text
-            style={[
-              styles.modeButtonText,
-              selected && styles.modeButtonTextSelected,
-            ]}
-          >
-            {mode === 'PERSONAL' ? 'Cá nhân' : 'Cả gia đình'}
-          </Text>
-        </Pressable>
-      );
-    },
-    [modePressHandlers, planMode, state.loading, state.saving],
   );
   const renderDateOption = useCallback(
     (day: PlanDay) => {
@@ -878,9 +850,15 @@ const WeeklyMealPlanScreen = () => {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.modeSelector}>
-          {(['PERSONAL', 'FAMILY'] as const).map(renderModeOption)}
-        </View>
+        <HouseholdScopeSwitch
+          enabled={planMode === 'FAMILY'}
+          householdAvailable={Boolean(household)}
+          personalLabel="Kế hoạch cá nhân"
+          householdLabel="Kế hoạch cho gia đình"
+          description="Chuyển đổi phạm vi để tạo thực đơn phù hợp."
+          disabled={state.loading || state.saving}
+          onToggle={handleTogglePlanMode}
+        />
         <Text style={styles.budgetLabel}>Ngân sách mỗi khẩu phần</Text>
         <Pressable
           accessibilityRole="button"
@@ -1004,7 +982,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 12,
   },
   header: {
     flexDirection: 'row',
@@ -1049,28 +1026,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
   },
-  content: { paddingTop: 8 },
-  modeSelector: {
-    flexDirection: 'row',
-    padding: 4,
-    marginBottom: 8,
-    borderRadius: 12,
-    backgroundColor: '#E8EEEA',
-  },
-  modeButton: {
-    flex: 1,
-    minHeight: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-  },
-  modeButtonSelected: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  modeButtonText: { color: COLORS.secondary, fontSize: 12, fontWeight: '700' },
-  modeButtonTextSelected: { color: COLORS.green },
+  content: { paddingTop: 8, paddingHorizontal: 16 },
   budgetLabel: {
     marginBottom: 6,
     color: COLORS.text,
