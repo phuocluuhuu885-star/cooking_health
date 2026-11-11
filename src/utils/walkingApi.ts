@@ -78,7 +78,7 @@ export const getWalkingWorkoutHistory = async (
     from,
     to,
     page: 1,
-    pageSize: 50,
+    pageSize: 20,
   })) as WalkingWorkoutHistoryResponse;
   if (!response.success || !response.data) {
     throw new Error(response.message || 'Không thể tải lịch sử đi bộ.');

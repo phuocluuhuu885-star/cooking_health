@@ -855,7 +855,9 @@ const WeeklyMealPlanScreen = () => {
           householdAvailable={Boolean(household)}
           personalLabel="Kế hoạch cá nhân"
           householdLabel="Kế hoạch cho gia đình"
-          description="Chuyển đổi phạm vi để tạo thực đơn phù hợp."
+          variant="swap"
+          swapPersonalLabel="Cá nhân"
+          swapHouseholdLabel="Gia đình"
           disabled={state.loading || state.saving}
           onToggle={handleTogglePlanMode}
         />

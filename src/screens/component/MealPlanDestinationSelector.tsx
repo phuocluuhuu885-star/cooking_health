@@ -1,6 +1,6 @@
 import React, { memo, useCallback } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MealPlanDestination } from '../../utils/types';
-import HouseholdScopeSwitch from './HouseholdScopeSwitch';
 
 type MealPlanDestinationSelectorProps = {
   selectedDestination: MealPlanDestination;
@@ -19,23 +19,79 @@ const MealPlanDestinationSelector = memo(
     const toggleDestination = useCallback(() => {
       onSelect(selectedDestination === 'PERSONAL' ? 'HOUSEHOLD' : 'PERSONAL');
     }, [onSelect, selectedDestination]);
+    const getSwitchButtonStyle = useCallback(
+      ({ pressed }: { pressed: boolean }) => [
+        styles.switchButton,
+        disabled && styles.disabled,
+        pressed && !disabled && styles.pressed,
+      ],
+      [disabled],
+    );
+
+    if (!householdAvailable) return null;
+
+    const isHousehold = selectedDestination === 'HOUSEHOLD';
+    const nextLabel = isHousehold ? 'Cá nhân' : 'Gia đình';
 
     return (
-      <HouseholdScopeSwitch
-        enabled={selectedDestination === 'HOUSEHOLD'}
-        householdAvailable={householdAvailable}
-        personalLabel="Thêm vào thực đơn cá nhân"
-        householdLabel="Đề xuất cho gia đình"
-        description={
-          selectedDestination === 'HOUSEHOLD'
-            ? 'Món sẽ được gửi để các thành viên gia đình bình chọn.'
-            : 'Bật để chuyển món sang thực đơn gia đình.'
-        }
-        disabled={disabled}
-        onToggle={toggleDestination}
-      />
+      <View style={styles.container}>
+        <Text style={styles.currentLabel}>Thêm món cho thực đơn</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Chuyển sang ${nextLabel}`}
+          accessibilityState={{ disabled }}
+          disabled={disabled}
+          onPress={toggleDestination}
+          style={getSwitchButtonStyle}
+        >
+          <Text style={styles.swapIcon}>⇄</Text>
+          <Text style={styles.nextLabel}>{nextLabel}</Text>
+        </Pressable>
+      </View>
     );
   },
 );
 
 export default MealPlanDestinationSelector;
+
+const styles = StyleSheet.create({
+  container: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  currentLabel: {
+    flex: 1,
+    color: '#172B23',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  switchButton: {
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#E7F4EC',
+  },
+  swapIcon: {
+    color: '#168653',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  nextLabel: {
+    color: '#168653',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  disabled: {
+    opacity: 0.55,
+  },
+  pressed: {
+    opacity: 0.75,
+  },
+});

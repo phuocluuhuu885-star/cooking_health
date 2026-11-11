@@ -134,6 +134,24 @@ const MealPlanComposerModal = ({
     setMealPeriod('DINNER');
   }, [setMealPeriod]);
 
+  const shiftDate = useCallback(
+    (amount: number) => {
+      const nextDate = new Date(`${date}T00:00:00.000Z`);
+      nextDate.setUTCDate(nextDate.getUTCDate() + amount);
+      setDate(nextDate.toISOString().slice(0, 10));
+      setDateError('');
+    },
+    [date, setDate, setDateError],
+  );
+
+  const handlePreviousDate = useCallback(() => {
+    shiftDate(-1);
+  }, [shiftDate]);
+
+  const handleNextDate = useCallback(() => {
+    shiftDate(1);
+  }, [shiftDate]);
+
   const handleOpenCalendar = useCallback(() => {
     setCalendarVisible(true);
   }, [setCalendarVisible]);
@@ -175,6 +193,27 @@ const MealPlanComposerModal = ({
   ]);
 
   const isLunchSelected = mealPeriod === 'LUNCH';
+  const previousDateDisabled =
+    saving ||
+    (destination === 'HOUSEHOLD' &&
+      date <= getMealPlanDateKey('HOUSEHOLD'));
+  const getPreviousDateButtonStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.dateArrow,
+      previousDateDisabled && styles.disabled,
+      pressed && !previousDateDisabled && styles.pressed,
+    ],
+    [previousDateDisabled],
+  );
+  const getNextDateButtonStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      styles.dateArrow,
+      saving && styles.disabled,
+      pressed && !saving && styles.pressed,
+    ],
+    [saving],
+  );
+
   return (
     <>
       <Modal
@@ -192,24 +231,93 @@ const MealPlanComposerModal = ({
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.title}>
-                {destination === 'HOUSEHOLD'
-                  ? 'Đề xuất món cho gia đình'
-                  : 'Thêm vào thực đơn cá nhân'}
-              </Text>
-              <Text style={styles.subtitle}>
-                Chọn ngày và bữa ăn.{' '}
-                {destination === 'HOUSEHOLD'
-                  ? 'Món sẽ được gửi đến gia đình để bình chọn.'
-                  : 'Món sẽ được lưu vào thực đơn cá nhân.'}
-              </Text>
-
               <MealPlanDestinationSelector
                 selectedDestination={destination}
                 householdAvailable={householdAvailable}
                 disabled={saving}
                 onSelect={handleDestinationChange}
               />
+
+              <View style={styles.optionsRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isLunchSelected }}
+                  disabled={saving}
+                  onPress={handleSelectLunch}
+                  style={[
+                    styles.option,
+                    isLunchSelected && styles.optionSelected,
+                    saving && styles.disabled,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      isLunchSelected && styles.optionTextSelected,
+                    ]}
+                  >
+                    Bữa trưa
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: !isLunchSelected }}
+                  disabled={saving}
+                  onPress={handleSelectDinner}
+                  style={[
+                    styles.option,
+                    !isLunchSelected && styles.optionSelected,
+                    saving && styles.disabled,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      !isLunchSelected && styles.optionTextSelected,
+                    ]}
+                  >
+                    Bữa tối
+                  </Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.dateNavigationRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Ngày trước"
+                  accessibilityState={{ disabled: previousDateDisabled }}
+                  disabled={previousDateDisabled}
+                  onPress={handlePreviousDate}
+                  style={getPreviousDateButtonStyle}
+                >
+                  <Text style={styles.dateArrowText}>‹</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ngày thực đơn: ${formatMealPlanDateLabel(
+                    date,
+                  )}. Chạm để chọn ngày`}
+                  accessibilityHint="Mở lịch chọn ngày thực đơn"
+                  disabled={saving}
+                  onPress={handleOpenCalendar}
+                  style={styles.dateButton}
+                >
+                  <Text style={styles.dateButtonText}>
+                    {formatMealPlanDateLabel(date)}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Ngày tiếp theo"
+                  accessibilityState={{ disabled: saving }}
+                  disabled={saving}
+                  onPress={handleNextDate}
+                  style={getNextDateButtonStyle}
+                >
+                  <Text style={styles.dateArrowText}>›</Text>
+                </Pressable>
+              </View>
+              {dateError ? <Text style={styles.error}>{dateError}</Text> : null}
 
               {recipe ? (
                 <View style={styles.selectedMeal}>
@@ -245,66 +353,6 @@ const MealPlanComposerModal = ({
                   </Pressable>
                 </View>
               ) : null}
-
-              <View style={styles.dateRow}>
-                <Text style={styles.dateLabel}>Ngày:</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Ngày thực đơn: ${formatMealPlanDateLabel(
-                    date,
-                  )}. Chạm để chọn ngày`}
-                  accessibilityHint="Mở lịch chọn ngày thực đơn"
-                  disabled={saving}
-                  onPress={handleOpenCalendar}
-                  style={styles.dateButton}
-                >
-                  <Text style={styles.dateButtonText}>
-                    {formatMealPlanDateLabel(date)}
-                  </Text>
-                  <Text style={styles.dateButtonAction}>Chọn ngày</Text>
-                </Pressable>
-              </View>
-              {dateError ? <Text style={styles.error}>{dateError}</Text> : null}
-
-              <Text style={styles.label}>Bữa ăn</Text>
-              <View style={styles.optionsRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isLunchSelected }}
-                  onPress={handleSelectLunch}
-                  style={[
-                    styles.option,
-                    isLunchSelected && styles.optionSelected,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      isLunchSelected && styles.optionTextSelected,
-                    ]}
-                  >
-                    Bữa trưa
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: !isLunchSelected }}
-                  onPress={handleSelectDinner}
-                  style={[
-                    styles.option,
-                    !isLunchSelected && styles.optionSelected,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      !isLunchSelected && styles.optionTextSelected,
-                    ]}
-                  >
-                    Bữa tối
-                  </Text>
-                </Pressable>
-              </View>
 
               <Pressable
                 accessibilityRole="button"
@@ -408,12 +456,12 @@ const styles = StyleSheet.create({
   },
   modal: {
     maxHeight: '90%',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 8,
     borderRadius: 12,
     overflow: 'hidden',
   },
-  title: { color: '#172B23', fontSize: 21, fontWeight: '800' },
-  subtitle: { color: '#66756D', fontSize: 13, marginTop: 5 },
   selectedMeal: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -446,23 +494,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF3F2',
   },
   removeText: { color: '#B42318', fontSize: 11, fontWeight: '700' },
-  label: {
-    color: '#34463D',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 15,
-    marginBottom: 7,
-  },
-  dateRow: {
+  dateNavigationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 15,
-  },
-  dateLabel: {
-    color: '#34463D',
-    fontSize: 12,
-    fontWeight: '700',
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 4,
   },
   dateButton: {
     flex: 1,
@@ -472,9 +509,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
     paddingHorizontal: 11,
+    marginHorizontal: 4,
     borderWidth: 1,
     borderColor: '#E5EBE7',
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: '#FFFFFF',
   },
   dateButtonText: {
@@ -484,10 +522,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'capitalize',
   },
-  dateButtonAction: {
+  dateArrow: {
+    width: 38,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5EBE7',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  dateArrowText: {
     color: '#168653',
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 26,
+    lineHeight: 30,
+    fontWeight: '600',
   },
   calendarOverlay: {
     flex: 1,
@@ -516,7 +565,7 @@ const styles = StyleSheet.create({
   },
   calendarCloseText: { color: '#168653', fontSize: 11, fontWeight: '700' },
   error: { color: '#B42318', fontSize: 11, marginTop: 5 },
-  optionsRow: { flexDirection: 'row', gap: 9 },
+  optionsRow: { flexDirection: 'row', gap: 9, marginTop: 10 },
   option: {
     flex: 1,
     minHeight: 42,
@@ -543,6 +592,7 @@ const styles = StyleSheet.create({
   },
   saveText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   disabled: { opacity: 0.6 },
+  pressed: { opacity: 0.75 },
   cancelButton: { alignItems: 'center', paddingVertical: 12 },
   cancelText: { color: '#66756D', fontSize: 12, fontWeight: '700' },
 });

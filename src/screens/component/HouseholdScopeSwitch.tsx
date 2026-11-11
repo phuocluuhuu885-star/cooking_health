@@ -6,6 +6,9 @@ type HouseholdScopeSwitchProps = {
   householdAvailable: boolean;
   personalLabel: string;
   householdLabel: string;
+  variant?: 'toggle' | 'swap';
+  swapPersonalLabel?: string;
+  swapHouseholdLabel?: string;
   description?: string;
   disabled?: boolean;
   onToggle: () => void;
@@ -17,6 +20,9 @@ const HouseholdScopeSwitch = memo(
     householdAvailable,
     personalLabel,
     householdLabel,
+    variant = 'toggle',
+    swapPersonalLabel,
+    swapHouseholdLabel,
     description,
     disabled = false,
     onToggle,
@@ -24,8 +30,42 @@ const HouseholdScopeSwitch = memo(
     const handleToggle = useCallback(() => {
       onToggle();
     }, [onToggle]);
+    const getSwapButtonStyle = useCallback(
+      ({ pressed }: { pressed: boolean }) => [
+        styles.swapButton,
+        disabled && styles.disabled,
+        pressed && !disabled && styles.pressed,
+      ],
+      [disabled],
+    );
 
-    if (!householdAvailable) return null;
+    if (!householdAvailable && variant !== 'swap') return null;
+
+    if (variant === 'swap') {
+      const currentLabel = enabled ? householdLabel : personalLabel;
+      const nextLabel = enabled
+        ? swapPersonalLabel ?? personalLabel
+        : swapHouseholdLabel ?? householdLabel;
+
+      return (
+        <View style={styles.swapContainer}>
+          <Text style={styles.title}>Thêm món cho thực đơn</Text>
+          {householdAvailable ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Chuyển sang ${nextLabel}`}
+              accessibilityState={{ disabled }}
+              disabled={disabled}
+              onPress={handleToggle}
+              style={getSwapButtonStyle}
+            >
+              <Text style={styles.swapIcon}>⇄</Text>
+              <Text style={styles.swapLabel}>{nextLabel}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      );
+    }
 
     return (
       <View style={styles.container}>
@@ -71,9 +111,30 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#FFFFFF',
   },
+  swapContainer: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
   copy: { flex: 1, gap: 3 },
-  title: { color: '#172B23', fontSize: 13, fontWeight: '700' },
+  title: { color: '#172B23', fontSize: 16, fontWeight: '700' },
   description: { color: '#66756D', fontSize: 10, lineHeight: 15 },
+  swapButton: {
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#E7F4EC',
+  },
+  swapIcon: { color: '#168653', fontSize: 18, fontWeight: '700' },
+  swapLabel: { color: '#168653', fontSize: 12, fontWeight: '700' },
   track: {
     width: 48,
     height: 28,
@@ -91,4 +152,5 @@ const styles = StyleSheet.create({
   },
   thumbEnabled: { alignSelf: 'flex-end' },
   disabled: { opacity: 0.55 },
+  pressed: { opacity: 0.75 },
 });
