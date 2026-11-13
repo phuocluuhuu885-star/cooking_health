@@ -154,9 +154,12 @@ const DailyPlannedMealsScreen = ({ route }: Props) => {
     }, [loadMeals]),
   );
 
-  const openMeal = useCallback((mealId: string) => {
-    navigate(ScreenKeys.RECIPE_DETAIL, { mealId });
-  }, []);
+  const openMeal = useCallback(
+    (mealId: string) => {
+      navigate(ScreenKeys.RECIPE_DETAIL, { mealId });
+    },
+    [],
+  );
 
   function renderPeriod(period: Period) {
     const meals = state.data?.meals[period.key].items ?? [];

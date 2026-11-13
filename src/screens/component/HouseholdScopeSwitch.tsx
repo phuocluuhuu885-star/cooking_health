@@ -10,6 +10,7 @@ type HouseholdScopeSwitchProps = {
   swapTitle?: string | null;
   swapPersonalLabel?: string;
   swapHouseholdLabel?: string;
+  compact?: boolean;
   description?: string;
   disabled?: boolean;
   onToggle: () => void;
@@ -25,6 +26,7 @@ const HouseholdScopeSwitch = memo(
     swapTitle,
     swapPersonalLabel,
     swapHouseholdLabel,
+    compact = false,
     description,
     disabled = false,
     onToggle,
@@ -42,15 +44,18 @@ const HouseholdScopeSwitch = memo(
     );
 
     if (!householdAvailable && variant !== 'swap') return null;
-
     if (variant === 'swap') {
-      const currentLabel = enabled ? householdLabel : personalLabel;
       const nextLabel = enabled
         ? swapPersonalLabel ?? personalLabel
         : swapHouseholdLabel ?? householdLabel;
 
       return (
-        <View style={styles.swapContainer}>
+        <View
+          style={[
+            styles.swapContainer,
+            compact && styles.swapContainerCompact,
+          ]}
+        >
           {swapTitle === null ? null : (
             <Text style={styles.title}>{swapTitle ?? 'Thêm món cho thực đơn'}</Text>
           )}
@@ -123,6 +128,11 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 12,
     marginBottom: 12,
+  },
+  swapContainerCompact: {
+    minHeight: 36,
+    marginBottom: 0,
+    paddingHorizontal: 0,
   },
   copy: { flex: 1, gap: 3 },
   title: { color: '#172B23', fontSize: 16, fontWeight: '700' },

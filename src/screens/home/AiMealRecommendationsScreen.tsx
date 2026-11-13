@@ -332,13 +332,13 @@ const AiMealRecommendationsScreen = () => {
       const estimatedPrice = getEstimatedMealPrice(recommendation);
       return total + (estimatedPrice?.maxVnd ?? 0);
     }, 0);
-    const estimatedMealTotalLabel = Math.round(
+    const estimatedMealTotalLabel = `${Math.round(
       estimatedMealTotal,
-    ).toLocaleString('vi-VN');
+    ).toLocaleString('vi-VN')}đ`;
     const mealBudgetLabel =
       mealBudget === undefined
         ? ''
-        : Math.round(mealBudget).toLocaleString('vi-VN');
+        : `${Math.round(mealBudget).toLocaleString('vi-VN')}đ`;
 
     function renderRecommendation(recommendation: AiMealRecommendation) {
       return (
@@ -358,15 +358,16 @@ const AiMealRecommendationsScreen = () => {
 
     return (
       <View key={period} style={index > 0 && styles.periodSection}>
-        <Text style={styles.periodTitle}>
-          {period === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'}
-        </Text>
-        {mealBudget !== undefined ? (
-          <Text style={styles.budgetHint}>
-            Tổng giá ước tính: {estimatedMealTotalLabel}đ / ngân sách tối đa{' '}
-            {mealBudgetLabel}đ
+        <View style={styles.periodHeader}>
+          <Text style={styles.periodTitle}>
+            {period === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'}
           </Text>
-        ) : null}
+          {mealBudget !== undefined ? (
+            <Text style={styles.budgetAmount}>
+              {estimatedMealTotalLabel} / {mealBudgetLabel}
+            </Text>
+          ) : null}
+        </View>
         {recommendations.length ? (
           recommendations.map(renderRecommendation)
         ) : (
@@ -374,7 +375,7 @@ const AiMealRecommendationsScreen = () => {
             {state.recommendations?.consumedPeriods.includes(period)
               ? 'Đã ghi nhận bữa này.'
               : mealBudget !== undefined
-              ? `Chưa tìm thấy món phù hợp với calo còn lại và ngân sách ${mealBudgetLabel}đ.`
+              ? `Chưa tìm thấy món phù hợp với calo còn lại và ngân sách ${mealBudgetLabel}.`
               : 'Chưa tìm thấy món phù hợp cho bữa này. Thử đổi bữa hoặc cập nhật mục tiêu dinh dưỡng.'}
           </Text>
         )}
@@ -452,7 +453,7 @@ const AiMealRecommendationsScreen = () => {
           >
             <ActivityIndicator color={COLORS.green} />
             <Text style={styles.emptyText}>
-              Đang so khớp món trong thư viện với mục tiêu dinh dưỡng...
+              Đang xử lý...
             </Text>
           </LinearGradient>
         ) : state.recommendations ? (
@@ -480,9 +481,7 @@ const AiMealRecommendationsScreen = () => {
             </Text>
           </LinearGradient>
         )}
-        <Text style={styles.disclaimer}>
-          Gợi ý dinh dưỡng chỉ mang tính tham khảo, không phải tư vấn y tế.
-        </Text>
+
       </ScrollView>
     </View>
   );
@@ -591,16 +590,22 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.border,
   },
   periodTitle: {
-    marginBottom: 8,
     color: COLORS.text,
     fontSize: 13,
     fontWeight: '800',
   },
-  budgetHint: {
+  periodHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 8,
+  },
+  budgetAmount: {
     color: COLORS.green,
     fontSize: 11,
-    lineHeight: 16,
-    marginBottom: 8,
+    fontWeight: '700',
+    textAlign: 'right',
   },
   addAllButton: {
     minHeight: 42,

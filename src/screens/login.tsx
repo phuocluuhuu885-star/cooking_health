@@ -59,6 +59,7 @@ const LogoSection = memo(() => {
 
 const Login = () => {
   const dispatch = useAppDispatch();
+  const insets = useSafeAreaInsets();
   const [state, setState] = useState<{
     isLogin: boolean;
 
@@ -331,7 +332,11 @@ const Login = () => {
       >
         <ScrollView
           style={styles.flex}
-          contentContainerStyle={[styles.scrollContent]}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: insets.bottom + 12 },
+          ]}
+          keyboardShouldPersistTaps="handled"
           keyboardDismissMode={
             Platform.OS === 'ios' ? 'interactive' : 'on-drag'
           }
@@ -341,7 +346,10 @@ const Login = () => {
           <View style={styles.content}>
             <LinearGradient
               colors={['#FFFFFF', '#F0F8F2']}
-              style={styles.authPanel}
+              style={[
+                styles.authPanel,
+                !state.isLogin && styles.registerAuthPanel,
+              ]}
             >
               <Text style={styles.formEyebrow}>
                 {state.isLogin
@@ -393,7 +401,7 @@ const Login = () => {
                   </TouchableOpacity>
                 </View>
               ) : (
-                <View style={styles.loginCard}>
+                <View style={[styles.loginCard, styles.registerForm]}>
                   <InputComponent
                     title="Họ và tên"
                     variant="auth"
@@ -558,11 +566,17 @@ const styles = StyleSheet.create({
     zIndex: 1,
     padding: 20,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2EAE4',
     shadowColor: '#183B29',
     shadowOpacity: 0.08,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 4,
+  },
+  registerAuthPanel: {
+    padding: 16,
+    backgroundColor: '#FFFFFF',
   },
   formEyebrow: {
     color: '#168653',
@@ -587,6 +601,9 @@ const styles = StyleSheet.create({
   },
   loginCard: {
     gap: 14,
+  },
+  registerForm: {
+    gap: 12,
   },
   loginButton: {
     minHeight: 52,

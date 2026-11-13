@@ -97,6 +97,51 @@ type IncomeForm = {
   note: string;
 };
 
+type ExpenseFilterCategory = ExpenseCategory | 'ALL';
+
+const EXPENSE_FILTER_CATEGORIES: Array<{
+  id: ExpenseFilterCategory;
+  label: string;
+  icon: string;
+}> = [{ id: 'ALL', label: 'Tất cả', icon: '☷' }, ...CATEGORIES];
+
+const ExpenseFilterOption = ({
+  category,
+  selected,
+  onSelect,
+}: {
+  category: (typeof EXPENSE_FILTER_CATEGORIES)[number];
+  selected: boolean;
+  onSelect: (category: ExpenseFilterCategory) => void;
+}) => {
+  const handlePress = useCallback(
+    () => onSelect(category.id),
+    [category.id, onSelect],
+  );
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={handlePress}
+      style={[
+        styles.expenseFilterOption,
+        selected && styles.expenseFilterOptionSelected,
+      ]}
+    >
+      <Text style={styles.expenseFilterOptionIcon}>{category.icon}</Text>
+      <Text
+        style={[
+          styles.expenseFilterOptionText,
+          selected && styles.expenseFilterOptionTextSelected,
+        ]}
+      >
+        {category.label}
+      </Text>
+    </Pressable>
+  );
+};
+
 const emptyForm = (): ExpenseForm => ({
   title: '',
   amount: '',
@@ -127,6 +172,9 @@ const ExpenseManagementScreen = () => {
   const [month, setMonth] = useState(currentMonthKey(new Date()));
   const [items, setItems] = useState<Expense[]>([]);
   const [incomeItems, setIncomeItems] = useState<Income[]>([]);
+  const [expenseFilterCategory, setExpenseFilterCategory] =
+    useState<ExpenseFilterCategory>('ALL');
+  const [expenseFilterVisible, setExpenseFilterVisible] = useState(false);
   const [total, setTotal] = useState(0);
   const [incomeTotal, setIncomeTotal] = useState(0);
   const [budgets, setBudgets] = useState<
@@ -313,6 +361,17 @@ const ExpenseManagementScreen = () => {
       )
       .slice(0, 8);
   }, [mealSearch, meals]);
+  const filteredExpenseItems = useMemo(
+    () =>
+      expenseFilterCategory === 'ALL'
+        ? items
+        : items.filter(item => item.category === expenseFilterCategory),
+    [expenseFilterCategory, items],
+  );
+  const selectedExpenseFilter =
+    EXPENSE_FILTER_CATEGORIES.find(
+      category => category.id === expenseFilterCategory,
+    ) ?? EXPENSE_FILTER_CATEGORIES[0];
   const dailyTotals = useMemo(
     () =>
       items.reduce<Record<string, number>>((totals, item) => {
@@ -331,6 +390,16 @@ const ExpenseManagementScreen = () => {
   const toggleTransactions = useCallback(() => {
     setTransactionsVisible(value => !value);
   }, []);
+  const toggleExpenseFilter = useCallback(() => {
+    setExpenseFilterVisible(value => !value);
+  }, []);
+  const selectExpenseFilterCategory = useCallback(
+    (category: ExpenseFilterCategory) => {
+      setExpenseFilterCategory(category);
+      setExpenseFilterVisible(false);
+    },
+    [],
+  );
   const changeScope = useCallback((nextScope: ExpenseScope) => {
     setScope(nextScope);
     setFormVisible(false);
@@ -863,6 +932,16 @@ const ExpenseManagementScreen = () => {
       onRemove={removeExpense}
     />
   );
+  const renderExpenseFilterOption = (category: (typeof EXPENSE_FILTER_CATEGORIES)[number]) => {
+    return (
+      <ExpenseFilterOption
+        key={category.id}
+        category={category}
+        selected={category.id === expenseFilterCategory}
+        onSelect={selectExpenseFilterCategory}
+      />
+    );
+  };
 
   return (
     <View style={styles.screen}>
@@ -1072,9 +1151,46 @@ const ExpenseManagementScreen = () => {
             <View>
               <Text style={styles.sectionTitle}>Khoản chi</Text>
               <Text style={styles.sectionHint}>
-                Thêm khoản chi bên ngoài hoặc ghi từ món trong app.
+                {filteredExpenseItems.length} khoản chi
+                {expenseFilterCategory === 'ALL'
+                  ? ' · Mọi danh mục'
+                  : ` · ${selectedExpenseFilter.label}`}
               </Text>
             </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Lọc khoản chi: ${selectedExpenseFilter.label}`}
+              accessibilityState={{ expanded: expenseFilterVisible }}
+              onPress={toggleExpenseFilter}
+              style={styles.expenseFilterButton}
+            >
+              <Text style={styles.expenseFilterButtonIcon}>
+                {selectedExpenseFilter.icon}
+              </Text>
+              <Text numberOfLines={1} style={styles.expenseFilterButtonText}>
+                {selectedExpenseFilter.label}
+              </Text>
+              <Svg
+                width={16}
+                height={16}
+                viewBox="0 0 24 24"
+                style={expenseFilterVisible ? styles.expenseFilterChevronOpen : undefined}
+              >
+                <Path
+                  d="m6 9 6 6 6-6"
+                  fill="none"
+                  stroke={COLORS.green}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                />
+              </Svg>
+            </Pressable>
+          </View>
+        ) : null}
+        {transactionsVisible && expenseFilterVisible ? (
+          <View style={styles.expenseFilterMenu}>
+            {EXPENSE_FILTER_CATEGORIES.map(renderExpenseFilterOption)}
           </View>
         ) : null}
 
@@ -1421,16 +1537,21 @@ const ExpenseManagementScreen = () => {
           <View style={styles.loadingCard}>
             <ActivityIndicator color={COLORS.green} />
           </View>
-        ) : transactionsVisible && items.length ? (
+        ) : transactionsVisible && filteredExpenseItems.length ? (
           <View style={styles.expenseList}>
-            {items.map(renderExpenseItem)}
+            {filteredExpenseItems.map(renderExpenseItem)}
           </View>
         ) : transactionsVisible ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>Chưa có khoản chi trong tháng</Text>
+            <Text style={styles.emptyTitle}>
+              {items.length
+                ? `Chưa có khoản chi thuộc danh mục ${selectedExpenseFilter.label}`
+                : 'Chưa có khoản chi trong tháng'}
+            </Text>
             <Text style={styles.emptyText}>
-              Thêm khoản chi bên ngoài hoặc liên kết giao dịch với món ăn trong
-              app.
+              {items.length
+                ? 'Chọn danh mục khác để xem thêm giao dịch.'
+                : 'Thêm khoản chi bên ngoài hoặc liên kết giao dịch với món ăn trong app.'}
             </Text>
           </View>
         ) : null}
@@ -1550,6 +1671,60 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  expenseFilterButton: {
+    maxWidth: '48%',
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 10,
+  },
+  expenseFilterButtonIcon: { fontSize: 13 },
+  expenseFilterButtonText: {
+    flexShrink: 1,
+    color: COLORS.text,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  expenseFilterChevronOpen: { transform: [{ rotate: '180deg' }] },
+  expenseFilterMenu: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginTop: -8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  expenseFilterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+  },
+  expenseFilterOptionSelected: {
+    borderColor: COLORS.green,
+    backgroundColor: COLORS.lightGreen,
+  },
+  expenseFilterOptionIcon: { fontSize: 12 },
+  expenseFilterOptionText: {
+    color: COLORS.secondary,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  expenseFilterOptionTextSelected: { color: COLORS.green },
   budgetPanel: {
     overflow: 'hidden',
     borderRadius: 10,

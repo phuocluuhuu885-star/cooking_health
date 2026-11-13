@@ -18,6 +18,7 @@ import {
 import {
   registerPushToken,
   type PushPlatform,
+  unregisterPushToken,
 } from '../../utils/pushNotificationApi';
 
 const PushNotificationTokenContext = createContext<string | null>(null);
@@ -35,18 +36,18 @@ const PushNotificationProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const accessToken = user?.accessToken;
+    setToken(null);
     if (Platform.OS !== 'android') {
-      setToken(null);
       return undefined;
     }
     if (!accessToken) {
-      setToken(null);
       return undefined;
     }
 
     const authenticatedAccessToken: string = accessToken;
     const platform: PushPlatform = 'ANDROID';
     let active = true;
+    let registeredToken: string | null = null;
     const retryTimers = new Set<ReturnType<typeof setTimeout>>();
     const registerTokenWithBackend = async (
       nextToken: string,
@@ -56,6 +57,27 @@ const PushNotificationProvider = ({ children }: { children: ReactNode }) => {
       setToken(nextToken);
       try {
         await registerPushToken(authenticatedAccessToken, nextToken, platform);
+        if (!active) {
+          await unregisterPushToken(
+            authenticatedAccessToken,
+            nextToken,
+            platform,
+          );
+          return;
+        }
+        const previousToken = registeredToken;
+        registeredToken = nextToken;
+        if (previousToken && previousToken !== nextToken) {
+          try {
+            await unregisterPushToken(
+              authenticatedAccessToken,
+              previousToken,
+              platform,
+            );
+          } catch (error) {
+            console.error('Failed to remove the previous push token', error);
+          }
+        }
       } catch (error) {
         console.error('Failed to sync push notification token', error);
         const retryDelay = TOKEN_SYNC_RETRY_DELAYS_MS[retryIndex];
@@ -90,6 +112,15 @@ const PushNotificationProvider = ({ children }: { children: ReactNode }) => {
       unsubscribe();
       retryTimers.forEach(clearTimeout);
       retryTimers.clear();
+      if (registeredToken) {
+        unregisterPushToken(
+          authenticatedAccessToken,
+          registeredToken,
+          platform,
+        ).catch(error => {
+          console.error('Failed to unregister push token', error);
+        });
+      }
     };
   }, [openNotifications, user?.accessToken]);
 

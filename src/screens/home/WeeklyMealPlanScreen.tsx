@@ -51,6 +51,8 @@ type PlanDay = {
   consumedPeriods: MealPeriod[];
 };
 
+type PlanDuration = 3 | 7;
+
 type ScreenState = {
   days: PlanDay[];
   selectedDate: string;
@@ -63,6 +65,7 @@ type ScreenState = {
 };
 
 const PERIODS: MealPeriod[] = ['LUNCH', 'DINNER'];
+const PLAN_DURATIONS: PlanDuration[] = [3, 7];
 const PRICE_BUDGETS = [
   { label: '20–40 nghìn', minVnd: 20_000, maxVnd: 40_000 },
   { label: '30–60 nghìn', minVnd: 30_000, maxVnd: 60_000 },
@@ -174,6 +177,8 @@ const WeeklyMealPlanScreen = () => {
   const household = useSelector(selectCurrentHousehold);
   const requestId = useRef(0);
   const [planMode, setPlanMode] = useState<'PERSONAL' | 'FAMILY'>('PERSONAL');
+  const [planDuration, setPlanDuration] = useState<PlanDuration>(7);
+  const [durationOptionsVisible, setDurationOptionsVisible] = useState(false);
   const [budgetOptionsVisible, setBudgetOptionsVisible] = useState(false);
   const [priceBudget, setPriceBudget] = useState<EstimatedPriceRange>({
     minVnd: 30_000,
@@ -243,6 +248,38 @@ const WeeklyMealPlanScreen = () => {
   const toggleBudgetOptions = useCallback(() => {
     setBudgetOptionsVisible(visible => !visible);
   }, []);
+  const changePlanDuration = useCallback(
+    (duration: PlanDuration) => {
+      if (duration === planDuration) return;
+      const applyDuration = () => {
+        setPlanDuration(duration);
+        resetPlan();
+      };
+      if (state.days.length === 0) {
+        applyDuration();
+        return;
+      }
+      Alert.alert(
+        'Tạo lại kế hoạch?',
+        'Đổi thời lượng sẽ xóa các lựa chọn hiện tại. Bạn có thể tạo lại kế hoạch theo thời lượng mới.',
+        [
+          { text: 'Giữ nguyên', style: 'cancel' },
+          { text: 'Đổi thời lượng', onPress: applyDuration },
+        ],
+      );
+    },
+    [planDuration, resetPlan, state.days.length],
+  );
+  const selectPlanDuration = useCallback(
+    (duration: PlanDuration) => {
+      setDurationOptionsVisible(false);
+      changePlanDuration(duration);
+    },
+    [changePlanDuration],
+  );
+  const toggleDurationOptions = useCallback(() => {
+    setDurationOptionsVisible(visible => !visible);
+  }, []);
 
   const generatePlan = useCallback(async () => {
     if (!user?.accessToken || !user.id) {
@@ -291,7 +328,7 @@ const WeeklyMealPlanScreen = () => {
 
     const currentRequestId = ++requestId.current;
     const startDate = getUtcDateKey(new Date());
-    const dates = Array.from({ length: 7 }, (_, index) =>
+    const dates = Array.from({ length: planDuration }, (_, index) =>
       addDays(startDate, index),
     );
     setSyncUser(user);
@@ -376,11 +413,11 @@ const WeeklyMealPlanScreen = () => {
           error:
             error instanceof Error
               ? error.message
-              : 'Không thể tạo kế hoạch 7 ngày.',
+              : `Không thể tạo kế hoạch ${planDuration} ngày.`,
         }));
       }
     }
-  }, [household, planMode, priceBudget, user]);
+  }, [household, planDuration, planMode, priceBudget, user]);
 
   useFocusEffect(
     useCallback(
@@ -421,6 +458,16 @@ const WeeklyMealPlanScreen = () => {
         ]),
       ),
     [changePriceBudget],
+  );
+  const durationPressHandlers = useMemo(
+    () =>
+      new Map(
+        PLAN_DURATIONS.map(duration => [
+          duration,
+          () => selectPlanDuration(duration),
+        ]),
+      ),
+    [selectPlanDuration],
   );
   const datePressHandlers = useMemo(
     () =>
@@ -527,7 +574,7 @@ const WeeklyMealPlanScreen = () => {
               ? 'Đã gửi các món đã chọn vào thực đơn/bình chọn gia đình.'
               : `Đã lưu ${
                   response.data?.savedCount ?? 0
-                } món vào thực đơn 7 ngày.`),
+                    } món vào thực đơn ${planDuration} ngày.`),
           response.data?.skippedPeriods?.length
             ? `Các bữa được giữ nguyên: ${formatSkippedMealPeriods(
                 response.data.skippedPeriods,
@@ -548,6 +595,7 @@ const WeeklyMealPlanScreen = () => {
   }, [
     dispatch,
     household,
+    planDuration,
     planMode,
     state.days,
     state.saving,
@@ -606,6 +654,36 @@ const WeeklyMealPlanScreen = () => {
       state.loading,
       state.saving,
     ],
+  );
+  const renderPlanDurationOption = useCallback(
+    (duration: PlanDuration) => {
+      const selected = duration === planDuration;
+      return (
+        <Pressable
+          key={duration}
+          accessibilityRole="button"
+          accessibilityLabel={`Tạo thực đơn ${duration} ngày`}
+          accessibilityState={{ selected }}
+          disabled={state.loading || state.saving}
+          onPress={durationPressHandlers.get(duration)}
+          style={[
+            styles.budgetButton,
+            selected && styles.budgetButtonSelected,
+            (state.loading || state.saving) && styles.disabled,
+          ]}
+        >
+          <Text
+            style={[
+              styles.budgetButtonText,
+              selected && styles.budgetButtonTextSelected,
+            ]}
+          >
+            {duration} ngày
+          </Text>
+        </Pressable>
+      );
+    },
+    [durationPressHandlers, planDuration, state.loading, state.saving],
   );
   const renderDateOption = useCallback(
     (day: PlanDay) => {
@@ -808,39 +886,51 @@ const WeeklyMealPlanScreen = () => {
         .map(formatSavedMealBudget)
         .join(' · ')}. Gợi ý được ưu tiên theo giới hạn này.`
     : 'Có thể đặt ngân sách tổng cho từng bữa trong mục Quản lý chi tiêu.';
+  const planModeSwitcher = household ? (
+    <HouseholdScopeSwitch
+      enabled={planMode === 'FAMILY'}
+      householdAvailable
+      personalLabel="Kế hoạch cá nhân"
+      householdLabel="Kế hoạch cho gia đình"
+      variant="swap"
+      swapTitle={null}
+      swapPersonalLabel="Cá nhân"
+      swapHouseholdLabel="Gia đình"
+      compact
+      disabled={state.loading || state.saving}
+      onToggle={handleTogglePlanMode}
+    />
+  ) : null;
+  const regenerateButton = state.days.length ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Tạo lại kế hoạch"
+      disabled={state.loading || state.saving}
+      onPress={generatePlan}
+      style={[
+        styles.regenerateButton,
+        (state.loading || state.saving) && styles.disabled,
+      ]}
+    >
+      {state.loading ? (
+        <ActivityIndicator color={COLORS.green} />
+      ) : (
+        <Text style={styles.regenerateIcon}>↻</Text>
+      )}
+    </Pressable>
+  ) : null;
 
   return (
     <View style={styles.screen}>
       <ScreenHeader
         eyebrow="HEALTH AI COACH"
-        title="Thực đơn 7 ngày"
+        title={`Thực đơn ${planDuration} ngày`}
         rightAction={
-          state.days.length ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Tạo lại kế hoạch"
-              disabled={state.loading || state.saving}
-              onPress={generatePlan}
-              style={[
-                styles.regenerateButton,
-                (state.loading || state.saving) && styles.disabled,
-              ]}
-            >
-              {state.loading ? (
-                <ActivityIndicator color={COLORS.green} />
-              ) : (
-                <Svg width={22} height={22} viewBox="0 0 24 24">
-                  <Path
-                    d="M4 7h16l-3-3m3 3-3 3M20 17H4l3 3m-3-3 3-3"
-                    fill="none"
-                    stroke={COLORS.green}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.8}
-                  />
-                </Svg>
-              )}
-            </Pressable>
+          household || regenerateButton ? (
+            <View style={styles.headerActions}>
+              {planModeSwitcher}
+              {regenerateButton}
+            </View>
           ) : null
         }
       />
@@ -852,17 +942,41 @@ const WeeklyMealPlanScreen = () => {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <HouseholdScopeSwitch
-          enabled={planMode === 'FAMILY'}
-          householdAvailable={Boolean(household)}
-          personalLabel="Kế hoạch cá nhân"
-          householdLabel="Kế hoạch cho gia đình"
-          variant="swap"
-          swapPersonalLabel="Cá nhân"
-          swapHouseholdLabel="Gia đình"
+        <Text style={styles.budgetLabel}>Tạo thực đơn cho</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Thời lượng thực đơn: ${planDuration} ngày`}
+          accessibilityHint={
+            durationOptionsVisible
+              ? 'Đóng danh sách thời lượng'
+              : 'Mở danh sách để chọn thời lượng'
+          }
+          accessibilityState={{ expanded: durationOptionsVisible }}
           disabled={state.loading || state.saving}
-          onToggle={handleTogglePlanMode}
-        />
+          onPress={toggleDurationOptions}
+          style={styles.budgetDropdown}
+        >
+          <Text style={styles.budgetDropdownValue}>{planDuration} ngày</Text>
+          <Svg width={18} height={18} viewBox="0 0 24 24">
+            <Path
+              d={
+                durationOptionsVisible
+                  ? 'm6 15 6-6 6 6'
+                  : 'm6 9 6 6 6-6'
+              }
+              fill="none"
+              stroke={COLORS.green}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+            />
+          </Svg>
+        </Pressable>
+        {durationOptionsVisible ? (
+          <View style={styles.budgetOptions}>
+            {PLAN_DURATIONS.map(renderPlanDurationOption)}
+          </View>
+        ) : null}
         <Text style={styles.budgetLabel}>Ngân sách mỗi khẩu phần</Text>
         <Pressable
           accessibilityRole="button"
@@ -882,9 +996,20 @@ const WeeklyMealPlanScreen = () => {
           <Text style={styles.budgetDropdownValue}>
             {selectedBudget?.label ?? '30–60 nghìn'} đồng
           </Text>
-          <Text style={styles.budgetDropdownChevron}>
-            {budgetOptionsVisible ? '⌃' : '⌄'}
-          </Text>
+          <Svg width={18} height={18} viewBox="0 0 24 24">
+            <Path
+              d={
+                budgetOptionsVisible
+                  ? 'm6 15 6-6 6 6'
+                  : 'm6 9 6 6 6-6'
+              }
+              fill="none"
+              stroke={COLORS.green}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+            />
+          </Svg>
         </Pressable>
         {budgetOptionsVisible ? (
           <View style={styles.budgetOptions}>
@@ -914,7 +1039,9 @@ const WeeklyMealPlanScreen = () => {
             {state.loading ? (
               <ActivityIndicator color={COLORS.white} />
             ) : (
-              <Text style={styles.primaryButtonText}>Tạo kế hoạch 7 ngày</Text>
+              <Text style={styles.primaryButtonText}>
+                Tạo kế hoạch {planDuration} ngày
+              </Text>
             )}
           </Pressable>
         ) : null}
@@ -929,7 +1056,7 @@ const WeeklyMealPlanScreen = () => {
         ) : null}
         {selectedDayPrice ? (
           <Text style={styles.totalPrice}>
-            Ngày này: {formatEstimatedPrice(selectedDayPrice)} · Cả tuần đã
+            Ngày này: {formatEstimatedPrice(selectedDayPrice)} · Cả kế hoạch đã
             chọn: {formatEstimatedPrice(selectedPlanPrice)}
           </Text>
         ) : null}
@@ -1016,6 +1143,16 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     backgroundColor: COLORS.white,
   },
+  regenerateIcon: {
+    color: COLORS.green,
+    fontSize: 27,
+    lineHeight: 31,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   headerCopy: { flex: 1 },
   eyebrow: {
     color: COLORS.green,
@@ -1079,11 +1216,6 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 12,
     fontWeight: '700',
-  },
-  budgetDropdownChevron: {
-    color: COLORS.green,
-    fontSize: 20,
-    fontWeight: '800',
   },
   budgetHint: {
     marginTop: 5,

@@ -28,6 +28,7 @@ export type Expense = {
   note: string | null;
   mealId: string | null;
   mealName: string | null;
+  imageUrl?: string | null;
   mealPeriod: MealPeriod | null;
   createdByUserId: string | null;
   createdAt: string;

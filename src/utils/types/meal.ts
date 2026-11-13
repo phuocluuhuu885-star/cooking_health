@@ -193,6 +193,7 @@ export type PlannedMeal = {
   addedAt?: string;
   meal: {
     id: string;
+    communityMealId?: string | null;
     name: string;
     description: string | null;
     imageUrl: string | null;
@@ -249,6 +250,7 @@ export type ConsumptionReportResponse = {
 export type DailyConsumedMeal = {
   id: string;
   mealId: string;
+  communityMealId?: string | null;
   name: string;
   imageUrl: string | null;
   mealPeriod: MealPeriod;

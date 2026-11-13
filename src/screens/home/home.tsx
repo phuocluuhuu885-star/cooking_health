@@ -69,6 +69,7 @@ import AICoachBox from './AICoachBox';
 import HouseholdChatButton from '../household/HouseholdChatButton';
 import HouseholdHomeButton from '../household/HouseholdHomeButton';
 import HouseholdNotificationButton from '../household/HouseholdNotificationButton';
+import HomeCommunityMealsSection from './HomeCommunityMealsSection';
 import { createStateSetter } from '../../utils/stateUtils';
 
 const COLORS = {
@@ -759,6 +760,8 @@ const HomeScreen = () => {
           onAiChat={openAiMealChat}
           onMealScan={openAiMealScan}
         />
+
+        <HomeCommunityMealsSection />
 
         <View style={styles.sectionHeader}>
           <View>

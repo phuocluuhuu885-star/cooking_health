@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { DateData } from 'react-native-calendars';
+import { AppImage } from '../../abase/component';
 import type {
   BackendMeal,
   Expense,
@@ -162,16 +163,17 @@ export const IncomeTransactionRow = ({
   );
 
   return (
-    <View style={styles.expenseCard}>
-      <View style={styles.expenseMeta}>
-        <View style={styles.tagWrap}>
-          <Text style={styles.tagIcon}>{category?.icon ?? '💵'}</Text>
-          <Text style={styles.tagText}>{category?.label ?? 'Khác'}</Text>
-        </View>
-        <Text style={styles.expenseDate}>{item.incomeDate}</Text>
+    <View style={styles.expenseRow}>
+      <View style={styles.expenseIcon}>
+        <Text style={styles.expenseIconText}>{category?.icon ?? '💵'}</Text>
       </View>
-      <View style={styles.expenseTitleRow}>
-        <Text style={styles.expenseTitle}>{item.title}</Text>
+      <View style={styles.expenseCopy}>
+        <Text style={styles.expenseTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={styles.expenseMeta}>
+          {category?.label ?? 'Khác'} · {item.incomeDate}
+        </Text>
         {item.note ? (
           <Text style={styles.expenseNote} numberOfLines={1}>
             {item.note}
@@ -261,13 +263,22 @@ export const ExpenseTransactionRow = ({
 }) => {
   const handleEdit = useCallback(() => onEdit(item), [item, onEdit]);
   const handleRemove = useCallback(() => onRemove(item), [item, onRemove]);
+  const category = CATEGORIES.find(
+    expenseCategory => expenseCategory.id === item.category,
+  );
 
   return (
     <View style={styles.expenseRow}>
       <View style={styles.expenseIcon}>
-        <Text style={styles.expenseIconText}>
-          {item.source === 'MEAL' ? '🍽' : '₫'}
-        </Text>
+        {item.source === 'MEAL' && item.imageUrl ? (
+          <AppImage
+            source={{ uri: item.imageUrl }}
+            style={styles.expenseImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text style={styles.expenseIconText}>{category?.icon ?? '₫'}</Text>
+        )}
       </View>
       <View style={styles.expenseCopy}>
         <Text style={styles.expenseTitle} numberOfLines={1}>

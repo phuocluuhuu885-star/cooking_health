@@ -2,11 +2,13 @@ import type { RootStackParamList } from './types/navigation';
 import { CommonActions } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 let navigation: StackNavigationProp<RootStackParamList>;
+const pendingNavigationActions: Array<() => void> = [];
 
 export const onSetNavigation = (
   navi: StackNavigationProp<RootStackParamList>,
 ) => {
   navigation = navi;
+  pendingNavigationActions.splice(0).forEach(action => action());
 };
 
 type NavigateArgs<RouteName extends keyof RootStackParamList> =
@@ -27,6 +29,18 @@ export const navigate = <RouteName extends keyof RootStackParamList>(
   } else {
     navigation.dispatch(CommonActions.navigate(screenKey, params));
   }
+};
+
+export const navigateWhenReady = <RouteName extends keyof RootStackParamList>(
+  screenKey: RouteName,
+  ...args: NavigateArgs<RouteName>
+) => {
+  const action = () => navigate(screenKey, ...args);
+  if (navigation) {
+    action();
+    return;
+  }
+  pendingNavigationActions.push(action);
 };
 
 export const resetTo = (screenKey: string, params?: any) => {

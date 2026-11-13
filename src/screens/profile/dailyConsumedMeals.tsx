@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Image } from 'react-native';
+import { AppImage } from '../../abase/component';
 import type {
   DailyConsumedMeal,
   DailyConsumedMealsCardProps,
@@ -44,7 +44,7 @@ const DailyConsumedMealRow = memo(
         style={styles.item}
       >
         {item.imageUrl?.trim() ? (
-          <Image
+          <AppImage
             source={{ uri: item.imageUrl.trim() }}
             style={styles.mealImage}
             resizeMode="cover"

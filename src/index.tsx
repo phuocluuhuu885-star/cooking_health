@@ -11,6 +11,7 @@ import { setupStore } from './reduxs/store';
 import type { StoreAndPersistor } from './reduxs/store';
 import HouseholdMealReminderProvider from './screens/household/HouseholdMealReminderProvider';
 import { FullscreenAdProvider } from './screens/component/FullscreenAdProvider';
+import PushNotificationProvider from './screens/component/PushNotificationProvider';
 import { createStateSetter } from './utils/stateUtils';
 import eventEmitter, { EventName } from './utils/eventEmitter';
 import { logOutUser, selectUserInfo } from './reduxs/reduces/user';
@@ -166,13 +167,15 @@ export default function App() {
           loading={<LoadingScreen />}
           persistor={storeAndPersistor.persistor}
         >
-          <FullscreenAdProvider>
-            <HouseholdMealReminderProvider>
-              <StackNavigation />
-              <AuthSessionExpiredHandler />
-              <LoadingIndicator />
-            </HouseholdMealReminderProvider>
-          </FullscreenAdProvider>
+          <PushNotificationProvider>
+            <FullscreenAdProvider>
+              <HouseholdMealReminderProvider>
+                <StackNavigation />
+                <AuthSessionExpiredHandler />
+                <LoadingIndicator />
+              </HouseholdMealReminderProvider>
+            </FullscreenAdProvider>
+          </PushNotificationProvider>
         </PersistGate>
       </Provider>
     </SafeAreaProvider>

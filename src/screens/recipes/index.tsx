@@ -581,6 +581,10 @@ const RecipeLibrary = () => {
     navigate(ScreenKeys.RECIPE_DETAIL, { mealId: recipeId });
   }, []);
 
+  const handleOpenCommunityMeals = useCallback(() => {
+    navigate(ScreenKeys.COMMUNITY_MEALS);
+  }, []);
+
   const isUnfilteredCatalog =
     state.search.trim().length === 0 && state.selectedCategory === 'all';
   const reviewMealIds = (
@@ -869,7 +873,15 @@ const RecipeLibrary = () => {
         >
           <Text style={styles.eyebrow}>BẾP CỦA BẠN</Text>
           <Text style={styles.title}>Khám phá món ngon</Text>
-          <Text style={styles.subtitle}>Tìm cảm hứng cho bữa ăn tiếp theo</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleOpenCommunityMeals}
+            style={styles.communityButton}
+          >
+            <Text style={styles.communityButtonText}>
+              Món ăn từ cộng đồng  →
+            </Text>
+          </Pressable>
           {aiSuggestionError ? (
             <Text style={styles.aiSuggestionHint}>{aiSuggestionError}</Text>
           ) : null}
@@ -1033,6 +1045,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#172B23',
     letterSpacing: -0.7,
+  },
+  communityButton: {
+    alignSelf: 'flex-start',
+    minHeight: 36,
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#E6F3E9',
+  },
+  communityButtonText: {
+    color: '#168653',
+    fontSize: 12,
+    fontWeight: '800',
   },
   subtitle: {
     marginTop: 4,

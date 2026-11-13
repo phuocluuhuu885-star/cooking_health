@@ -129,6 +129,7 @@ export type HouseholdMealPollOption = {
   };
   meal: {
     id: string;
+    communityMealId?: string | null;
     name: string;
     description?: string | null;
     imageUrl: string | null;

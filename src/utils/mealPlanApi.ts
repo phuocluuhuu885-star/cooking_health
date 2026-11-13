@@ -20,7 +20,8 @@ export const addMealToPlan = async (
   user: UserInfo,
   destination: MealPlanDestination,
   data: {
-    mealId: string;
+    mealId?: string;
+    communityMealId?: string;
     date: string;
     mealPeriod: MealPeriod;
     servings?: number;

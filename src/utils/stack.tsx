@@ -23,6 +23,10 @@ import HealthDashboardScreen from '../screens/home/HealthDashboardScreen';
 import ExpenseManagementScreen from '../screens/profile/ExpenseManagementScreen';
 import ExpenseReportScreen from '../screens/profile/ExpenseReportScreen';
 import HouseholdHealthScreen from '../screens/household/HouseholdHealthScreen';
+import CommunityMealsScreen from '../screens/community/CommunityMealsScreen';
+import CommunityCreatorMealsScreen from '../screens/community/CommunityCreatorMealsScreen';
+import ShareCommunityMealScreen from '../screens/community/ShareCommunityMealScreen';
+import CommunityMealDetailScreen from '../screens/community/CommunityMealDetailScreen';
 
 const HomeStack = createStackNavigator<RootStackParamList>({
   initialRouteName: ScreenKeys.PRIVACY_POLICY,
@@ -32,6 +36,10 @@ const HomeStack = createStackNavigator<RootStackParamList>({
     [ScreenKeys.LOGIN]: Login,
     [ScreenKeys.RECIPE_DETAIL]: RecipeDetail,
     [ScreenKeys.MEAL_REVIEWS]: MealReviewsScreen,
+    [ScreenKeys.COMMUNITY_MEALS]: CommunityMealsScreen,
+    [ScreenKeys.COMMUNITY_CREATOR_MEALS]: CommunityCreatorMealsScreen,
+    [ScreenKeys.SHARE_COMMUNITY_MEAL]: ShareCommunityMealScreen,
+    [ScreenKeys.COMMUNITY_MEAL_DETAIL]: CommunityMealDetailScreen,
     [ScreenKeys.WALKING]: WalkingScreen,
     [ScreenKeys.PERSONAL_INFO]: PersonalInfoScreen,
     [ScreenKeys.DAILY_CONSUMED_MEALS]: DailyConsumedMealsScreen,

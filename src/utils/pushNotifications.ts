@@ -1,31 +1,30 @@
 import { Platform } from 'react-native';
-import notifee, {
-  AndroidImportance,
-  AuthorizationStatus,
-  EventType,
-} from '@notifee/react-native';
-import {
-  getMessaging,
-  getToken,
-  getInitialNotification,
-  onMessage,
-  onNotificationOpenedApp,
-  onTokenRefresh,
-  setBackgroundMessageHandler,
-  type RemoteMessage,
-} from '@react-native-firebase/messaging';
+import type { RemoteMessage } from '@react-native-firebase/messaging';
+
+type NotifeeModule = typeof import('@notifee/react-native');
+type FirebaseMessagingModule = typeof import('@react-native-firebase/messaging');
+
+const loadNotifee = () =>
+  require('@notifee/react-native') as NotifeeModule;
+const loadFirebaseMessaging = () =>
+  require('@react-native-firebase/messaging') as FirebaseMessagingModule;
 
 const ANDROID_CHANNEL_ID = 'mealcraft_general';
 const ANDROID_CHANNEL_NAME = 'Thông báo MealCraft';
 
-const ensureAndroidNotificationChannel = () =>
-  notifee.createChannel({
+const ensureAndroidNotificationChannel = () => {
+  const { AndroidImportance, default: notifee } = loadNotifee();
+  return notifee.createChannel({
     id: ANDROID_CHANNEL_ID,
     name: ANDROID_CHANNEL_NAME,
     importance: AndroidImportance.DEFAULT,
   });
+};
 
 const showRemoteNotification = async (message: RemoteMessage) => {
+  if (Platform.OS !== 'android') return;
+
+  const { default: notifee } = loadNotifee();
   const dataTitle = message.data?.title;
   const dataBody = message.data?.body;
   const title =
@@ -37,21 +36,15 @@ const showRemoteNotification = async (message: RemoteMessage) => {
 
   if (!body) return;
 
-  const notificationPlatform =
-    Platform.OS === 'android'
-      ? {
-          android: {
-            channelId: await ensureAndroidNotificationChannel(),
-            smallIcon: 'ic_notification',
-            pressAction: { id: 'default' },
-          },
-        }
-      : { ios: { sound: 'default' } };
   await notifee.displayNotification({
     title,
     body,
     data: message.data,
-    ...notificationPlatform,
+    android: {
+      channelId: await ensureAndroidNotificationChannel(),
+      smallIcon: 'ic_notification',
+      pressAction: { id: 'default' },
+    },
   });
 };
 
@@ -60,6 +53,8 @@ export const registerForPushNotifications = async () => {
     return null;
   }
 
+  const { AuthorizationStatus, default: notifee } = loadNotifee();
+  const { getMessaging, getToken } = loadFirebaseMessaging();
   const settings = await notifee.requestPermission();
   if (settings.authorizationStatus < AuthorizationStatus.AUTHORIZED) {
     return null;
@@ -76,6 +71,18 @@ export const subscribeToPushNotifications = ({
   onToken: (token: string) => void;
   onOpenNotification: () => void;
 }) => {
+  if (Platform.OS !== 'android') {
+    return () => {};
+  }
+
+  const { EventType, default: notifee } = loadNotifee();
+  const {
+    getInitialNotification,
+    getMessaging,
+    onMessage,
+    onNotificationOpenedApp,
+    onTokenRefresh,
+  } = loadFirebaseMessaging();
   const messaging = getMessaging();
   const unsubscribeMessage = onMessage(messaging, message => {
     showRemoteNotification(message).catch(error => {
@@ -119,6 +126,10 @@ export const subscribeToPushNotifications = ({
 };
 
 export const configureBackgroundPushNotifications = () => {
+  if (Platform.OS !== 'android') return;
+
+  const { getMessaging, setBackgroundMessageHandler } =
+    loadFirebaseMessaging();
   setBackgroundMessageHandler(getMessaging(), async message => {
     if (message.notification) return;
     await showRemoteNotification(message);

@@ -7,6 +7,14 @@ export type RootStackParamList = {
   [ScreenKeys.LOGIN]: undefined;
   [ScreenKeys.RECIPE_DETAIL]: { mealId: string };
   [ScreenKeys.MEAL_REVIEWS]: { mealId: string; mealName: string };
+  [ScreenKeys.COMMUNITY_MEALS]: undefined;
+  [ScreenKeys.COMMUNITY_CREATOR_MEALS]: {
+    creatorId: string;
+    creatorName: string;
+    creatorAvatar: string | null;
+  };
+  [ScreenKeys.SHARE_COMMUNITY_MEAL]: undefined;
+  [ScreenKeys.COMMUNITY_MEAL_DETAIL]: { mealId: string };
   [ScreenKeys.WALKING]: undefined;
   [ScreenKeys.PERSONAL_INFO]: { section?: 'BASIC' | 'PASSWORD' } | undefined;
   [ScreenKeys.DAILY_CONSUMED_MEALS]: undefined;

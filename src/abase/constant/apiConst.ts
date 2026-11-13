@@ -10,6 +10,15 @@ type API = {
   updateAvatar: ApiType;
   getMealDetail: ApiType;
   searchMeals: ApiType;
+  getCommunityMeals: ApiType;
+  getCommunityMeal: ApiType;
+  favoriteCommunityMeal: ApiType;
+  unfavoriteCommunityMeal: ApiType;
+  createCommunityMeal: ApiType;
+  deleteCommunityMeal: ApiType;
+  analyzeCommunityMealNutrition: ApiType;
+  getCommunityMealReviews: ApiType;
+  upsertCommunityMealReview: ApiType;
   getMealPlan: ApiType;
   addMealToPlan: ApiType;
   deleteMealFromPlan: ApiType;
@@ -103,6 +112,43 @@ const apiConst: API = {
   searchMeals: {
     method: 'get',
     url: 'api/meal/search',
+  },
+  getCommunityMeals: {
+    method: 'get',
+    url: 'api/community-meals',
+  },
+  getCommunityMeal: {
+    method: 'get',
+    url: 'api/community-meals/:id',
+  },
+  favoriteCommunityMeal: {
+    method: 'put',
+    url: 'api/community-meals/:id/favorite',
+  },
+  unfavoriteCommunityMeal: {
+    method: 'delete',
+    url: 'api/community-meals/:id/favorite',
+  },
+  createCommunityMeal: {
+    method: 'post',
+    url: 'api/community-meals',
+  },
+  deleteCommunityMeal: {
+    method: 'delete',
+    url: 'api/community-meals/:id',
+  },
+  analyzeCommunityMealNutrition: {
+    method: 'post',
+    url: 'api/community-meals/analyze-nutrition',
+    timeout: 50000,
+  },
+  getCommunityMealReviews: {
+    method: 'get',
+    url: 'api/community-meals/:id/reviews',
+  },
+  upsertCommunityMealReview: {
+    method: 'post',
+    url: 'api/community-meals/:id/reviews',
   },
   getMealPlan: {
     method: 'get',
