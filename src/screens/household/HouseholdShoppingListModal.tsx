@@ -14,6 +14,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import LinearGradient from '../../components/LinearGradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { HouseholdShoppingItem, MealPeriod } from '../../utils/types';
@@ -223,7 +224,15 @@ const HouseholdShoppingListModal = ({
             onPress={onClose}
             style={styles.closeButton}
           >
-            <Text style={styles.closeText}>Đóng</Text>
+            <Svg width={18} height={18} viewBox="0 0 24 24">
+              <Path
+                d="m6 6 12 12M18 6 6 18"
+                fill="none"
+                stroke={COLORS.green}
+                strokeLinecap="round"
+                strokeWidth={2}
+              />
+            </Svg>
           </Pressable>
         </View>
 
@@ -427,15 +436,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   closeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
     backgroundColor: COLORS.lightGreen,
-  },
-  closeText: {
-    color: COLORS.green,
-    fontSize: 12,
-    fontWeight: '800',
   },
   summary: {
     paddingHorizontal: 18,

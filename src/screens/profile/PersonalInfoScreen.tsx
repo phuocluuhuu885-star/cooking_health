@@ -234,14 +234,20 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
       if (!selectedAvatar) return;
 
       const response = await updateUserAvatar(user, selectedAvatar);
-      if (!response.success || !response.data?.user) {
+      const savedAvatar = response.data?.user?.avatar;
+      if (
+        !response.success ||
+        typeof savedAvatar !== 'string' ||
+        savedAvatar.trim().length === 0
+      ) {
         Alert.alert(
           'Không thể cập nhật ảnh',
-          response.message || 'Vui lòng thử lại.',
+          response.message ||
+            'Máy chủ chưa trả về đường dẫn ảnh đã lưu. Vui lòng thử lại hoặc liên hệ hỗ trợ.',
         );
         return;
       }
-      dispatch(updateAvatarState({ avatar: response.data.user.avatar }));
+      dispatch(updateAvatarState({ avatar: savedAvatar }));
       Alert.alert('Đã cập nhật', 'Ảnh đại diện của bạn đã được cập nhật.');
     } catch (error) {
       Alert.alert(
@@ -419,7 +425,7 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
     }
     Alert.alert(
       'Thu hồi đồng ý dùng gợi ý AI?',
-      'HealthAndCook sẽ ngừng gửi dữ liệu dinh dưỡng cho Gemini trên thiết bị này. Gợi ý AI đã tải sẽ bị xóa khỏi màn hình.',
+      'Ứng dụng sẽ ngừng gửi dữ liệu dinh dưỡng cho Gemini trên thiết bị này. Gợi ý AI đã tải sẽ bị xóa khỏi màn hình.',
       [
         { text: 'Hủy', style: 'cancel' },
         {
@@ -490,12 +496,7 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
           ) : null}
 
           {section === 'BASIC' ? (
-            <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
-              <Text style={styles.sectionTitle}>Thông tin cơ bản</Text>
-              <Text style={styles.description}>
-                Cập nhật ảnh đại diện và tên hiển thị trong tài khoản
-                HealthAndCook.
-              </Text>
+            <View style={styles.formContent}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Chọn ảnh đại diện"
@@ -572,16 +573,11 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
                   <Text style={styles.primaryButtonText}>Lưu thông tin</Text>
                 )}
               </Pressable>
-            </LinearGradient>
+            </View>
           ) : null}
 
           {section === 'PASSWORD' ? (
-            <LinearGradient colors={['#FFFFFF', '#F3FAF5']} style={styles.card}>
-              <Text style={styles.sectionTitle}>Đổi mật khẩu</Text>
-              <Text style={styles.description}>
-                Nhập mật khẩu hiện tại để xác nhận thay đổi.
-              </Text>
-
+            <View style={styles.formContent}>
               <PasswordField
                 label="Mật khẩu hiện tại"
                 value={state.currentPassword}
@@ -623,7 +619,7 @@ const PersonalInfoScreen = ({ route }: PersonalInfoScreenProps) => {
                   </Text>
                 )}
               </Pressable>
-            </LinearGradient>
+            </View>
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -740,6 +736,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+  formContent: {
+    paddingHorizontal: 2,
   },
   optionsList: {
     gap: 8,

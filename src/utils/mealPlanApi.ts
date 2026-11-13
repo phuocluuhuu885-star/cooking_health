@@ -23,14 +23,17 @@ export const addMealToPlan = async (
     mealId: string;
     date: string;
     mealPeriod: MealPeriod;
+    servings?: number;
   },
 ) => {
   setSyncUser(user);
+  const servings =
+    destination === 'HOUSEHOLD' ? Math.max(1, data.servings ?? 1) : 1;
   return (await syncApi(
     destination === 'HOUSEHOLD'
       ? apiConst.addMealToHouseholdPlan
       : apiConst.addMealToPlan,
-    { ...data, servings: 1 },
+    { ...data, servings },
   )) as AddMealToPlanResponse;
 };
 

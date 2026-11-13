@@ -2,7 +2,6 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import {
@@ -16,8 +15,6 @@ import {
   View,
 } from 'react-native';
 import LinearGradient from '../../components/LinearGradient';
-import { useIsFocused } from '@react-navigation/native';
-import { TestIds, useInterstitialAd } from 'react-native-google-mobile-ads';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppImage } from '../../abase/component';
 import LoginRequiredModal from '../component/LoginRequiredModal';
@@ -45,10 +42,9 @@ import {
 } from '../../utils/mealReviewApi';
 import { createStateSetter } from '../../utils/stateUtils';
 import { formatNumberWithOptionalDecimal } from '../../utils/numberUtils';
-import { localStorage } from '../../utils/storage';
-import { initializeGoogleMobileAds } from '../../utils/googleMobileAds';
 import MealPlanComposerModal from './MealPlanComposerModal';
 import MealReviewModal from './MealReviewModal';
+import { useFullscreenAdOnFocus } from '../component/FullscreenAdProvider';
 import type {
   MealPeriod,
   MealPlanDestination,
@@ -67,13 +63,9 @@ const CATEGORY_LABELS: Record<RecipeDetailMeal['category'], string> = {
   DINNER: 'Bữa tối',
   SNACK: 'Ăn nhẹ',
 };
-const INTERSTITIAL_COOLDOWN_MS = 5 * 60 * 1000;
-const INTERSTITIAL_LOAD_TIMEOUT_MS = 10 * 1000;
-const LAST_INTERSTITIAL_SHOWN_KEY = 'recipe-detail-interstitial-last-shown';
-
 const RecipeDetail = (props: RecipeDetailScreenProps) => {
+  useFullscreenAdOnFocus();
   const insets = useSafeAreaInsets();
-  const isFocused = useIsFocused();
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
   const household = useSelector(selectCurrentHousehold);
@@ -81,8 +73,6 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
   const mealPlanDestination = useSelector(selectMealPlanDestination);
   const [loginPromptVisible, setLoginPromptVisible] = useState(false);
   const [reviewPreview, setReviewPreview] = useState<MealReview[]>([]);
-  const [adLoadStarted, setAdLoadStarted] = useState(false);
-  const [adGateComplete, setAdGateComplete] = useState(false);
   const [state, setState] = useState<RecipeDetailState>({
     servings: 1,
     reloadIndex: 0,
@@ -104,18 +94,6 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
     reviewModalVisible,
     reviewSummary,
   } = state;
-  const {
-    status: interstitialStatus,
-    error: interstitialError,
-    load: loadInterstitial,
-    show: showInterstitial,
-  } = useInterstitialAd({
-    adUnitId: TestIds.INTERSTITIAL,
-    autoLoad: false,
-    requestOptions: { requestNonPersonalizedAdsOnly: true },
-  });
-  const adLoadStartedRef = useRef(false);
-  const adShowAttemptedRef = useRef(false);
   const setComposerVisible = useMemo(
     () => createStateSetter(setState, 'composerVisible'),
     [setState],
@@ -133,93 +111,6 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
     [setState],
   );
   const mealId = props.route.params.mealId;
-  useEffect(() => {
-    if (adLoadStartedRef.current || adGateComplete) {
-      return;
-    }
-
-    if (!user?.accessToken) {
-      setAdGateComplete(true);
-      return;
-    }
-
-    const lastShownAt =
-      localStorage.getNumber(LAST_INTERSTITIAL_SHOWN_KEY) ?? 0;
-    if (Date.now() - lastShownAt < INTERSTITIAL_COOLDOWN_MS) {
-      setAdGateComplete(true);
-      return;
-    }
-
-    adLoadStartedRef.current = true;
-    setAdLoadStarted(true);
-    initializeGoogleMobileAds()
-      .then(() => {
-        loadInterstitial();
-      })
-      .catch(adError => {
-        console.error('Failed to initialize Google Mobile Ads SDK', adError);
-        setAdGateComplete(true);
-      });
-  }, [adGateComplete, loadInterstitial, user?.accessToken]);
-
-  useEffect(() => {
-    if (
-      !adLoadStarted ||
-      adGateComplete ||
-      interstitialStatus === 'loaded' ||
-      interstitialStatus === 'showing'
-    ) {
-      return undefined;
-    }
-    const timeout = setTimeout(
-      () => setAdGateComplete(true),
-      INTERSTITIAL_LOAD_TIMEOUT_MS,
-    );
-    return () => clearTimeout(timeout);
-  }, [adGateComplete, adLoadStarted, interstitialStatus]);
-
-  useEffect(() => {
-    if (!isFocused || !adLoadStarted || adGateComplete) {
-      return;
-    }
-    if (interstitialStatus === 'loaded' && !adShowAttemptedRef.current) {
-      adShowAttemptedRef.current = true;
-      try {
-        showInterstitial();
-      } catch (adError) {
-        console.error('Failed to show recipe detail interstitial ad', adError);
-        setAdGateComplete(true);
-      }
-      return;
-    }
-    if (
-      interstitialStatus === 'closed' ||
-      interstitialStatus === 'no-fill' ||
-      interstitialStatus === 'error'
-    ) {
-      setAdGateComplete(true);
-    }
-  }, [
-    adGateComplete,
-    adLoadStarted,
-    interstitialStatus,
-    isFocused,
-    showInterstitial,
-  ]);
-
-  useEffect(() => {
-    if (interstitialStatus === 'showing') {
-      localStorage.set(LAST_INTERSTITIAL_SHOWN_KEY, Date.now());
-    }
-  }, [interstitialStatus]);
-
-  useEffect(() => {
-    if (interstitialError) {
-      console.warn('Recipe detail interstitial ad failed', interstitialError);
-      setAdGateComplete(true);
-    }
-  }, [interstitialError]);
-
   const composerRecipe = useMemo<Recipe | null>(
     () =>
       meal
@@ -334,21 +225,6 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
       reloadIndex: previous.reloadIndex + 1,
     }));
   }, [setState]);
-  const adjustServings = useCallback(
-    (amount: number) => {
-      setState(previous => ({
-        ...previous,
-        servings: Math.max(1, Math.min(20, previous.servings + amount)),
-      }));
-    },
-    [setState],
-  );
-  const decreaseServings = useCallback(() => {
-    adjustServings(-1);
-  }, [adjustServings]);
-  const increaseServings = useCallback(() => {
-    adjustServings(1);
-  }, [adjustServings]);
   const handleViewReviews = useCallback(() => {
     if (meal) {
       navigate(ScreenKeys.MEAL_REVIEWS, {
@@ -512,6 +388,10 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
           mealId: meal.id,
           date,
           mealPeriod,
+          servings:
+            destination === 'HOUSEHOLD'
+              ? Math.max(1, activeHousehold?.members.length ?? 1)
+              : 1,
         });
         if (!response?.success) {
           Alert.alert(
@@ -574,15 +454,11 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
     ],
   );
 
-  if (!adGateComplete || loading) {
+  if (loading) {
     return (
       <View style={[styles.statusScreen, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={COLORS.green} />
-        <Text style={styles.statusMessage}>
-          {!adGateComplete
-            ? 'Đang chuẩn bị nội dung...'
-            : 'Đang tải công thức...'}
-        </Text>
+        <Text style={styles.statusMessage}>Đang tải công thức...</Text>
       </View>
     );
   }
@@ -692,7 +568,7 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: insets.bottom + 32 },
+          { paddingBottom: insets.bottom + 112 },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -715,18 +591,6 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
               {CATEGORY_LABELS[meal.category]}
             </Text>
           </View>
-        </View>
-
-        <View style={styles.heroActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Thêm món vào thực đơn"
-            onPress={handleOpenComposer}
-            style={styles.addToPlanButton}
-          >
-            <Text style={styles.addToPlanIcon}>+</Text>
-            <Text style={styles.addToPlanButtonText}>Thêm vào thực đơn</Text>
-          </Pressable>
         </View>
 
         <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.section}>
@@ -779,45 +643,6 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
               <Text style={styles.quickInfoValue}>
                 {meal.prepTimeMinutes + meal.cookTimeMinutes} phút
               </Text>
-            </View>
-          </View>
-        </LinearGradient>
-
-        <LinearGradient colors={['#FFFFFF', '#F2F8F4']} style={styles.section}>
-          <Text style={styles.sectionTitle}>Khẩu phần</Text>
-          <Text style={styles.sectionSubtitle}>
-            Nguyên liệu và dinh dưỡng được cập nhật theo số người
-          </Text>
-          <View style={styles.servingSelector}>
-            <View style={styles.servingControl}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Giảm khẩu phần"
-                disabled={servings <= 1}
-                onPress={decreaseServings}
-                style={[
-                  styles.servingButton,
-                  servings <= 1 && styles.disabledButton,
-                ]}
-              >
-                <Text style={styles.servingButtonText}>−</Text>
-              </Pressable>
-              <View style={styles.servingValueContainer}>
-                <Text style={styles.servingValue}>{servings}</Text>
-                <Text style={styles.servingUnit}>khẩu phần</Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Tăng khẩu phần"
-                disabled={servings >= 20}
-                onPress={increaseServings}
-                style={[
-                  styles.servingButton,
-                  servings >= 20 && styles.disabledButton,
-                ]}
-              >
-                <Text style={styles.servingButtonText}>+</Text>
-              </Pressable>
             </View>
           </View>
         </LinearGradient>
@@ -938,6 +763,21 @@ const RecipeDetail = (props: RecipeDetailScreenProps) => {
           nguyên liệu thực tế.
         </Text>
       </ScrollView>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Thêm món vào thực đơn"
+        onPress={handleOpenComposer}
+        style={[styles.addMealFab, { bottom: insets.bottom + 20 }]}
+      >
+        <LinearGradient
+          colors={['#168653', '#0D6B40']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.addMealFabGradient}
+        >
+          <Text style={styles.addMealFabIcon}>+</Text>
+        </LinearGradient>
+      </Pressable>
       <MealPlanComposerModal
         visible={composerVisible}
         recipe={composerRecipe}
@@ -996,7 +836,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   content: {
-    paddingBottom: 24,
+    paddingBottom: 112,
   },
   hero: {
     height: 280,
@@ -1100,31 +940,30 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     backgroundColor: COLORS.border,
   },
-  heroActions: {
-    alignItems: 'flex-end',
-    marginHorizontal: 16,
-    marginTop: 10,
+  addMealFab: {
+    position: 'absolute',
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    elevation: 6,
+    shadowColor: '#0D4931',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 7,
   },
-  addToPlanButton: {
-    minHeight: 42,
-    flexDirection: 'row',
+  addMealFabGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
-    paddingHorizontal: 14,
-    borderRadius: 22,
-    backgroundColor: COLORS.green,
+    borderRadius: 30,
   },
-  addToPlanIcon: {
+  addMealFabIcon: {
+    marginTop: -3,
     color: COLORS.white,
-    fontSize: 22,
-    lineHeight: 24,
+    fontSize: 36,
+    lineHeight: 40,
     fontWeight: '500',
-  },
-  addToPlanButtonText: {
-    color: COLORS.white,
-    fontSize: 13,
-    fontWeight: '800',
   },
   ratingStarsButton: {
     alignSelf: 'flex-start',
@@ -1210,52 +1049,6 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
     fontSize: 12,
     lineHeight: 18,
-  },
-  servingControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
-  },
-  servingSelector: {
-    marginTop: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#F7FAF8',
-  },
-  servingValueContainer: {
-    minWidth: 108,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  servingUnit: {
-    marginTop: 2,
-    color: COLORS.secondary,
-    fontSize: 11,
-  },
-  servingButton: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    backgroundColor: COLORS.lightGreen,
-  },
-  servingButtonText: {
-    color: COLORS.green,
-    fontSize: 21,
-    lineHeight: 24,
-    fontWeight: '700',
-  },
-  disabledButton: {
-    opacity: 0.4,
-  },
-  servingValue: {
-    minWidth: 16,
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: '800',
-    textAlign: 'center',
   },
   nutritionCard: {
     marginTop: 12,

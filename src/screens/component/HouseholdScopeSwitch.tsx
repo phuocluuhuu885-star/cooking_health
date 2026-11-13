@@ -7,6 +7,7 @@ type HouseholdScopeSwitchProps = {
   personalLabel: string;
   householdLabel: string;
   variant?: 'toggle' | 'swap';
+  swapTitle?: string | null;
   swapPersonalLabel?: string;
   swapHouseholdLabel?: string;
   description?: string;
@@ -21,6 +22,7 @@ const HouseholdScopeSwitch = memo(
     personalLabel,
     householdLabel,
     variant = 'toggle',
+    swapTitle,
     swapPersonalLabel,
     swapHouseholdLabel,
     description,
@@ -49,7 +51,9 @@ const HouseholdScopeSwitch = memo(
 
       return (
         <View style={styles.swapContainer}>
-          <Text style={styles.title}>Thêm món cho thực đơn</Text>
+          {swapTitle === null ? null : (
+            <Text style={styles.title}>{swapTitle ?? 'Thêm món cho thực đơn'}</Text>
+          )}
           {householdAvailable ? (
             <Pressable
               accessibilityRole="button"

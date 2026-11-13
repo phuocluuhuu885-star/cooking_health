@@ -250,7 +250,6 @@ const EatingProgressScreen = () => {
       <ScreenHeader
         eyebrow="DINH DƯỠNG CỦA BẠN"
         title="Tiến độ ăn uống"
-        subtitle="Hiểu thói quen qua những bữa bạn đã ghi nhận"
       />
       <ScrollView
         contentContainerStyle={[

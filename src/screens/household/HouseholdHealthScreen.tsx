@@ -7,6 +7,15 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, {
+  Circle,
+  Defs,
+  Line,
+  LinearGradient as SvgLinearGradient,
+  Path,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +46,10 @@ const COLORS = {
   warning: '#9A6700',
 };
 
+const CHART_WIDTH = 360;
+const CHART_HEIGHT = 190;
+const CHART_PLOT = { left: 44, right: 348, top: 16, bottom: 142 };
+
 const GOAL_LABELS = {
   LOSE_WEIGHT: 'Giảm cân',
   MAINTAIN: 'Duy trì',
@@ -58,7 +71,13 @@ type ScreenState = {
   detail: HouseholdMemberHealthResponse['data'] | null;
   editVisible: boolean;
   date: string;
+  monthlyReportMonth: string;
+  monthlyCalories: MonthlyReportPoint[] | null;
+  monthlyReportLoading: boolean;
+  monthlyReportError: string;
 };
+
+type MonthlyReportPoint = { date: string; value: number };
 
 const shiftDate = (date: string, days: number) => {
   const shifted = new Date(`${date}T00:00:00.000Z`);
@@ -80,6 +99,24 @@ const formatNumber = (value: number, digits = 0) =>
     maximumFractionDigits: digits,
     minimumFractionDigits: digits,
   }).format(value);
+
+const getMonthDates = (month: string) => {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  const today = getVietnamDateKey();
+
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const day = String(index + 1).padStart(2, '0');
+    return `${month}-${day}`;
+  }).filter(date => date <= today);
+};
+
+const formatMonth = (month: string) =>
+  new Date(`${month}-01T00:00:00.000Z`).toLocaleDateString('vi-VN', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 
 const HouseholdHealthMemberCard = ({
   member,
@@ -148,6 +185,182 @@ const Metric = ({ label, value }: { label: string; value: string }) => (
   </View>
 );
 
+const MonthlyAreaChart = ({
+  data,
+  month,
+  unit,
+  color,
+  gradientId,
+  accessibilityLabel,
+  emptyMessage,
+  targetValue,
+}: {
+  data: MonthlyReportPoint[];
+  month: string;
+  unit: string;
+  color: string;
+  gradientId: string;
+  accessibilityLabel: string;
+  emptyMessage: string;
+  targetValue?: number;
+}) => {
+  const daysInMonth = new Date(
+    Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0),
+  ).getUTCDate();
+  const values = data.map(point => point.value);
+  const maxValue = Math.max(
+    ...values,
+    targetValue ?? 0,
+    unit === 'kcal' ? 500 : 0,
+  );
+  const minValue = values.length ? Math.min(...values) : 0;
+  const padding = Math.max((maxValue - minValue) * 0.15, maxValue * 0.05, 1);
+  const lower = unit === 'kcal' ? 0 : Math.max(0, minValue - padding);
+  const upper = maxValue + padding;
+  const plotWidth = CHART_PLOT.right - CHART_PLOT.left;
+  const plotHeight = CHART_PLOT.bottom - CHART_PLOT.top;
+  const xForDay = (day: number) =>
+    CHART_PLOT.left + ((day - 1) / Math.max(daysInMonth - 1, 1)) * plotWidth;
+  const yForValue = (value: number) =>
+    CHART_PLOT.bottom - ((value - lower) / (upper - lower)) * plotHeight;
+  const points = data.map(point => ({
+    x: xForDay(Number(point.date.slice(8, 10))),
+    y: yForValue(point.value),
+    value: point.value,
+    date: point.date,
+  }));
+  const linePath = points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+    .join(' ');
+  const areaPath = points.length
+    ? `${linePath} L ${points[points.length - 1].x} ${CHART_PLOT.bottom} L ${
+        points[0].x
+      } ${CHART_PLOT.bottom} Z`
+    : '';
+  const yAxisTicks = [upper, (upper + lower) / 2, lower];
+  const xAxisDays = [...new Set([1, 15, daysInMonth])];
+  const targetY =
+    targetValue != null && targetValue > 0 ? yForValue(targetValue) : null;
+
+  function renderYAxisTick(index: number) {
+    const y = CHART_PLOT.top + (index * plotHeight) / 2;
+    return (
+      <React.Fragment key={index}>
+        <Line
+          x1={CHART_PLOT.left}
+          y1={y}
+          x2={CHART_PLOT.right}
+          y2={y}
+          stroke={COLORS.border}
+          strokeDasharray="3 4"
+        />
+        <SvgText
+          x={CHART_PLOT.left - 7}
+          y={y + 3}
+          textAnchor="end"
+          fontSize={9}
+          fill={COLORS.secondary}
+        >
+          {formatNumber(yAxisTicks[index])}
+        </SvgText>
+      </React.Fragment>
+    );
+  }
+
+  function renderXAxisDay(day: number) {
+    return (
+      <SvgText
+        key={day}
+        x={xForDay(day)}
+        y={CHART_PLOT.bottom + 18}
+        textAnchor="middle"
+        fontSize={9}
+        fill={COLORS.secondary}
+      >
+        {String(day).padStart(2, '0')}
+      </SvgText>
+    );
+  }
+
+  function renderPoint(point: (typeof points)[number], index: number) {
+    return (
+      <Circle
+        key={`${point.date}-${index}`}
+        cx={point.x}
+        cy={point.y}
+        r={3}
+        fill={COLORS.white}
+        stroke={color}
+        strokeWidth={2}
+      />
+    );
+  }
+
+  return (
+    <View>
+      {data.length ? (
+        <>
+          <Text style={styles.chartAxisLabel}>Trục dọc · {unit}</Text>
+          <Svg
+            width="100%"
+            height={CHART_HEIGHT}
+            viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+            accessibilityLabel={accessibilityLabel}
+          >
+            <Defs>
+              <SvgLinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={color} stopOpacity="0.3" />
+                <Stop offset="1" stopColor={color} stopOpacity="0.03" />
+              </SvgLinearGradient>
+            </Defs>
+            {[0, 1, 2].map(renderYAxisTick)}
+            {targetY != null ? (
+              <Line
+                x1={CHART_PLOT.left}
+                y1={targetY}
+                x2={CHART_PLOT.right}
+                y2={targetY}
+                stroke="#E59B2F"
+                strokeDasharray="5 4"
+                strokeWidth={1.5}
+              />
+            ) : null}
+            {areaPath ? (
+              <Path d={areaPath} fill={`url(#${gradientId})`} />
+            ) : null}
+            {points.length > 1 ? (
+              <Path
+                d={linePath}
+                fill="none"
+                stroke={color}
+                strokeWidth={2.5}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            ) : null}
+            {points.map(renderPoint)}
+            {xAxisDays.map(renderXAxisDay)}
+          </Svg>
+          {targetY != null ? (
+            <View style={styles.chartLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: color }]} />
+                <Text style={styles.legendText}>Đã ghi nhận</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={styles.targetLegendLine} />
+                <Text style={styles.legendText}>Mục tiêu calo</Text>
+              </View>
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <Text style={styles.helper}>{emptyMessage}</Text>
+      )}
+    </View>
+  );
+};
+
 const HouseholdHealthScreen = () => {
   const route =
     useRoute<RouteProp<RootStackParamList, typeof ScreenKeys.HOUSEHOLD_HEALTH>>();
@@ -155,6 +368,7 @@ const HouseholdHealthScreen = () => {
   const user = useSelector(selectUserInfo);
   const insets = useSafeAreaInsets();
   const requestId = useRef(0);
+  const monthlyReportRequestId = useRef(0);
   const [state, setState] = useState<ScreenState>({
     loading: true,
     error: '',
@@ -162,7 +376,12 @@ const HouseholdHealthScreen = () => {
     detail: null,
     editVisible: false,
     date: getVietnamDateKey(),
+    monthlyReportMonth: '',
+    monthlyCalories: null,
+    monthlyReportLoading: false,
+    monthlyReportError: '',
   });
+  const month = state.date.slice(0, 7);
 
   const loadData = useCallback(async () => {
     const currentRequestId = ++requestId.current;
@@ -237,6 +456,107 @@ const HouseholdHealthScreen = () => {
     }, [loadData]),
   );
 
+  const loadMonthlyReport = useCallback(async () => {
+    const currentRequestId = ++monthlyReportRequestId.current;
+    if (!memberId) {
+      setState(previous => ({
+        ...previous,
+        monthlyReportMonth: '',
+        monthlyCalories: null,
+        monthlyReportLoading: false,
+        monthlyReportError: '',
+      }));
+      return;
+    }
+    if (!user?.accessToken) {
+      setState(previous => ({
+        ...previous,
+        monthlyReportMonth: month,
+        monthlyCalories: null,
+        monthlyReportLoading: false,
+        monthlyReportError: 'Đăng nhập để xem báo cáo sức khỏe tháng.',
+      }));
+      return;
+    }
+
+    setSyncUser(user);
+    setState(previous => ({
+      ...previous,
+      monthlyReportMonth: month,
+      monthlyCalories: null,
+      monthlyReportLoading: true,
+      monthlyReportError: '',
+    }));
+
+    try {
+      const dates = getMonthDates(month);
+      const points: MonthlyReportPoint[] = [];
+      const batchSize = 8;
+      for (let index = 0; index < dates.length; index += batchSize) {
+        const batch = await Promise.all(
+          dates.slice(index, index + batchSize).map(async date => {
+            const response = (await syncApi(
+              apiConst.getHouseholdMemberHealth,
+              { memberId, date },
+            )) as HouseholdMemberHealthResponse;
+            if (!response.success || !response.data) {
+              throw new Error(
+                response.message || `Không thể tải dữ liệu calo ngày ${date}.`,
+              );
+            }
+            const calories = response.data.daily?.nutrition?.calories;
+            if (typeof calories !== 'number' || !Number.isFinite(calories)) {
+              throw new Error(`Dữ liệu calo ngày ${date} không hợp lệ.`);
+            }
+            return { date, value: calories };
+          }),
+        );
+        if (currentRequestId !== monthlyReportRequestId.current) return;
+        points.push(...batch);
+      }
+
+      setState(previous => ({
+        ...previous,
+        monthlyReportMonth: month,
+        monthlyCalories: points,
+        monthlyReportLoading: false,
+        monthlyReportError: '',
+      }));
+    } catch (loadError) {
+      if (currentRequestId !== monthlyReportRequestId.current) return;
+      console.error('Failed to load household monthly health report', loadError);
+      setState(previous => ({
+        ...previous,
+        monthlyReportMonth: month,
+        monthlyCalories: null,
+        monthlyReportLoading: false,
+        monthlyReportError:
+          loadError instanceof Error
+            ? loadError.message
+            : 'Không thể kết nối để tải báo cáo tháng.',
+      }));
+    }
+  }, [memberId, month, user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!memberId) {
+        setState(previous => ({
+          ...previous,
+          monthlyReportMonth: '',
+          monthlyCalories: null,
+          monthlyReportLoading: false,
+          monthlyReportError: '',
+        }));
+        return undefined;
+      }
+      loadMonthlyReport();
+      return () => {
+        monthlyReportRequestId.current += 1;
+      };
+    }, [loadMonthlyReport, memberId]),
+  );
+
   const handleSelectMember = useCallback((selectedMemberId: string) => {
     navigate(ScreenKeys.HOUSEHOLD_HEALTH, { memberId: selectedMemberId });
   }, []);
@@ -280,20 +600,8 @@ const HouseholdHealthScreen = () => {
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        eyebrow={memberId ? 'SỨC KHỎE THÀNH VIÊN' : 'SỨC KHỎE GIA ĐÌNH'}
-        title={selectedMember?.name ?? 'Theo dõi gia đình'}
-        subtitle={memberId ? 'Hồ sơ và hoạt động sức khỏe' : 'Tổng quan các thành viên'}
-        rightAction={
-          memberId && state.detail?.member.canUpdate ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={handleOpenEditor}
-              style={styles.headerAction}
-            >
-              <Text style={styles.headerActionText}>Cập nhật</Text>
-            </Pressable>
-          ) : null
-        }
+        title={memberId ? 'Hồ sơ sức khỏe' : 'Theo dõi gia đình'}
+        eyebrow={memberId ? undefined : 'SỨC KHỎE GIA ĐÌNH'}
       />
       <ScrollView
         contentContainerStyle={[
@@ -302,6 +610,23 @@ const HouseholdHealthScreen = () => {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {memberId && selectedMember ? (
+          <View style={styles.memberHeading}>
+            <View style={styles.memberHeadingCopy}>
+              <Text style={styles.memberHeadingLabel}>Thành viên</Text>
+              <Text style={styles.memberHeadingName}>{selectedMember.name}</Text>
+            </View>
+            {state.detail?.member.canUpdate ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={handleOpenEditor}
+                style={styles.updateAction}
+              >
+                <Text style={styles.updateActionText}>Cập nhật</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
         <View style={styles.dateNavigator}>
           <Pressable
             accessibilityRole="button"
@@ -340,6 +665,17 @@ const HouseholdHealthScreen = () => {
             profile={profile}
             daily={state.detail?.daily ?? null}
             weightHistory={state.detail?.weightHistory ?? []}
+            month={month}
+            monthlyCalories={
+              state.monthlyReportMonth === month ? state.monthlyCalories : null
+            }
+            monthlyReportLoading={
+              state.monthlyReportMonth !== month || state.monthlyReportLoading
+            }
+            monthlyReportError={
+              state.monthlyReportMonth === month ? state.monthlyReportError : ''
+            }
+            onRetryMonthlyReport={loadMonthlyReport}
           />
         ) : state.overview ? (
           <View style={styles.memberList}>
@@ -369,12 +705,22 @@ const MemberDetail = ({
   profile,
   daily,
   weightHistory,
+  month,
+  monthlyCalories,
+  monthlyReportLoading,
+  monthlyReportError,
+  onRetryMonthlyReport,
 }: {
   profile: NonNullable<HouseholdMemberHealthResponse['data']>['member']['profile'] | null;
   daily: HouseholdHealthDaily | null;
   weightHistory: NonNullable<
     HouseholdMemberHealthResponse['data']
   >['weightHistory'];
+  month: string;
+  monthlyCalories: MonthlyReportPoint[] | null;
+  monthlyReportLoading: boolean;
+  monthlyReportError: string;
+  onRetryMonthlyReport: () => void;
 }) => {
   if (!profile || !daily) {
     return (
@@ -383,6 +729,14 @@ const MemberDetail = ({
       </View>
     );
   }
+  const monthlyWeights = weightHistory
+    .filter(entry => entry.measuredAt.slice(0, 7) === month)
+    .sort((left, right) => left.measuredAt.localeCompare(right.measuredAt))
+    .map(entry => ({
+      date: entry.measuredAt.slice(0, 10),
+      value: entry.weightKg,
+    }));
+
   return (
     <View style={styles.detailContent}>
       <View style={styles.card}>
@@ -420,36 +774,74 @@ const MemberDetail = ({
         </View>
       </View>
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Lịch sử cân nặng</Text>
-        {weightHistory.length ? weightHistory.map(renderWeightHistory) : (
-          <Text style={styles.helper}>Chưa có lịch sử cân nặng.</Text>
+        <Text style={styles.sectionTitle}>Báo cáo cân nặng tháng</Text>
+        <Text style={styles.chartSubtitle}>{formatMonth(month)}</Text>
+        <MonthlyAreaChart
+          data={monthlyWeights}
+          month={month}
+          unit="kg"
+          color={COLORS.green}
+          gradientId="monthlyWeightArea"
+          accessibilityLabel="Biểu đồ miền cân nặng trong tháng"
+          emptyMessage="Chưa có dữ liệu cân nặng trong tháng này."
+        />
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Báo cáo calo tháng</Text>
+        <Text style={styles.chartSubtitle}>{formatMonth(month)}</Text>
+        {monthlyReportLoading ? (
+          <View style={styles.chartLoading}>
+            <ActivityIndicator color={COLORS.green} />
+            <Text style={styles.helper}>Đang tải báo cáo calo tháng...</Text>
+          </View>
+        ) : monthlyReportError ? (
+          <View style={styles.chartLoading}>
+            <Text style={styles.errorText}>{monthlyReportError}</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onRetryMonthlyReport}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryText}>Thử lại</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <MonthlyAreaChart
+            data={monthlyCalories ?? []}
+            month={month}
+            unit="kcal"
+            color="#E59B2F"
+            gradientId="monthlyCaloriesArea"
+            accessibilityLabel="Biểu đồ miền lượng calo trong tháng"
+            emptyMessage="Chưa có dữ liệu calo trong tháng này."
+            targetValue={profile.dailyCaloriesTarget}
+          />
         )}
       </View>
     </View>
   );
 };
 
-const renderWeightHistory = (
-  entry: NonNullable<HouseholdMemberHealthResponse['data']>['weightHistory'][number],
-) => (
-  <View key={entry.id} style={styles.historyRow}>
-    <View>
-      <Text style={styles.historyWeight}>{formatNumber(entry.weightKg, 1)} kg</Text>
-      <Text style={styles.historyDate}>
-        {new Date(entry.measuredAt).toLocaleDateString('vi-VN')}
-      </Text>
-    </View>
-    <Text style={styles.historyActor}>
-      {entry.recordedByUserId ? 'Quản trị viên cập nhật' : 'Thành viên ghi nhận'}
-    </Text>
-  </View>
-);
-
 export default HouseholdHealthScreen;
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   content: { paddingHorizontal: 16, paddingTop: 12, gap: 12 },
+  memberHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+  },
+  memberHeadingCopy: { flex: 1, gap: 3 },
+  memberHeadingLabel: {
+    color: COLORS.secondary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  memberHeadingName: { color: COLORS.text, fontSize: 18, fontWeight: '800' },
   dateNavigator: {
     minHeight: 44,
     flexDirection: 'row',
@@ -516,18 +908,24 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  historyRow: {
+  chartSubtitle: { color: COLORS.secondary, fontSize: 11, marginTop: -8 },
+  chartAxisLabel: { color: COLORS.secondary, fontSize: 10 },
+  chartLoading: { minHeight: 88, justifyContent: 'center', gap: 10 },
+  chartLegend: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 9,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.border,
+    flexWrap: 'wrap',
+    gap: 14,
+    paddingHorizontal: 42,
   },
-  historyWeight: { color: COLORS.text, fontSize: 14, fontWeight: '800' },
-  historyDate: { marginTop: 3, color: COLORS.secondary, fontSize: 10 },
-  historyActor: { color: COLORS.secondary, fontSize: 10, textAlign: 'right' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  targetLegendLine: {
+    width: 18,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#E59B2F',
+    borderStyle: 'dashed',
+  },
+  legendText: { color: COLORS.secondary, fontSize: 10 },
   status: { minHeight: 120, alignItems: 'center', justifyContent: 'center', gap: 10 },
   statusCard: {
     padding: 16,
@@ -546,11 +944,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E7F4EC',
   },
   retryText: { color: COLORS.green, fontSize: 12, fontWeight: '800' },
-  headerAction: {
+  updateAction: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: '#E7F4EC',
   },
-  headerActionText: { color: COLORS.green, fontSize: 11, fontWeight: '800' },
+  updateActionText: { color: COLORS.green, fontSize: 11, fontWeight: '800' },
 });

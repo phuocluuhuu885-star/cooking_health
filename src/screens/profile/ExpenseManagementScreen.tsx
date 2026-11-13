@@ -1,6 +1,5 @@
 import React, {
   useCallback,
-  useContext,
   useMemo,
   useRef,
   useState,
@@ -59,107 +58,27 @@ import type {
   BackendMeal,
   MealsResponse,
 } from '../../utils/types';
+import {
+  CATEGORIES,
+  CategoryChip,
+  ExpenseCalendarContext,
+  ExpenseCalendarDay,
+  ExpenseTransactionRow,
+  formatMoney,
+  INCOME_CATEGORIES,
+  IncomeTransactionRow,
+  localDateKey,
+  MealBudgetCard,
+  MealPickerOption,
+} from './ExpenseManagementComponents';
+import { COLORS } from './ExpenseManagement.styles';
 import ScreenHeader from '../component/ScreenHeader';
 import HouseholdScopeSwitch from '../component/HouseholdScopeSwitch';
+import { useFullscreenAdOnFocus } from '../component/FullscreenAdProvider';
 import '../../utils/calendarLocale';
-
-const CATEGORIES: Array<{
-  id: ExpenseCategory;
-  label: string;
-  icon: string;
-}> = [
-  { id: 'FOOD', label: 'Ăn uống', icon: '🍽️' },
-  { id: 'SHOPPING', label: 'Mua sắm', icon: '🛍️' },
-  { id: 'TRANSPORT', label: 'Đi lại', icon: '🚗' },
-  { id: 'HOUSEHOLD', label: 'Gia đình', icon: '🏠' },
-  { id: 'HEALTH', label: 'Sức khỏe', icon: '❤️' },
-  { id: 'ENTERTAINMENT', label: 'Giải trí', icon: '🎬' },
-  { id: 'OTHER', label: 'Khác', icon: '•••' },
-];
-
-const INCOME_CATEGORIES: Array<{
-  id: IncomeCategory;
-  label: string;
-  icon: string;
-}> = [
-  { id: 'SALARY', label: 'Lương', icon: '💰' },
-  { id: 'BUSINESS', label: 'Kinh doanh', icon: '📈' },
-  { id: 'INVESTMENT', label: 'Đầu tư', icon: '📊' },
-  { id: 'GIFT', label: 'Quà tặng', icon: '🎁' },
-  { id: 'OTHER', label: 'Khác', icon: '•••' },
-];
-
-const COLORS = {
-  background: '#F5F8F5',
-  white: '#FFFFFF',
-  text: '#172B23',
-  secondary: '#66756D',
-  green: '#168653',
-  lightGreen: '#E7F4EC',
-  border: '#E5EBE7',
-  danger: '#B42318',
-};
-
-const localDateKey = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-    2,
-    '0',
-  )}-${String(date.getDate()).padStart(2, '0')}`;
 
 const currentMonthKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-const formatMoney = (amount: number) => {
-  const compact = (value: number) => value.toFixed(1).replace(/\.0$/, '');
-  if (amount >= 1_000_000) return `${compact(amount / 1_000_000)}M`;
-  if (amount >= 1_000) return `${compact(amount / 1_000)}K`;
-  return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
-};
-
-const categoryLabel = (category: ExpenseCategory) =>
-  CATEGORIES.find(item => item.id === category)?.label ?? 'Khác';
-
-const ExpenseCalendarTotalsContext = React.createContext<
-  Record<string, number>
->({});
-
-const ExpenseCalendarDay = ({
-  date,
-  state,
-}: {
-  date?: DateData;
-  state?: string;
-}) => {
-  const dailyTotals = useContext(ExpenseCalendarTotalsContext);
-  if (!date) return <View style={styles.calendarCell} />;
-  const dayTotal = dailyTotals[date.dateString] ?? 0;
-  const isToday = date.dateString === localDateKey(new Date());
-  return (
-    <View
-      accessibilityLabel={`${date.day}, ${formatMoney(dayTotal)} đã chi`}
-      style={[
-        styles.calendarCell,
-        isToday && styles.calendarToday,
-        dayTotal > 0 && styles.calendarCellSpent,
-      ]}
-    >
-      <Text
-        style={[
-          styles.calendarDate,
-          state === 'disabled' && styles.calendarDateDisabled,
-          dayTotal > 0 && styles.calendarDateSpent,
-        ]}
-      >
-        {date.day}
-      </Text>
-      {dayTotal > 0 ? (
-        <Text style={styles.calendarAmount} numberOfLines={1}>
-          {formatMoney(dayTotal)}
-        </Text>
-      ) : null}
-    </View>
-  );
-};
 
 type ExpenseForm = {
   title: string;
@@ -195,223 +114,8 @@ const emptyIncomeForm = (): IncomeForm => ({
   note: '',
 });
 
-const CategoryChip = <T extends ExpenseCategory | IncomeCategory>({
-  id,
-  label,
-  icon,
-  selected,
-  onSelect,
-}: {
-  id: T;
-  label: string;
-  icon: string;
-  selected: boolean;
-  onSelect: (id: T) => void;
-}) => {
-  const handlePress = useCallback(() => {
-    onSelect(id);
-  }, [id, onSelect]);
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={handlePress}
-      style={[styles.categoryChip, selected && styles.categoryChipSelected]}
-    >
-      <Text style={styles.categoryIcon}>{icon}</Text>
-      <Text
-        style={[styles.categoryText, selected && styles.categoryTextSelected]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-};
-
-const IncomeTransactionRow = ({
-  item,
-  onEdit,
-  onRemove,
-}: {
-  item: Income;
-  onEdit: (item: Income) => void;
-  onRemove: (item: Income) => void;
-}) => {
-  const handleEdit = useCallback(() => onEdit(item), [item, onEdit]);
-  const handleRemove = useCallback(() => onRemove(item), [item, onRemove]);
-  const category = INCOME_CATEGORIES.find(
-    incomeCategory => incomeCategory.id === item.category,
-  );
-
-  return (
-    <View style={styles.expenseCard}>
-      <View style={styles.expenseMeta}>
-        <View style={styles.tagWrap}>
-          <Text style={styles.tagIcon}>{category?.icon ?? '💵'}</Text>
-          <Text style={styles.tagText}>{category?.label ?? 'Khác'}</Text>
-        </View>
-        <Text style={styles.expenseDate}>{item.incomeDate}</Text>
-      </View>
-      <View style={styles.expenseTitleRow}>
-        <Text style={styles.expenseTitle}>{item.title}</Text>
-        {item.note ? (
-          <Text style={styles.expenseNote} numberOfLines={1}>
-            {item.note}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.expenseAmountWrap}>
-        <Text style={styles.incomeAmount}>{formatMoney(item.amountVnd)}</Text>
-        <View style={styles.rowActions}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={handleEdit}
-            style={styles.rowIconButton}
-            hitSlop={8}
-          >
-            <Svg width={17} height={17} viewBox="0 0 24 24">
-              <Path
-                d="m14 5 5 5M4 20l4.5-1 10.2-10.2a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z"
-                fill="none"
-                stroke={COLORS.green}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.8}
-              />
-            </Svg>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={handleRemove}
-            style={styles.rowIconButton}
-            hitSlop={8}
-          >
-            <Svg width={17} height={17} viewBox="0 0 24 24">
-              <Path
-                d="M4 7h16M10 11v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3"
-                fill="none"
-                stroke={COLORS.danger}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.8}
-              />
-            </Svg>
-          </Pressable>
-        </View>
-      </View>
-    </View>
-  );
-};
-
-const MealPickerOption = ({
-  meal,
-  onSelect,
-}: {
-  meal: BackendMeal;
-  onSelect: (meal: BackendMeal) => void;
-}) => {
-  const handlePress = useCallback(() => onSelect(meal), [meal, onSelect]);
-  const category =
-    meal.category === 'LUNCH'
-      ? 'Bữa trưa'
-      : meal.category === 'DINNER'
-        ? 'Bữa tối'
-        : meal.category === 'BREAKFAST'
-          ? 'Bữa sáng'
-          : 'Ăn nhẹ';
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={handlePress}
-      style={styles.mealOption}
-    >
-      <Text style={styles.mealOptionName}>{meal.name}</Text>
-      <Text style={styles.mealOptionCategory}>{category}</Text>
-    </Pressable>
-  );
-};
-
-const ExpenseTransactionRow = ({
-  item,
-  onEdit,
-  onRemove,
-}: {
-  item: Expense;
-  onEdit: (item: Expense) => void;
-  onRemove: (item: Expense) => void;
-}) => {
-  const handleEdit = useCallback(() => onEdit(item), [item, onEdit]);
-  const handleRemove = useCallback(() => onRemove(item), [item, onRemove]);
-
-  return (
-    <View style={styles.expenseRow}>
-      <View style={styles.expenseIcon}>
-        <Text style={styles.expenseIconText}>
-          {item.source === 'MEAL' ? '🍽' : '₫'}
-        </Text>
-      </View>
-      <View style={styles.expenseCopy}>
-        <Text style={styles.expenseTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.expenseMeta}>
-          {categoryLabel(item.category)} · {item.expenseDate}
-          {item.source === 'MEAL' ? ' · Món trong app' : ''}
-        </Text>
-        {item.note ? (
-          <Text style={styles.expenseNote} numberOfLines={1}>
-            {item.note}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.expenseAmountWrap}>
-        <Text style={styles.expenseAmount}>{formatMoney(item.amountVnd)}</Text>
-        <View style={styles.rowActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Sửa ${item.title}`}
-            onPress={handleEdit}
-            style={styles.rowIconButton}
-            hitSlop={8}
-          >
-            <Svg width={17} height={17} viewBox="0 0 24 24">
-              <Path
-                d="m14 5 5 5M4 20l4.5-1 10.2-10.2a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z"
-                fill="none"
-                stroke={COLORS.green}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.8}
-              />
-            </Svg>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Xóa ${item.title}`}
-            onPress={handleRemove}
-            style={styles.rowIconButton}
-            hitSlop={8}
-          >
-            <Svg width={17} height={17} viewBox="0 0 24 24">
-              <Path
-                d="M4 7h16M10 11v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3"
-                fill="none"
-                stroke={COLORS.danger}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.8}
-              />
-            </Svg>
-          </Pressable>
-        </View>
-      </View>
-    </View>
-  );
-};
-
 const ExpenseManagementScreen = () => {
+  useFullscreenAdOnFocus();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
@@ -428,7 +132,14 @@ const ExpenseManagementScreen = () => {
   const [budgets, setBudgets] = useState<
     Partial<Record<'LUNCH' | 'DINNER', number>>
   >({});
+  const [budgetEnabled, setBudgetEnabled] = useState<
+    Partial<Record<'LUNCH' | 'DINNER', boolean>>
+  >({});
   const [budgetDraft, setBudgetDraft] = useState({ LUNCH: '', DINNER: '' });
+  const [editingBudget, setEditingBudget] = useState<
+    Partial<Record<'LUNCH' | 'DINNER', boolean>>
+  >({});
+  const [budgetSectionExpanded, setBudgetSectionExpanded] = useState(false);
   const [form, setForm] = useState<ExpenseForm>(emptyForm);
   const [incomeForm, setIncomeForm] = useState<IncomeForm>(emptyIncomeForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -456,6 +167,7 @@ const ExpenseManagementScreen = () => {
       setTotal(0);
       setIncomeTotal(0);
       setBudgets({});
+      setBudgetEnabled({});
       setLoading(false);
       setError('Đăng nhập để quản lý khoản chi.');
       return;
@@ -501,6 +213,17 @@ const ExpenseManagementScreen = () => {
           budget.limitVnd,
         ]),
       ) as Partial<Record<'LUNCH' | 'DINNER', number>>;
+      if (budgetResponse.data.some(budget => typeof budget.enabled !== 'boolean')) {
+        throw new Error(
+          'Máy chủ chưa trả trạng thái bật/tắt ngân sách. Hãy cập nhật backend và áp dụng migration ngân sách.',
+        );
+      }
+      const budgetEnabledMap = Object.fromEntries(
+        budgetResponse.data.map((budget: MealBudget) => [
+          budget.mealPeriod,
+          budget.enabled,
+        ]),
+      ) as Partial<Record<'LUNCH' | 'DINNER', boolean>>;
       const incomeMonthData =
         scope === 'PERSONAL'
           ? (incomeResponse?.data as IncomeMonthData | undefined)
@@ -510,6 +233,8 @@ const ExpenseManagementScreen = () => {
       setIncomeItems(incomeMonthData?.items ?? []);
       setIncomeTotal(incomeMonthData?.totalAmountVnd ?? 0);
       setBudgets(budgetMap);
+      setBudgetEnabled(budgetEnabledMap);
+      setEditingBudget({});
       setBudgetDraft({
         LUNCH: budgetMap.LUNCH ? String(budgetMap.LUNCH) : '',
         DINNER: budgetMap.DINNER ? String(budgetMap.DINNER) : '',
@@ -614,13 +339,20 @@ const ExpenseManagementScreen = () => {
     setMealPickerVisible(false);
   }, []);
 
-  const startNewExpense = useCallback(() => {
-    setForm(emptyForm());
+  const initializeNewExpense = useCallback((date?: string) => {
+    setForm({ ...emptyForm(), ...(date ? { date } : {}) });
     setEditingId(null);
     setFormVisible(true);
     setMealPickerVisible(false);
     setMealSearch('');
   }, []);
+  const startNewExpense = useCallback(() => initializeNewExpense(), [
+    initializeNewExpense,
+  ]);
+  const handleCalendarDatePress = useCallback(
+    (date: string) => initializeNewExpense(date),
+    [initializeNewExpense],
+  );
 
   const editExpense = useCallback((item: Expense) => {
     setForm({
@@ -836,11 +568,29 @@ const ExpenseManagementScreen = () => {
       }
       setSavingBudget(period);
       try {
-        const response = await saveMealBudget(user, scope, period, limitVnd);
+        const enabled = budgetEnabled[period] ?? true;
+        const response = await saveMealBudget(
+          user,
+          scope,
+          period,
+          limitVnd,
+          enabled,
+        );
         if (!response.success || !response.data) {
           throw new Error(response.message || 'Không thể lưu ngân sách.');
         }
+        const savedBudget = response.data;
+        if (savedBudget.enabled !== enabled) {
+          throw new Error(
+            'Máy chủ chưa lưu trạng thái bật/tắt ngân sách. Hãy cập nhật backend và áp dụng migration.',
+          );
+        }
         setBudgets(previous => ({ ...previous, [period]: limitVnd }));
+        setBudgetEnabled(previous => ({
+          ...previous,
+          [period]: savedBudget.enabled,
+        }));
+        setEditingBudget(previous => ({ ...previous, [period]: false }));
       } catch (saveError) {
         Alert.alert(
           'Không thể lưu ngân sách',
@@ -850,8 +600,60 @@ const ExpenseManagementScreen = () => {
         setSavingBudget(null);
       }
     },
-    [budgetDraft, scope, user],
+    [budgetDraft, budgetEnabled, scope, user],
   );
+  const toggleBudgetEnabled = useCallback(
+    async (period: 'LUNCH' | 'DINNER', enabled: boolean) => {
+      const limitVnd = budgets[period];
+      if (limitVnd === undefined || !user?.accessToken) return;
+      setSavingBudget(period);
+      try {
+        const response = await saveMealBudget(
+          user,
+          scope,
+          period,
+          limitVnd,
+          enabled,
+        );
+        if (!response.success || !response.data) {
+          throw new Error(response.message || 'Không thể cập nhật ngân sách.');
+        }
+        const savedBudget = response.data;
+        if (savedBudget.enabled !== enabled) {
+          throw new Error(
+            'Máy chủ chưa lưu trạng thái bật/tắt ngân sách. Hãy cập nhật backend và áp dụng migration.',
+          );
+        }
+        setBudgetEnabled(previous => ({
+          ...previous,
+          [period]: savedBudget.enabled,
+        }));
+      } catch (toggleError) {
+        Alert.alert(
+          'Không thể cập nhật ngân sách',
+          toggleError instanceof Error
+            ? toggleError.message
+            : 'Vui lòng thử lại.',
+        );
+      } finally {
+        setSavingBudget(null);
+      }
+    },
+    [budgets, scope, user],
+  );
+  const editBudget = useCallback(
+    (period: 'LUNCH' | 'DINNER') => {
+      setBudgetDraft(previous => ({
+        ...previous,
+        [period]: String(budgets[period] ?? ''),
+      }));
+      setEditingBudget(previous => ({ ...previous, [period]: true }));
+    },
+    [budgets],
+  );
+  const toggleBudgetSection = useCallback(() => {
+    setBudgetSectionExpanded(previous => !previous);
+  }, []);
   const updateBudgetDraft = useCallback(
     (period: 'LUNCH' | 'DINNER', value: string) => {
       setBudgetDraft(previous => ({
@@ -876,6 +678,12 @@ const ExpenseManagementScreen = () => {
           return next;
         });
         setBudgetDraft(previous => ({ ...previous, [period]: '' }));
+        setBudgetEnabled(previous => {
+          const next = { ...previous };
+          delete next[period];
+          return next;
+        });
+        setEditingBudget(previous => ({ ...previous, [period]: false }));
       } catch (clearError) {
         Alert.alert(
           'Không thể xóa ngân sách',
@@ -888,6 +696,21 @@ const ExpenseManagementScreen = () => {
       }
     },
     [scope, user],
+  );
+  const confirmClearBudget = useCallback(
+    (period: 'LUNCH' | 'DINNER') => {
+      const title =
+        period === 'LUNCH' ? 'ngân sách bữa trưa' : 'ngân sách bữa tối';
+      Alert.alert('Xóa ngân sách?', `Bạn có muốn xóa ${title} không?`, [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: () => clearBudget(period),
+        },
+      ]);
+    },
+    [clearBudget],
   );
 
   const selectMeal = useCallback((meal: BackendMeal) => {
@@ -1065,14 +888,19 @@ const ExpenseManagementScreen = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <HouseholdScopeSwitch
-          enabled={scope === 'HOUSEHOLD'}
-          householdAvailable={Boolean(household)}
-          personalLabel="Chi tiêu cá nhân"
-          householdLabel={`Chi tiêu hộ ${household?.name ?? ''}`}
-          description="Chuyển đổi phạm vi quản lý chi tiêu."
-          onToggle={handleToggleScope}
-        />
+        {household ? (
+          <HouseholdScopeSwitch
+            enabled={scope === 'HOUSEHOLD'}
+            householdAvailable
+            personalLabel="Cá nhân"
+            householdLabel="Gia đình"
+            variant="swap"
+            swapTitle={null}
+            swapPersonalLabel="Cá nhân"
+            swapHouseholdLabel="Gia đình"
+            onToggle={handleToggleScope}
+          />
+        ) : null}
 
         <LinearGradient
           colors={['#FFFFFF', '#F3FAF5']}
@@ -1085,7 +913,12 @@ const ExpenseManagementScreen = () => {
             {scope === 'PERSONAL' ? 'Cá nhân' : 'Dùng chung trong hộ'}
           </Text>
           <View style={styles.calendar}>
-            <ExpenseCalendarTotalsContext.Provider value={dailyTotals}>
+            <ExpenseCalendarContext.Provider
+              value={{
+                dailyTotals,
+                onSelectDate: handleCalendarDatePress,
+              }}
+            >
               <Calendar
                 current={`${month}-01`}
                 enableSwipeMonths
@@ -1102,37 +935,81 @@ const ExpenseManagementScreen = () => {
                   textDayHeaderFontWeight: '700',
                 }}
               />
-            </ExpenseCalendarTotalsContext.Provider>
+            </ExpenseCalendarContext.Provider>
           </View>
         </LinearGradient>
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>Ngân sách bữa ăn</Text>
-          </View>
-        </View>
-        <View style={styles.budgetList}>
-          <MealBudgetCard
-            period="LUNCH"
-            title="Ngân sách bữa trưa"
-            currentBudget={budgets.LUNCH}
-            draft={budgetDraft.LUNCH}
-            saving={savingBudget === 'LUNCH'}
-            disabled={savingBudget !== null}
-            onChange={updateBudgetDraft}
-            onSave={saveBudget}
-            onRemove={clearBudget}
-          />
-          <MealBudgetCard
-            period="DINNER"
-            title="Ngân sách bữa tối"
-            currentBudget={budgets.DINNER}
-            draft={budgetDraft.DINNER}
-            saving={savingBudget === 'DINNER'}
-            disabled={savingBudget !== null}
-            onChange={updateBudgetDraft}
-            onSave={saveBudget}
-            onRemove={clearBudget}
-          />
+        <View style={styles.budgetPanel}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ngân sách bữa ăn"
+            accessibilityHint={
+              budgetSectionExpanded
+                ? 'Thu gọn ngân sách'
+                : 'Mở cài đặt ngân sách'
+            }
+            accessibilityState={{ expanded: budgetSectionExpanded }}
+            onPress={toggleBudgetSection}
+            style={styles.budgetSectionHeader}
+          >
+            <View style={styles.budgetSectionTitleGroup}>
+              <Text style={styles.sectionTitle}>Ngân sách bữa ăn</Text>
+              <Text style={styles.sectionHint}>
+                {budgetSectionExpanded
+                  ? 'Bật để AI giới hạn tổng giá món theo từng bữa.'
+                  : 'Chạm để xem và cài đặt giới hạn cho AI.'}
+              </Text>
+            </View>
+            <View style={styles.budgetChevronBox}>
+              <Svg width={18} height={18} viewBox="0 0 24 24">
+                <Path
+                  d={
+                    budgetSectionExpanded
+                      ? 'm6 15 6-6 6 6'
+                      : 'm6 9 6 6 6-6'
+                  }
+                  fill="none"
+                  stroke={COLORS.green}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                />
+              </Svg>
+            </View>
+          </Pressable>
+          {budgetSectionExpanded ? (
+            <View style={styles.budgetList}>
+              <MealBudgetCard
+                period="LUNCH"
+                title="Ngân sách bữa trưa"
+                currentBudget={budgets.LUNCH}
+                enabled={budgetEnabled.LUNCH ?? true}
+                editing={editingBudget.LUNCH ?? false}
+                draft={budgetDraft.LUNCH}
+                saving={savingBudget === 'LUNCH'}
+                disabled={savingBudget !== null}
+                onChange={updateBudgetDraft}
+                onSave={saveBudget}
+                onEdit={editBudget}
+                onToggleEnabled={toggleBudgetEnabled}
+                onRemove={confirmClearBudget}
+              />
+              <MealBudgetCard
+                period="DINNER"
+                title="Ngân sách bữa tối"
+                currentBudget={budgets.DINNER}
+                enabled={budgetEnabled.DINNER ?? true}
+                editing={editingBudget.DINNER ?? false}
+                draft={budgetDraft.DINNER}
+                saving={savingBudget === 'DINNER'}
+                disabled={savingBudget !== null}
+                onChange={updateBudgetDraft}
+                onSave={saveBudget}
+                onEdit={editBudget}
+                onToggleEnabled={toggleBudgetEnabled}
+                onRemove={confirmClearBudget}
+              />
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.transactionHeader}>
@@ -1562,83 +1439,6 @@ const ExpenseManagementScreen = () => {
   );
 };
 
-const MealBudgetCard = ({
-  period,
-  title,
-  currentBudget,
-  draft,
-  saving,
-  disabled,
-  onChange,
-  onSave,
-  onRemove,
-}: {
-  period: 'LUNCH' | 'DINNER';
-  title: string;
-  currentBudget?: number;
-  draft: string;
-  saving: boolean;
-  disabled: boolean;
-  onChange: (period: 'LUNCH' | 'DINNER', value: string) => void;
-  onSave: (period: 'LUNCH' | 'DINNER') => void;
-  onRemove: (period: 'LUNCH' | 'DINNER') => void;
-}) => {
-  const handleChange = useCallback(
-    (value: string) => onChange(period, value),
-    [onChange, period],
-  );
-  const handleSave = useCallback(() => onSave(period), [onSave, period]);
-  const handleRemove = useCallback(() => onRemove(period), [onRemove, period]);
-
-  return (
-    <View style={styles.budgetCard}>
-      <View style={styles.budgetHeader}>
-        <Text style={styles.budgetTitle}>{title}</Text>
-        <Text style={styles.budgetCurrent}>
-          {currentBudget
-            ? `Đang áp dụng ${formatMoney(currentBudget)}`
-            : 'Chưa thiết lập'}
-        </Text>
-      </View>
-      <View style={styles.budgetInputRow}>
-        <TextInput
-          accessibilityLabel={`${title}, số tiền giới hạn`}
-          keyboardType="number-pad"
-          onChangeText={handleChange}
-          placeholder="Nhập số tiền (VND)"
-          placeholderTextColor="#97A59D"
-          value={draft}
-          style={styles.budgetInput}
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Lưu ${title}`}
-          disabled={disabled}
-          onPress={handleSave}
-          style={[styles.budgetSaveButton, disabled && styles.disabled]}
-        >
-          {saving ? (
-            <ActivityIndicator color={COLORS.white} size="small" />
-          ) : (
-            <Text style={styles.budgetSaveButtonText}>Lưu</Text>
-          )}
-        </Pressable>
-      </View>
-      {currentBudget ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Gỡ ${title}`}
-          disabled={disabled}
-          onPress={handleRemove}
-          style={styles.budgetRemoveButton}
-        >
-          <Text style={styles.budgetRemoveText}>Gỡ ngân sách</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-};
-
 export default ExpenseManagementScreen;
 
 const styles = StyleSheet.create({
@@ -1750,20 +1550,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-  budgetList: { gap: 10 },
-  budgetCard: {
-    backgroundColor: COLORS.white,
+  budgetPanel: {
+    overflow: 'hidden',
     borderRadius: 10,
-    borderColor: COLORS.border,
     borderWidth: 1,
-    padding: 12,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  budgetSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+  },
+  budgetSectionTitleGroup: { flex: 1 },
+  budgetChevronBox: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: '#F6FAF7',
+  },
+  budgetList: { paddingHorizontal: 14 },
+  budgetCard: {
+    paddingVertical: 13,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.border,
   },
   budgetHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 8,
   },
+  budgetHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  budgetHeading: { flex: 1, gap: 4 },
   budgetTitle: {
     flex: 1,
     color: COLORS.text,
@@ -1771,9 +1599,46 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   budgetCurrent: {
+    color: COLORS.green,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  budgetEditButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: COLORS.lightGreen,
+  },
+  budgetRemoveIconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: '#FFF1F0',
+  },
+  budgetSwitchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 9,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.border,
+  },
+  budgetSwitchCopy: { flex: 1 },
+  budgetSwitchTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  budgetSwitchHint: {
     color: COLORS.secondary,
     fontSize: 10,
-    textAlign: 'right',
+    lineHeight: 14,
+    marginTop: 2,
   },
   budgetInputRow: {
     flexDirection: 'row',
@@ -1805,18 +1670,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 12,
     fontWeight: '800',
-  },
-  budgetRemoveButton: {
-    alignSelf: 'flex-end',
-    minHeight: 28,
-    justifyContent: 'center',
-    marginTop: 2,
-    paddingHorizontal: 2,
-  },
-  budgetRemoveText: {
-    color: COLORS.danger,
-    fontSize: 11,
-    fontWeight: '700',
   },
   disabled: { opacity: 0.6 },
   headerAddButton: {

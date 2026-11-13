@@ -34,6 +34,7 @@ import type {
 } from '../../utils/types';
 import { setSyncUser, syncApi } from '../../utils/syncUtils';
 import ScreenHeader from '../component/ScreenHeader';
+import { useFullscreenAdOnFocus } from '../component/FullscreenAdProvider';
 
 type SelectedImage = {
   uri: string;
@@ -315,6 +316,7 @@ const ComponentAmountEditor = ({
 };
 
 const AiMealScanScreen = () => {
+  useFullscreenAdOnFocus();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
@@ -575,7 +577,6 @@ const AiMealScanScreen = () => {
       <ScreenHeader
         eyebrow="HEALTH AI COACH"
         title="Quét món ăn"
-        subtitle="Ước tính thành phần và dinh dưỡng từ ảnh"
       />
       <ScrollView
         contentContainerStyle={[

@@ -191,12 +191,14 @@ export const saveMealBudget = async (
   scope: ExpenseScope,
   mealPeriod: 'LUNCH' | 'DINNER',
   limitVnd: number,
+  enabled: boolean,
 ): Promise<ExpenseResponse<MealBudget>> => {
   setSyncUser(user);
   return (await syncApi(apiConst.upsertMealBudget, {
     scope,
     mealPeriod,
     limitVnd,
+    enabled,
   })) as ExpenseResponse<MealBudget>;
 };
 

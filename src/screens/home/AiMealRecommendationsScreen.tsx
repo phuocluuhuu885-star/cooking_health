@@ -24,7 +24,6 @@ import {
 } from '../../reduxs/reduces/appData';
 import { selectUserInfo } from '../../reduxs/reduces/user';
 import { useAppDispatch } from '../../reduxs/store';
-import { fetchMealBudgets } from '../../utils/expenseApi';
 import { fetchCurrentHousehold } from '../../utils/householdApi';
 import { navigate } from '../../utils/navigation';
 import { addMealToPlan } from '../../utils/mealPlanApi';
@@ -45,6 +44,7 @@ import type {
 } from '../../utils/types';
 import HomeRecipeCard from './homeRecipeCard';
 import ScreenHeader from '../component/ScreenHeader';
+import { useFullscreenAdOnFocus } from '../component/FullscreenAdProvider';
 
 type ScreenState = {
   recommendations: AiMealRecommendationsResponse['data'] | null;
@@ -61,6 +61,7 @@ const getEstimatedMealPrice = (recommendation: AiMealRecommendation) =>
   );
 
 const AiMealRecommendationsScreen = () => {
+  useFullscreenAdOnFocus();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);
@@ -96,75 +97,24 @@ const AiMealRecommendationsScreen = () => {
     setState(previous => ({ ...previous, loading: true, error: '' }));
     try {
       const date = getUtcDateKey(new Date());
-      const budgetResponse = await fetchMealBudgets(user, 'PERSONAL');
-      if (!budgetResponse.success || !budgetResponse.data) {
+      const response = (await syncApi(apiConst.getAiMealRecommendations, {
+        date,
+        consent: true,
+      })) as AiMealRecommendationsResponse;
+      const recommendationData = response.data;
+      if (!response?.success || !recommendationData?.recommendations) {
         throw new Error(
-          budgetResponse.message || 'Không thể tải ngân sách bữa ăn.',
+          response?.message ||
+            response?.ErrorMessage ||
+            'Không thể tạo gợi ý AI lúc này.',
         );
       }
-      const mealBudgets = Object.fromEntries(
-        budgetResponse.data.map(budget => [budget.mealPeriod, budget.limitVnd]),
-      ) as Partial<Record<MealPeriod, number>>;
-      const hasBudgets = PERIODS.some(
-        period => mealBudgets[period] !== undefined,
-      );
-      const periodsToRequest: Array<MealPeriod | undefined> = hasBudgets
-        ? PERIODS
-        : [undefined];
-      const recommendationResponses = await Promise.all(
-        periodsToRequest.map(async period => {
-          const limitVnd = period ? mealBudgets[period] : undefined;
-          const response = (await syncApi(apiConst.getAiMealRecommendations, {
-            date,
-            consent: true,
-            ...(limitVnd !== undefined
-              ? { budget: { minVnd: 0, maxVnd: limitVnd } }
-              : {}),
-          })) as AiMealRecommendationsResponse;
-          if (!response?.success || !response.data?.recommendations) {
-            throw new Error(
-              response?.message ||
-                response?.ErrorMessage ||
-                `Không thể tạo gợi ý ${
-                  period === 'LUNCH'
-                    ? 'bữa trưa'
-                    : period === 'DINNER'
-                    ? 'bữa tối'
-                    : 'AI'
-                } lúc này.`,
-            );
-          }
-          return { period, data: response.data };
-        }),
-      );
       if (currentRequestId !== requestId.current) return;
-      const recommendations = { LUNCH: [], DINNER: [] } as NonNullable<
-        AiMealRecommendationsResponse['data']
-      >['recommendations'];
-      recommendationResponses.forEach(({ period, data }) => {
-        const periods = period ? [period] : PERIODS;
-        periods.forEach(mealPeriod => {
-          const periodRecommendations = data.recommendations[mealPeriod];
-          const limitVnd = mealBudgets[mealPeriod];
-          recommendations[mealPeriod] =
-            limitVnd === undefined
-              ? periodRecommendations
-              : periodRecommendations.filter(recommendation => {
-                  const estimatedPrice = getEstimatedMealPrice(recommendation);
-                  return (
-                    estimatedPrice !== null && estimatedPrice.maxVnd <= limitVnd
-                  );
-                });
-        });
-      });
-      const firstResponseData = recommendationResponses[0].data;
       setState(previous => ({
         ...previous,
         recommendations: {
-          ...firstResponseData,
+          ...recommendationData,
           date,
-          mealBudgets,
-          recommendations,
         },
         loading: false,
         error: '',
@@ -291,6 +241,10 @@ const AiMealRecommendationsScreen = () => {
             mealId: recommendation.meal.id,
             date,
             mealPeriod: period,
+            servings:
+              destination === 'HOUSEHOLD'
+                ? Math.max(1, activeHousehold?.members.length ?? 1)
+                : 1,
           });
           if (!response?.success) {
             throw new Error(response?.message || 'Vui lòng thử lại.');
@@ -373,6 +327,18 @@ const AiMealRecommendationsScreen = () => {
   function renderPeriod(period: MealPeriod, index: number) {
     const recommendations =
       state.recommendations?.recommendations[period] ?? [];
+    const mealBudget = state.recommendations?.mealBudgets?.[period];
+    const estimatedMealTotal = recommendations.reduce((total, recommendation) => {
+      const estimatedPrice = getEstimatedMealPrice(recommendation);
+      return total + (estimatedPrice?.maxVnd ?? 0);
+    }, 0);
+    const estimatedMealTotalLabel = Math.round(
+      estimatedMealTotal,
+    ).toLocaleString('vi-VN');
+    const mealBudgetLabel =
+      mealBudget === undefined
+        ? ''
+        : Math.round(mealBudget).toLocaleString('vi-VN');
 
     function renderRecommendation(recommendation: AiMealRecommendation) {
       return (
@@ -395,13 +361,10 @@ const AiMealRecommendationsScreen = () => {
         <Text style={styles.periodTitle}>
           {period === 'LUNCH' ? 'Bữa trưa' : 'Bữa tối'}
         </Text>
-        {state.recommendations?.mealBudgets?.[period] ? (
+        {mealBudget !== undefined ? (
           <Text style={styles.budgetHint}>
-            Gợi ý ưu tiên trong ngân sách{' '}
-            {Math.round(
-              state.recommendations.mealBudgets[period]!,
-            ).toLocaleString('vi-VN')}
-            đ cho cả bữa
+            Tổng giá ước tính: {estimatedMealTotalLabel}đ / ngân sách tối đa{' '}
+            {mealBudgetLabel}đ
           </Text>
         ) : null}
         {recommendations.length ? (
@@ -410,11 +373,9 @@ const AiMealRecommendationsScreen = () => {
           <Text style={styles.emptyText}>
             {state.recommendations?.consumedPeriods.includes(period)
               ? 'Đã ghi nhận bữa này.'
-              : state.recommendations?.mealBudgets?.[period]
-              ? `Chưa có món phù hợp với dinh dưỡng và ngân sách ${Math.round(
-                  state.recommendations.mealBudgets[period]!,
-                ).toLocaleString('vi-VN')}đ.`
-              : 'Chưa có món trong thư viện phù hợp với lượng dinh dưỡng còn lại.'}
+              : mealBudget !== undefined
+              ? `Chưa tìm thấy món phù hợp với calo còn lại và ngân sách ${mealBudgetLabel}đ.`
+              : 'Chưa tìm thấy món phù hợp cho bữa này. Thử đổi bữa hoặc cập nhật mục tiêu dinh dưỡng.'}
           </Text>
         )}
         {recommendations.length ? (

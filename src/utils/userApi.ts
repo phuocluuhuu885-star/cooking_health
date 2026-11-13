@@ -25,7 +25,9 @@ export type AvatarResponse = {
   success: boolean;
   message?: string;
   data?: {
-    user: Pick<UserInfo, 'id' | 'email' | 'fullName' | 'avatar'>;
+    user: Pick<UserInfo, 'id' | 'email' | 'fullName'> & {
+      avatar: string | null;
+    };
   };
 };
 

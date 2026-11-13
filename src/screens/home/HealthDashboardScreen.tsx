@@ -28,6 +28,7 @@ import { getUtcDateKey, getVietnamDateKey } from '../../utils/dateUtils';
 import { navigate } from '../../utils/navigation';
 import ScreenKeys from '../../utils/screenKey';
 import { setSyncUser, syncApi } from '../../utils/syncUtils';
+import { getBmiAssessment } from '../../utils/bmiAssessment';
 import type {
   AddWaterIntakeResponse,
   ConsumptionReportData,
@@ -215,6 +216,49 @@ const SectionCard = ({
     {children}
   </View>
 );
+
+const BmiAssessmentCard = ({
+  age,
+  bmi,
+}: {
+  age: number;
+  bmi: number;
+}) => {
+  const assessment = getBmiAssessment(age, bmi);
+  const palette = BMI_ASSESSMENT_PALETTE[assessment.tone];
+
+  return (
+    <View
+      style={[
+        styles.bmiAssessmentCard,
+        { backgroundColor: palette.background, borderColor: palette.border },
+      ]}
+    >
+      <View style={styles.bmiAssessmentHeader}>
+        <View style={styles.bmiAssessmentCopy}>
+          <Text style={styles.bmiAssessmentEyebrow}>ĐÁNH GIÁ THEO BMI</Text>
+          <Text style={[styles.bmiAssessmentLabel, { color: palette.text }]}>
+            {assessment.label}
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.bmiAssessmentValueBadge,
+            { backgroundColor: palette.badge },
+          ]}
+        >
+          <Text style={[styles.bmiAssessmentValue, { color: palette.text }]}>
+            {formatNumber(bmi, 1)}
+          </Text>
+          <Text style={[styles.bmiAssessmentUnit, { color: palette.text }]}>
+            BMI
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.bmiAssessmentRange}>{assessment.range}</Text>
+    </View>
+  );
+};
 
 const WeeklyCaloriesChart = ({
   days,
@@ -600,12 +644,19 @@ const HealthDashboardScreen = () => {
           </View>
         ) : null}
 
+        {healthProfile ? (
+          <BmiAssessmentCard
+            age={healthProfile.age}
+            bmi={healthProfile.bmi}
+          />
+        ) : null}
+
         <SectionCard
           title="Dinh dưỡng đã tiêu thụ"
           subtitle={
             state.calorieReport
-              ? `Món đã xác nhận · ${state.calorieReport.startDate} – ${state.calorieReport.endDate}`
-              : 'Chỉ tính các món đã ghi nhận là đã ăn'
+              ? `${state.calorieReport.startDate} – ${state.calorieReport.endDate}`
+              : ''
           }
         >
           {state.errors.nutrition ? (
@@ -986,6 +1037,39 @@ const COLORS = {
   danger: '#B42318',
 };
 
+const BMI_ASSESSMENT_PALETTE = {
+  low: {
+    background: '#F0F6FF',
+    border: '#C9DCF8',
+    badge: '#DCEAFF',
+    text: '#315B91',
+  },
+  healthy: {
+    background: '#EAF6EE',
+    border: '#B7DFC3',
+    badge: '#D2EED9',
+    text: '#17643D',
+  },
+  elevated: {
+    background: '#FFF7E8',
+    border: '#F0D49D',
+    badge: '#FCE9C3',
+    text: '#8A5A00',
+  },
+  obesity: {
+    background: '#FFF0EF',
+    border: '#F0C1BE',
+    badge: '#FAD9D6',
+    text: '#A1322B',
+  },
+  unknown: {
+    background: '#F2F5F3',
+    border: '#D7E0DB',
+    badge: '#E4EBE7',
+    text: '#54645B',
+  },
+} as const;
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -1032,6 +1116,48 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 10,
     backgroundColor: COLORS.white,
+  },
+  bmiAssessmentCard: {
+    padding: 16,
+    borderWidth: 1,
+    borderLeftWidth: 5,
+    borderRadius: 10,
+  },
+  bmiAssessmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  bmiAssessmentCopy: { flex: 1, gap: 5 },
+  bmiAssessmentEyebrow: {
+    color: COLORS.secondary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  bmiAssessmentLabel: { fontSize: 17, fontWeight: '800', lineHeight: 23 },
+  bmiAssessmentValueBadge: {
+    minWidth: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  bmiAssessmentValue: { fontSize: 19, fontWeight: '800' },
+  bmiAssessmentUnit: { fontSize: 9, fontWeight: '700' },
+  bmiAssessmentRange: {
+    marginTop: 10,
+    color: COLORS.text,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  bmiAssessmentNote: {
+    marginTop: 8,
+    color: COLORS.secondary,
+    fontSize: 10,
+    lineHeight: 15,
   },
   sectionTitle: { color: COLORS.text, fontSize: 16, fontWeight: '800' },
   sectionSubtitle: {

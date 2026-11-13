@@ -73,6 +73,8 @@ const CATEGORIES: Category[] = [
   { id: 'VEGETARIAN', title: 'Món chay' },
 ];
 
+const MEALS_PAGE_SIZE = 20;
+
 const getMealCategoryFilters = (selectedCategory: string) => ({
   ...(selectedCategory !== 'all' && selectedCategory !== 'VEGETARIAN'
     ? { category: selectedCategory }
@@ -161,12 +163,12 @@ const RecipeLibrary = () => {
           ? {
               q: state.search.trim(),
               page: 1,
-              limit: 100,
+              limit: MEALS_PAGE_SIZE,
               ...getMealCategoryFilters(state.selectedCategory),
             }
           : {
               page: 1,
-              limit: 100,
+              limit: MEALS_PAGE_SIZE,
               ...getMealCategoryFilters(state.selectedCategory),
             };
 
@@ -233,7 +235,7 @@ const RecipeLibrary = () => {
     const request = {
       ...(isSearch ? { q: state.search.trim() } : {}),
       page,
-      limit: 100,
+      limit: MEALS_PAGE_SIZE,
       ...getMealCategoryFilters(state.selectedCategory),
     };
     setState(previous => ({ ...previous, loadingMore: true }));
@@ -508,6 +510,10 @@ const RecipeLibrary = () => {
           mealId: selectedRecipe.id,
           date,
           mealPeriod,
+          servings:
+            destination === 'HOUSEHOLD'
+              ? Math.max(1, activeHousehold?.members.length ?? 1)
+              : 1,
         });
         if (!response?.success) {
           Alert.alert(

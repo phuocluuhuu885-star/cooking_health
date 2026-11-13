@@ -16,6 +16,7 @@ import { useSelector } from 'react-redux';
 import { AppImage } from '../../abase/component';
 import ScreenHeader from '../component/ScreenHeader';
 import HouseholdScopeSwitch from '../component/HouseholdScopeSwitch';
+import { useFullscreenAdOnFocus } from '../component/FullscreenAdProvider';
 import apiConst from '../../abase/constant/apiConst';
 import {
   invalidateCachedHouseholdMealPlan,
@@ -166,6 +167,7 @@ const getSelectedPlanPrice = (
   );
 
 const WeeklyMealPlanScreen = () => {
+  useFullscreenAdOnFocus();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);

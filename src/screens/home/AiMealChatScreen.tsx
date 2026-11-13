@@ -30,6 +30,7 @@ import type {
   MealPeriod,
 } from '../../utils/types';
 import ScreenHeader from '../component/ScreenHeader';
+import { useFullscreenAdOnFocus } from '../component/FullscreenAdProvider';
 
 type Message = {
   id: number;
@@ -154,6 +155,7 @@ const SuggestionCard = ({
 };
 
 const AiMealChatScreen = () => {
+  useFullscreenAdOnFocus();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const user = useSelector(selectUserInfo);

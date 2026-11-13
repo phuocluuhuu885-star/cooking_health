@@ -60,6 +60,7 @@ export type MealBudget = {
   id: string;
   mealPeriod: MealPeriod;
   limitVnd: number;
+  enabled: boolean;
   ownerUserId: string | null;
   householdId: string | null;
   updatedByUserId: string | null;

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "959573874332",
+    "project_id": "healthandcook-f4fd8",
+    "storage_bucket": "healthandcook-f4fd8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:959573874332:android:f95257860517d69bd13f59",
+        "android_client_info": {
+          "package_name": "com.mealcraft"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB01bRuapZP6P-uaN6G1GxmBF3p1Vl8fDs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
